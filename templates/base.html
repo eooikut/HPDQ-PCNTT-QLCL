@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Hệ Thống QC{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/qlcl.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {% block head %}{% endblock %}
+</head>
+<style>
+    /* CSS cho Toast Notification */
+    .toast-notification {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: #0f172a;
+        color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        display: none; /* Mặc định ẩn */
+        z-index: 9999;
+        animation: slideIn 0.3s ease-out;
+        border-left: 5px solid #16a34a;
+        max-width: 350px;
+    }
+    .toast-content { display: flex; align-items: center; gap: 15px; }
+    .toast-btn {
+        background: #16a34a; color: white; border: none; 
+        padding: 5px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;
+    }
+    .toast-btn:hover { background: #15803d; }
+    .notification-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+.notification-badge {
+    position: absolute;
+    top: -5px;
+    right: -8px; /* Chỉnh vị trí chấm đỏ */
+    background-color: #ef4444; /* Màu đỏ */
+    color: white;
+    font-size: 0.7em;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+    border: 2px solid white; /* Viền trắng cho nổi */
+    display: none; /* Mặc định ẩn */
+    animation: popIn 0.3s ease;
+}
+    @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+</style>
+<body>
+
+<div id="updateToast" class="toast-notification">
+    <div class="toast-content">
+        <div>
+            <div style="font-weight:bold; margin-bottom:2px;">🔔 Dữ liệu mới!</div>
+            <div id="toastMsg" style="font-size:0.9em; color:#cbd5e1;">Hệ thống vừa cập nhật cuộn thép mới.</div>
+        </div>
+        <button class="toast-btn" onclick="location.reload()">F5 Ngay</button>
+        <button class="btn-reset" onclick="closeToast()" style="color:#94a3b8; margin-left:5px;">✕</button>
+    </div>
+</div>
+
+<div class="app-container">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2>🏭 QC SYSTEM</h2>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <a href="/qlcl" class="nav-item {{ 'active' if request.endpoint == 'qlcl' else '' }}">
+                <span class="icon">📊</span> Dashboard QC
+            </a>
+            
+            <div class="nav-divider">QUẢN LÝ ĐƠN HÀNG</div>
+            
+            <a href="/tdc_manager" class="nav-item {{ 'active' if request.endpoint == 'tdc_manager' else '' }}">
+                <span class="icon">📑</span> Quản lý TDC
+            </a>
+            <a href="/allocation_run" class="nav-item {{ 'active' if request.endpoint == 'allocation_run' else '' }}">
+                <span class="icon">🚀</span> Chạy Phân Bổ
+            </a>
+            <a href="/allocation_history" class="nav-item {{ 'active' if request.endpoint == 'allocation_history' else '' }}">
+                <span class="icon">📦</span> Lịch sử Mapping
+            </a>
+
+            <div class="nav-divider">HỆ THỐNG</div>
+            <a href="#" class="nav-item" onclick="openLogModal()">
+                <span class="icon">🔔</span> Thông báo
+            </a>
+
+            <div class="nav-divider">CẤU HÌNH</div>
+
+            <a href="/config_page" class="nav-item {{ 'active' if request.endpoint == 'config_page' else '' }}">
+                <span class="icon">⚙️</span> Cấu hình Mác Thép
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <span>👤 Admin User</span>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+</div>
+
+<div id="logModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; justify-content:center; align-items:center;">
+    <div style="background:white; width:600px; height:80vh; border-radius:8px; display:flex; flex-direction:column; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+        
+        <div style="padding:15px 20px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; color:#1e293b;">📜 Lịch sử Hoạt động Hệ thống</h3>
+            <div style="display:flex; gap:10px;">
+                <button onclick="fetchLogs()" class="btn-reset" title="Làm mới">↻</button>
+                <button onclick="document.getElementById('logModal').style.display='none'" class="btn-reset" style="font-size:1.5em;">✕</button>
+            </div>
+        </div>
+        
+        <div style="flex:1; overflow-y:auto; padding:0;" id="logListBody">
+            </div>
+        
+        <div style="padding:10px; background:#f8fafc; text-align:center; color:#64748b; font-size:0.85em; border-top:1px solid #eee;">
+            Hiển thị 50 thông báo gần nhất
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- A. LOGIC HIỂN THỊ TOAST (POLLING) ---
+    // (Phần này đang thiếu trong file của bạn)
+    let localLastUpdate = 0;
+
+    // Lấy thời gian update hiện tại khi mới vào trang
+    fetch('/api/check_new_data')
+        .then(r => r.json())
+        .then(d => { localLastUpdate = d.timestamp; })
+        .catch(e => console.log("Init check failed", e));
+
+    // Định kỳ 10 giây hỏi server 1 lần
+    setInterval(() => {
+        fetch('/api/check_new_data')
+            .then(r => r.json())
+            .then(data => {
+                // Nếu server có thời gian mới hơn -> Hiện Toast
+                if (data.timestamp > localLastUpdate) {
+                    localLastUpdate = data.timestamp;
+                    showToast(data.message);
+                }
+            })
+            .catch(e => console.log("Check update error", e));
+    }, 10000); // 10s
+
+    function showToast(msg) {
+        const t = document.getElementById('updateToast');
+        if (msg) document.getElementById('toastMsg').innerText = msg;
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 10000); // Tự tắt sau 10s
+    }
+
+    function closeToast() {
+        document.getElementById('updateToast').style.display = 'none';
+    }
+
+    // --- B. LOGIC MODAL LỊCH SỬ ---
+    function openLogModal() {
+        document.getElementById('logModal').style.display = 'flex';
+        fetchLogs();
+    }
+
+    async function fetchLogs() {
+        const div = document.getElementById('logListBody');
+        div.innerHTML = '<div style="padding:20px; text-align:center;">⏳ Đang tải...</div>';
+        
+        try {
+            const res = await fetch('/api/get_system_logs');
+            const logs = await res.json();
+            
+            if (logs.length === 0) {
+                div.innerHTML = '<div style="padding:40px; text-align:center; color:#94a3b8;">Chưa có thông báo nào.</div>';
+                return;
+            }
+
+            let html = '';
+            logs.forEach(log => {
+                let icon = 'ℹ️';
+                let bg = '#f1f5f9';
+                if (log.type === 'success') { icon = '✅'; bg = '#f0fdf4'; }
+                if (log.type === 'warning') { icon = '⚠️'; bg = '#fffbeb'; }
+                if (log.type === 'error')   { icon = '❌'; bg = '#fef2f2'; }
+
+                html += `
+                <div style="padding:12px 20px; border-bottom:1px solid #f1f5f9; display:flex; gap:15px; align-items:start; transition:0.2s; hover:background:#f8fafc;">
+                    <div style="background:${bg}; width:35px; height:35px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-size:1.1em; flex-shrink:0;">
+                        ${icon}
+                    </div>
+                    <div style="flex:1;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                            <span style="font-weight:700; color:#334155;">${log.title || 'Thông báo'}</span>
+                            <span style="font-size:0.8em; color:#94a3b8;">${log.time}</span>
+                        </div>
+                        <div style="font-size:0.95em; color:#475569; line-height:1.4;">
+                            ${log.message}
+                        </div>
+                    </div>
+                </div>`;
+            });
+            div.innerHTML = html;
+        } catch(e) {
+            div.innerHTML = `<div style="padding:20px; text-align:center; color:red;">Lỗi: ${e}</div>`;
+        }
+    }
+
+    // Khởi tạo bảng log (nếu chưa có)
+    fetch('/api/init_log_table');
+</script>
+
+{% block scripts %}
+{% endblock %}
+
+</body>
+</html>

@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard QC{% endblock %}
+
+{% block content %}
+<div id="loadingOverlay" class="loading-overlay"><div class="spinner"></div><h3>Đang xử lý...</h3></div>
+
+<div class="app-header">
+    <div class="app-title-row">
+        <div class="app-info" style="display:flex; align-items:center; gap:15px;">
+            <div>
+                <h1>DASHBOARD QC</h1>
+                <span class="time-badge">Dữ liệu: {{ data['time_range'] if data['has_data'] else '---' }}</span>
+            </div>
+            
+            <div style="margin-left: 20px;">
+                <label style="font-size:0.8em; font-weight:bold; color:#64748b;">Mác thép hiện tại:</label>
+                <select id="globalGradeSelect" 
+                        data-current="{{ current_grade }}"  onchange="changeGlobalGrade()" 
+                        style="...">
+                    <option value="{{ current_grade }}">{{ current_grade }}</option>
+                </select>
+            </div>
+        </div>
+        <div class="header-actions" style="display:none;"></div>
+    </div>
+
+    <div class="upload-container">
+        <div class="upload-box" style="border: 2px dashed #f59e0b; background: #fffbeb;">
+            <div class="upload-label" style="color: #b45309; display:flex; justify-content:space-between;">
+                <span>🚀 Quét Batch (Nhiều ID)</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:5px; margin-top:5px;">
+                <textarea id="txtBatchCoils" rows="3" placeholder="Nhập ID" 
+                        style="width:100%; padding:8px; border:1px solid #fcd34d; border-radius:4px; font-weight:bold; outline:none; resize:vertical; font-family:monospace;"></textarea>
+                
+                <div style="display:flex; justify-content:flex-end;">
+                    <button class="btn-upload" onclick="triggerBatchSync()" style="background:#f59e0b; width:auto; padding:5px 20px;">
+                        ⚡ Quét Ngay
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="upload-box">
+            <div class="upload-label">1. Bề mặt</div>
+            <div style="display:flex; gap:5px;">
+                <div class="upload-btn-wrapper" style="flex:1; position: relative; overflow: hidden;">
+                    <button class="btn-upload btn-surf">📄 Upload Excel</button>
+                    <input type="file" id="fSurf" onchange="upAjax('/upload_surface','fSurf')" style="position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;">
+                </div>
+                <button class="btn-delete" onclick="deleteData('geo')" title="Xóa">🗑️</button>
+            </div>
+        </div>
+        <div class="upload-box">
+            <div class="upload-label">2. Hình Học</div>
+            <div style="display:flex; gap:5px;">
+                <div class="upload-btn-wrapper" style="flex:1; position: relative; overflow: hidden;">
+                    <button class="btn-upload btn-geo">📐 Upload Excel</button>
+                    <input type="file" id="fGeo" onchange="upAjax('/upload_geometry','fGeo')" style="position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;">
+                </div>
+                <button class="btn-delete" onclick="deleteData('geo')" title="Xóa">🗑️</button>
+            </div>
+        </div>
+        <div class="upload-box">
+            <div class="upload-label">3. Cơ/Lý/Hóa</div>
+            <div style="display:flex; gap:5px;">
+                <div class="upload-btn-wrapper" style="flex:1; position: relative; overflow: hidden;">
+                    <button class="btn-upload btn-prop">🧪 Upload Excel</button>
+                    <input type="file" id="fProp" onchange="upAjax('/upload_properties','fProp')" style="position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;">
+                </div>
+                <button class="btn-delete" onclick="deleteData('prop')" title="Xóa">🗑️</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% if msg %}
+<div style="padding:15px; border-radius:8px; margin-bottom:20px; text-align:center; font-weight:600; background: {{ '#dcfce7' if 'thành công' in msg else '#fee2e2' }}; color: {{ '#166534' if 'thành công' in msg else '#991b1b' }};">
+    {{ msg }}
+</div>
+{% endif %}
+
+{% if data['has_data'] %}
+<div class="nav-container">
+    <div class="group-nav">
+        <button class="group-btn g-sum active" onclick="switchGroup('SUMMARY')">📊 Tổng Hợp</button>
+        <button class="group-btn g-input" onclick="switchGroup('INPUT')" style="color:#7c3aed;">📝 Nhập Liệu</button>
+        <button class="group-btn g-surf" onclick="switchGroup('SURFACE')">🔍 Bề Mặt <span class="badge">{{ menu['surface']|length }}</span></button>
+        <button class="group-btn g-geo" onclick="switchGroup('GEOMETRY')">📐 Hình Học <span class="badge">{{ menu['geometry']|length }}</span></button>
+        <button class="group-btn g-prop" onclick="switchGroup('PROP')">🧪 Cơ/Lý/Hóa <span class="badge">{{ menu['prop']|length }}</span></button>
+    </div>
+
+    <div class="sub-nav-container">
+        <div id="grp_SUMMARY" class="sub-group show">
+            <span style="color:#64748b; font-style:italic; font-size:0.9em;">Báo cáo tổng quan toàn bộ dữ liệu</span>
+        </div>
+        <div id="grp_SURFACE" class="sub-group">
+            {% for name in menu['surface'] %}
+            <button class="tab-btn" onclick="openTab(event, '{{name}}')">{{name}} {% if name in data.get('custom_configs', {}) %}<span class="tab-close" onclick="delCfg(event,'{{name}}')">✕</span>{% endif %}</button>
+            {% endfor %}
+        </div>
+        <div id="grp_GEOMETRY" class="sub-group">
+            {% for name in menu['geometry'] %}
+            <button class="tab-btn" onclick="openTab(event, '{{name}}')">{{name}}</button>
+            {% endfor %}
+        </div>
+        <div id="grp_PROP" class="sub-group">
+            {% for name in menu['prop'] %}
+            <button class="tab-btn" onclick="openTab(event, '{{name}}')">{{name}}</button>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div id="SUMMARY_TAB" class="tab-content" style="display:none">
+    <div class="card-panel">
+        <div class="summary-grid">
+            <div class="summary-stats" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="stat-card" style="grid-column: 1 / -1; background:#f8fafc;">
+                    <span class="stat-num" id="totalCoils">0</span> <span class="stat-label">Tổng Số Cuộn</span>
+                </div>
+                <div class="stat-card clickable-card" onclick="filterSummaryTable('FULL')" style="grid-column: 1 / -1; border-left: 5px solid #16a34a; background:#f0fdf4;">
+                    <span class="stat-num" id="cntFull" style="color:#15803d">0</span> <span class="stat-label">✅ Đủ 3 Nguồn</span>
+                </div>
+                <div class="stat-card clickable-card" onclick="filterSummaryTable('GEO_PROP')" style="border-left: 4px solid #0ea5e9;">
+                    <span class="stat-num" id="cntGeoProp" style="color:#0284c7">0</span> <span class="stat-label">Hình học + TPHH</span>
+                </div>
+                <div class="stat-card clickable-card" onclick="filterSummaryTable('SURF_GEO')" style="border-left: 4px solid #f59e0b;">
+                    <span class="stat-num" id="cntSurfGeo" style="color:#d97706">0</span> <span class="stat-label">Bề mặt + Hình học</span>
+                </div>
+                <div class="stat-card clickable-card" onclick="filterSummaryTable('SURF_PROP')" style="border-left: 4px solid #8b5cf6;">
+                    <span class="stat-num" id="cntSurfProp" style="color:#7c3aed">0</span> <span class="stat-label">Bề mặt + TPHH</span>
+                </div>
+                <div class="stat-card clickable-card" onclick="filterSummaryTable('MISSING')" style="border-left: 4px solid #dc2626; background:#fef2f2;">
+                    <span class="stat-num" id="cntMissing" style="color:#b91c1c">0</span> <span class="stat-label">Dữ liệu sơ sài</span>
+                </div>
+            </div>
+            <div class="radar-container">
+                <div class="radar-box"><h4>Trung Bình Bề Mặt</h4><div style="position:relative; height:350px; width:100%;"><canvas id="avgSurf"></canvas></div></div>
+                <div class="radar-box"><h4>Trung Bình Hình Học</h4><div style="position:relative; height:350px; width:100%;"><canvas id="avgGeo"></canvas></div></div>
+                <div class="radar-box"><h4>Trung Bình Cơ/Lý/Hóa</h4><div style="position:relative; height:350px; width:100%;"><canvas id="avgProp"></canvas></div></div>
+                <div class="radar-box"><h4>Trung Bình Ngoại Quan</h4><div style="position:relative; height:350px; width:100%;"><canvas id="avgApp"></canvas></div></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card-panel">
+        <h3 id="tableTitle" style="text-transform: uppercase; color:#334155; border-bottom:2px solid #f1f5f9; padding-bottom:10px;">DANH SÁCH CUỘN</h3>
+        <div class="filter-tools" style="margin-bottom:15px; background:#f8fafc; padding:10px; border-radius:6px; border:1px solid #e2e8f0; display:flex; gap:15px; align-items:center; flex-wrap:wrap;">
+            <select id="f_surf" onchange="applyFilters()" class="filter-select-sm" style="background:#fef2f2;color:#dc2626;border-color:#fca5a5"><option value="ALL">Bề Mặt: Tất cả</option><option value="YES">✅ Có Bề Mặt</option><option value="NO">❌ Thiếu Bề Mặt</option></select>
+            <select id="f_geo" onchange="applyFilters()" class="filter-select-sm" style="background:#f0f9ff;color:#0284c7;border-color:#bae6fd"><option value="ALL">Hình Học: Tất cả</option><option value="YES">✅ Có Hình Học</option><option value="NO">❌ Thiếu Hình Học</option></select>
+            <select id="f_prop" onchange="applyFilters()" class="filter-select-sm" style="background:#f0fdf4;color:#16a34a;border-color:#bbf7d0"><option value="ALL">Cơ/Lý: Tất cả</option><option value="YES">✅ Có Cơ/Lý</option><option value="NO">❌ Thiếu Cơ/Lý</option></select>
+            <select id="f_app" onchange="applyFilters()" class="filter-select-sm" style="background:#f3e8ff;color:#7e22ce;border-color:#d8b4fe"><option value="ALL">Ngoại quan: Tất cả</option><option value="YES">✅ Có Ngoại quan</option><option value="NO">❌ Thiếu Ngoại quan</option></select>
+            <div style="flex:1; display:flex; justify-content:flex-end; gap:5px;">
+                <input type="text" id="s_full" onkeyup="applyFilters()" placeholder="🔍 Tìm ID cuộn..." style="padding:8px; border:1px solid #ccc; border-radius:4px; width: 200px;">
+                <button onclick="resetFilters()" class="btn-reset" title="Xóa bộ lọc" style="padding:8px 12px; font-weight:bold;">↺</button>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="table-standard">
+                <thead>
+                    <tr>
+                        <th>STT</th>
+                        <th>Cuộn</th>
+                        <th>Mác thép</th> 
+                        <th>Loại</th>
+                        <th>Chi tiết</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody_full"></tbody>
+            </table>
+        </div>
+        <div style="margin-top:10px; text-align:right;">
+            <button class="btn-reset" onclick="changeFullPage(-1)">❮</button> <span id="pinfo_full"></span> <button class="btn-reset" onclick="changeFullPage(1)">❯</button>
+        </div>
+    </div>
+</div>
+
+<div id="INPUT_TAB" class="tab-content" style="display:none">
+    <div class="input-layout">
+        <div class="input-sidebar">
+            <div class="input-search">
+                <input type="text" id="inputSearch" onkeyup="INPUT_PAGE=1; renderInputList()" placeholder="🔍 Quét mã cuộn..." style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+            </div>
+            <div id="inputListContainer" class="input-list"></div>
+            <div class="sidebar-pagination" style="padding:10px; border-top:1px solid #eee; text-align:center;">
+                <button class="btn-reset" onclick="changeInputPage(-1)">❮</button>
+                <span id="inputPageInfo" style="font-weight:600; font-size:0.9em; color:#475569">--/--</span>
+                <button class="btn-reset" onclick="changeInputPage(1)">❯</button>
+            </div>
+        </div>
+        <div class="input-preview">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
+                <div><h2 id="lblInputCoil" style="margin:0; color:#0f172a; font-size:1.5rem;">---</h2><small style="color:#64748b;">💡 Click trực tiếp lên trục biểu đồ để chấm điểm.</small></div>
+                <div style="display:flex; gap:10px;">
+                    <button onclick="resetCurrentInput()" class="btn-reset" style="padding:10px 15px;">↺ Reset</button>
+                    <button onclick="saveManualData()" style="background:#16a34a; color:white; border:none; padding:10px 30px; border-radius:6px; font-weight:bold; cursor:pointer;">💾 LƯU</button>
+                </div>
+            </div>
+            <div id="inputEmpty" style="text-align:center; color:#999; margin-top:100px;"><h2>👈 Chọn cuộn để nhập liệu</h2></div>
+            <div id="radarInputArea" class="radar-live-grid" style="display:none;">
+                <div class="mini-radar-box"><div class="radar-title">1. BỀ MẶT</div><div class="radar-canvas-wrap"><canvas id="chartInSurf"></canvas></div></div>
+                <div class="mini-radar-box"><div class="radar-title">2. KÍCH THƯỚC</div><div class="radar-canvas-wrap"><canvas id="chartInGeo"></canvas></div></div>
+                <div class="mini-radar-box"><div class="radar-title">3. CƠ/LÝ/HÓA</div><div class="radar-canvas-wrap"><canvas id="chartInProp"></canvas></div></div>
+                <div class="mini-radar-box"><div class="radar-title">4. NGOẠI QUAN</div><div class="radar-canvas-wrap"><canvas id="chartInApp"></canvas></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% for name, tab in data['tabs'].items() %}
+<div id="{{name}}" class="tab-content">
+    <div class="card-panel">
+        <div class="header-row"><h2>PHÂN BỐ {{ name }}</h2></div>
+        <div class="heatmap-container">
+            <table class="table-heatmap">
+                <tbody>
+                    {% for row in tab['matrix'] %}
+                    <tr>
+                        <td class="row-header">{{row['SizeName']}}</td>
+                        {% for cell in row['Cells'] %}
+                        <td {% if cell['Count'] > 0 %} class="clickable-cell" onclick="showModal('{{cell['CoilList']}}', 'Chi tiết nhóm lỗi')" {% endif %}>
+                            {% if cell['Count'] > 0 %}
+                            <div class="cell-box bg-{{cell['Class']}}"><span class="cell-label">{{cell['Class']}}</span><span class="cell-val">{{cell['Count']}}</span><span class="cell-pct">{{cell['Percent']}}%</span></div>
+                            {% else %}<div class="cell-box bg-empty">-</div>{% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot><tr><td></td>{% for h in tab['col_headers'] %}<td class="col-footer">Nhóm {{h}}</td>{% endfor %}</tr></tfoot>
+            </table>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 350px 1fr; gap: 20px;">
+        <div class="card-panel" style="margin-bottom:0; display:flex; flex-direction:column;">
+            <div class="header-row"><h2>Tỉ lệ Phân Bố</h2></div>
+            <div class="table-wrapper" style="flex:1; max-height:400px; border:none; box-shadow:none;">
+                <table class="table-standard">
+                    <thead><tr><th>Loại</th><th>SL</th><th>%</th></tr></thead>
+                    <tbody>
+                        {% for r in tab['summary'] %}
+                        <tr>
+                            <td><span class="badge type-{{r['Loại']}}">{{r['Loại']}}</span></td>
+                            <td><b>{{r['Số Cuộn']}}</b></td>
+                            <td>{{r['Tỉ lệ']}}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div style="text-align:center; padding:15px; font-weight:bold; color:#64748b; border-top:1px solid #f1f5f9; background:#f8fafc; border-radius:0 0 8px 8px;">
+                Tổng cộng: <span style="color:#0f172a; font-size:1.1em">{{ tab['total'] }}</span> cuộn
+            </div>
+        </div>
+
+        <div class="card-panel" style="margin-bottom:0;">
+            <div class="header-row">
+                <h2>Chi tiết {{name}}</h2>
+                <div class="filter-tools">
+                    <input type="text" id="s_{{name}}" onkeyup="renderTabList('{{name}}')" placeholder="Tìm ID..." class="filter-input-sm">
+                    <select id="f_{{name}}" onchange="renderTabList('{{name}}')" class="filter-select-sm">
+                        <option value="all">Tất cả</option>
+                        <option value="C6">C6</option>
+                        <option value="C5">C5</option>
+                        <option value="C4">C4</option>
+                        <option value="C3">C3</option>
+                        <option value="C2">C2</option>
+                        <option value="C1">C1</option>
+                    </select>
+                </div>
+            </div>
+            <div class="table-wrapper">
+                <table class="table-standard">
+                    <thead>
+                        <tr>
+                            <th>STT</th>
+                            <th>Cuộn</th>
+                            <th>Mác thép</th> <th>Loại</th>
+                            <th>Chi tiết</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody_{{name}}"></tbody>
+                </table>
+            </div>
+            <div class="table-controls" style="padding:10px; display:flex; justify-content:space-between; align-items:center;">
+                <button class="btn-reset" onclick="changeTabPage('{{name}}',-1)">❮</button> 
+                <span id="pinfo_{{name}}" style="font-weight:600; font-size:0.9em">...</span> 
+                <button class="btn-reset" onclick="changeTabPage('{{name}}',1)">❯</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<div id="detailModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-header"><span class="modal-title" id="modalTitle">Chi tiết cuộn</span><span class="close-btn" onclick="closeModal()">✕</span></div>
+        <div class="modal-body">
+            <div class="modal-left">
+                <input type="text" id="modalSearch" onkeyup="filterModalList()" placeholder="🔍 Tìm mã cuộn..." style="width:100%; padding:8px; margin-bottom:10px; border:1px solid #ccc; border-radius:4px;">
+                <div class="coil-list-wrapper" style="flex:1; overflow-y:auto;"><div id="modalList"></div></div>
+                <div style="margin-top:10px; display:flex; justify-content:space-between;">
+                    <button class="btn-reset" onclick="changeModalPage(-1)">❮</button><span id="modalPageInfo">--/--</span><button class="btn-reset" onclick="changeModalPage(1)">❯</button>
+                </div>
+            </div>
+            <div class="modal-right">
+                <div id="emptyView" class="empty-state"><div class="empty-icon">👈</div><h3>Vui lòng chọn cuộn</h3></div>
+                <div id="radarView" style="display:none; height:100%;">
+                    <div class="radar-live-grid">
+                        <div class="mini-radar-box"><div class="radar-title">1. BỀ MẶT</div><div class="radar-canvas-wrap"><canvas id="chartModalSurf"></canvas></div></div>
+                        <div class="mini-radar-box"><div class="radar-title">2. HÌNH HỌC</div><div class="radar-canvas-wrap"><canvas id="chartModalGeo"></canvas></div></div>
+                        <div class="mini-radar-box"><div class="radar-title">3. CƠ/LÝ/HÓA</div><div class="radar-canvas-wrap"><canvas id="chartModalProp"></canvas></div></div>
+                        <div class="mini-radar-box"><div class="radar-title">4. NGOẠI QUAN</div><div class="radar-canvas-wrap"><canvas id="chartModalApp"></canvas></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="scoreInputPopup" class="score-popup" style="display:none;">
+    <div class="popup-header">
+        <span id="popupTitle" style="font-weight:bold;">Tên Lỗi</span>
+        <span onclick="closePopup()" style="cursor:pointer; float:right;">✕</span>
+    </div>
+    <div class="popup-body">
+        <label>Chọn điểm:</label>
+        <div class="score-buttons">
+            <button onclick="setPopupScore(0)" class="btn-score s0">0</button>
+            <button onclick="setPopupScore(1)" class="btn-score s1">C1</button>
+            <button onclick="setPopupScore(2)" class="btn-score s2">C2</button>
+            <button onclick="setPopupScore(3)" class="btn-score s3">C3</button>
+            <button onclick="setPopupScore(4)" class="btn-score s4">C4</button>
+            <button onclick="setPopupScore(5)" class="btn-score s5">C5</button>
+            <button onclick="setPopupScore(6)" class="btn-score s6">C6</button>
+        </div>
+        <div style="margin-top:10px; display:flex; gap:5px;">
+            <input type="number" id="manualScoreInput" min="0" max="6" step="0.5" placeholder="Nhập số..." style="width:60px; padding:5px;">
+            <button onclick="confirmPopupScore()" style="flex:1; background:#16a34a; color:white; border:none; border-radius:4px;">Cập Nhật</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+    // Chỉ giữ lại các biến cần Jinja2 truyền vào
+    const RADAR_DATA = {{ radar_data | tojson | default({}) }};
+    const TABLE_DATA = {};
+    const TAB_PAGING = {};
+    
+    {% if data['has_data'] %}
+        {% for name, tab in data['tabs'].items() %}
+            TABLE_DATA['{{name}}'] = {{ tab['details'] | tojson }};
+            TAB_PAGING['{{name}}'] = { page: 1, data: TABLE_DATA['{{name}}'] };
+        {% endfor %}
+    {% endif %}
+
+    window.addEventListener('load', () => {
+        {% if data['has_data'] %}
+        calculateSummary(); // Hàm này nằm trong qlcl.js
+        switchGroup('SUMMARY');
+        {% endif %}
+    });
+</script>
+<script src="{{ url_for('static', filename='js/qlcl.js') }}"></script>
+{% endblock %}

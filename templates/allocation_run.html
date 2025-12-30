@@ -1,0 +1,635 @@
+{% extends "base.html" %}
+
+{% block title %}Lịch sử Phân Bổ{% endblock %}
+
+{% block head %}
+    <style>
+        /* === RESET & LAYOUT CƠ BẢN === */
+        body { background: #f8fafc; font-family: 'Inter', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; margin: 0; }
+        
+        /* Layout chia cột: Trái (360px) - Phải (Auto) */
+        .run-layout { display: grid; grid-template-columns: 360px 1fr; gap: 20px; padding: 20px; flex: 1; overflow: hidden; min-height: 0; }
+        
+        .panel { 
+            background: white; border: 1px solid #e2e8f0; border-radius: 12px; 
+            display: flex; flex-direction: column; overflow: hidden; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); 
+            height: 100%; /* Quan trọng để scroll hoạt động */
+        }
+        
+        /* === STYLE CỘT TRÁI (TDC CONFIG) === */
+        .tdc-select-item { padding: 12px 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: 0.2s; border-left: 4px solid transparent; }
+        .tdc-select-item:hover { background: #f8fafc; }
+        .tdc-select-item.selected { background: #eff6ff; border-left-color: #3b82f6; }
+        
+        /* Form nhập Số lượng & Tấn (Hiện ra khi chọn) */
+        .tdc-config-area {
+            margin-top: 10px; padding-top: 10px; border-top: 1px dashed #cbd5e1;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+            animation: fadeIn 0.3s ease;
+        }
+        .input-wrapper { display: flex; flex-direction: column; gap: 4px; }
+        .input-wrapper label { font-size: 0.75em; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        .input-wrapper input {
+            width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px;
+            font-weight: bold; color: #0f172a; text-align: center; font-size: 0.9em;
+            transition: 0.2s;
+        }
+        .input-wrapper input:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+
+        /* === STYLE CỘT PHẢI (KẾT QUẢ) === */
+        .table-container { flex: 1; overflow: auto; position: relative; }
+        .result-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 900px; } /* Min-width để không bị bóp méo */
+        
+        .result-table th { 
+            background: #f8fafc; color: #475569; padding: 12px 16px; 
+            font-weight: 700; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.5px;
+            position: sticky; top: 0; z-index: 10; border-bottom: 2px solid #e2e8f0; 
+        }
+        .result-table td { border-bottom: 1px solid #f1f5f9; padding: 10px 16px; vertical-align: middle; }
+        .result-table tr:hover { background-color: #f8fafc; }
+        .result-table tr.row-selected { background-color: #eff6ff !important; }
+        .result-table th:last-child {
+            text-align: center; 
+        }
+        /* === RADAR NẰM NGANG === */
+       .radar-wrapper { 
+            display: flex; 
+            align-items: center; 
+            gap: 25px; /* Tăng khoảng cách giữa các biểu đồ lên chút cho thoáng */
+            padding: 5px 0; 
+            justify-content: center; /* <--- QUAN TRỌNG: Căn giữa các item con */
+            width: 100%; /* Đảm bảo wrapper chiếm hết chiều rộng ô */
+        }
+        .radar-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+        
+        /* Box chứa SVG Radar - Tinh chỉnh size chuẩn */
+        .mini-radar-box { 
+            width: 90px; height: 90px; /* Tăng từ 80 lên 90 hoặc 100 tùy thích */
+            position: relative; display: flex; align-items: center; justify-content: center;
+            transition: transform 0.2s;
+        }
+        .mini-radar-box svg {
+            width: 100%; height: 100%; /* SVG co giãn theo box */
+            overflow: visible; /* Để điểm tròn không bị cắt */
+        }
+        .mini-radar-box:hover { transform: scale(1.15); z-index: 5; }
+        .mini-chart-label { font-size: 9px; color: #94a3b8; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
+
+        /* === CÁC THÀNH PHẦN KHÁC === */
+        .coil-main { display: flex; flex-direction: column; }
+        .coil-id { font-size: 1em; font-weight: 700; color: #2563eb; font-family: monospace; }
+        .coil-meta { font-size: 0.85em; color: #64748b; display: flex; gap: 8px; margin-top: 2px; align-items: center; }
+        .meta-tag { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 0.85em; color: #475569; }
+        
+        .status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 0.8em; font-weight: 700; white-space: nowrap; }
+        .st-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .st-warning { background: #fff7ed; color: #9a3412; border: 1px solid #ffedd5; }
+        
+        .defect-pill { display: inline-block; font-size: 0.75em; padding: 2px 6px; border-radius: 4px; background: #fef2f2; color: #dc2626; border: 1px solid #fee2e2; margin-right: 4px; font-weight: 600; margin-bottom: 2px; }
+        .custom-chk { width: 18px; height: 18px; accent-color: #2563eb; cursor: pointer; }
+        
+        /* Modal & Animations */
+        .chart-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: none; justify-content: center; align-items: center; }
+        .chart-box { background: white; width: 90%; max-width: 1000px; height: 80vh; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; }
+        .chart-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; flex: 1; min-height: 0; }
+        .chart-container { position: relative; border: 1px solid #eee; border-radius: 8px; padding: 10px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+{% endblock %}
+
+
+
+{% block content %}
+<div class="app-header" style="margin:0; border-radius:0; flex-shrink:0;">
+    <div class="app-title-row" style="border:none; margin:0; padding:0;">
+        <h1>🚀 CHẠY PHÂN BỔ ĐƠN HÀNG</h1>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <button onclick="initDB()" class="btn-reset" style="font-size:0.8em; opacity:0.7; padding:5px 10px;">🛠️ Fix DB</button>
+            <a href="/allocation_history" class="btn-upload" style="background:#f59e0b; text-decoration:none; color:white; display:flex; align-items:center; gap:5px; font-weight:bold;">📦 Lịch sử & Gỡ đơn</a>
+            <a href="/tdc_manager" class="btn-upload btn-geo" style="text-decoration:none;">⚙️ Quản lý TDC</a>
+            <a href="/qlcl" class="btn-reset">⬅️ Dashboard</a>
+        </div>
+    </div>
+</div>
+
+<div class="run-layout">
+    <div class="panel">
+        <div style="padding:15px; border-bottom:1px solid #eee; font-weight:bold; color:#334155; background:#f8fafc; display:flex; justify-content:space-between; align-items:center;">
+            <span>1. THƯ VIỆN TDC</span>
+            <button onclick="loadTDCList()" class="btn-reset" title="Tải lại">↻</button>
+        </div>
+        <div style="flex:1; overflow-y:auto;" id="tdcList"></div>
+        <div style="padding:15px; border-top:1px solid #eee; background:#fff;">
+            <button onclick="runSelectedTDC()" class="btn-upload btn-prop" style="width:100%; padding:12px; font-size:1em; display:flex; align-items:center; justify-content:center; gap:8px;">
+                🔍 TÌM ỨNG VIÊN
+            </button>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div style="padding:15px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; background:#fff;">
+            <div>
+                <h3 style="margin:0; color:#1e293b; font-size:1.1em;">2. KẾT QUẢ ĐỀ XUẤT</h3>
+                <div id="selectionStatus" style="font-size:0.9em; color:#64748b; margin-top:3px;">Chưa chọn đơn hàng nào</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:15px;">
+                <span id="resCount" style="color:#64748b; font-weight:600; font-size:0.95em;"></span>
+                <button id="btnConfirm" onclick="confirmMapping()" class="btn-upload btn-surf" style="display:none; background:#ea580c; border:none; padding:8px 20px; font-weight:bold;">
+                    💾 CHỐT MAPPING
+                </button>
+            </div>
+        </div>
+        <div class="table-container">
+           <table class="result-table">
+                <thead>
+                    <tr>
+                        <th width="50" style="text-align:center;">Chọn</th>
+                        <th width="50" style="text-align:center;">#</th>
+                        <th width="120">Khách hàng</th>
+                        <th width="200">Mã Cuộn / Quy cách</th>
+                        <th width="200">Trạng thái Chất lượng</th>
+                        <th>Biểu đồ trực quan (Radar)</th> </tr>
+                </thead>
+                <tbody id="resBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="compareModal" class="chart-modal" onclick="closeModal(event)">
+    <div class="chart-box" onclick="event.stopPropagation()">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h2 id="modalTitle" style="margin:0; color:#1e293b;">So sánh Chi tiết</h2>
+            <button onclick="document.getElementById('compareModal').style.display='none'" class="btn-reset" style="font-size:1.5em;">✕</button>
+        </div>
+        <div class="chart-grid">
+            <div class="chart-container"><h4 style="text-align:center; color:#dc2626;">Bề Mặt</h4><div style="height:90%"><canvas id="cmpSurf"></canvas></div></div>
+            <div class="chart-container"><h4 style="text-align:center; color:#2563eb;">Kích Thước</h4><div style="height:90%"><canvas id="cmpGeo"></canvas></div></div>
+            <div class="chart-container"><h4 style="text-align:center; color:#16a34a;">Cơ/Lý/Hóa</h4><div style="height:90%"><canvas id="cmpProp"></canvas></div></div>
+        </div>
+        <div style="text-align:center; margin-top:10px; font-size:0.9em; color:#64748b;">
+            <span style="color:#16a34a; font-weight:bold; border-bottom:2px dashed #16a34a;">--- Giới hạn TDC</span> &nbsp;&nbsp;|&nbsp;&nbsp; 
+            <span style="color:#dc2626; font-weight:bold;">● Thực tế cuộn</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let TDC_LIST = [];
+let GRADE_CONFIGS = {}; 
+let COMPARE_CHARTS = { surf: null, geo: null, prop: null };
+let ALL_CANDIDATES = []; 
+let SELECTED_INDICES = new Set(); 
+let SELECTED_TDCS = [];
+
+window.onload = async () => {
+    const resConf = await fetch('/api/grade_configs');
+    GRADE_CONFIGS = await resConf.json();
+    loadTDCList();
+    initCompareCharts();
+};
+
+async function initDB() { await fetch('/api/update_db_schema'); alert("DB Updated!"); }
+
+function initCompareCharts() {
+    const cfg = { type: 'radar', options: { scales: { r: { min: 0, max: 6, ticks: { display: false } } }, plugins: { legend: { display: false } }, maintainAspectRatio: false } };
+    COMPARE_CHARTS.surf = new Chart(document.getElementById('cmpSurf'), { ...cfg, data: { labels: [], datasets: [] } });
+    COMPARE_CHARTS.geo = new Chart(document.getElementById('cmpGeo'), { ...cfg, data: { labels: [], datasets: [] } });
+    COMPARE_CHARTS.prop = new Chart(document.getElementById('cmpProp'), { ...cfg, data: { labels: [], datasets: [] } });
+}
+
+async function loadTDCList() {
+    const res = await fetch('/api/get_order_history');
+    TDC_LIST = await res.json();
+    renderTDCList();
+}
+
+function renderTDCList() {
+    const div = document.getElementById('tdcList');
+    div.innerHTML = '';
+    
+    // Gom nhóm: Cust -> SO -> Items
+    const tree = {};
+    TDC_LIST.forEach(item => {
+        const cust = item.customer_name;
+        const so = item.so_number || 'NO_SO';
+        if(!tree[cust]) tree[cust] = {};
+        if(!tree[cust][so]) tree[cust][so] = [];
+        tree[cust][so].push(item);
+    });
+
+    let html = '';
+    for (const [cust, sos] of Object.entries(tree)) {
+        html += `<div style="padding:10px; background:#e0e7ff; color:#3730a3; font-weight:700; border-bottom:1px solid #cbd5e1;">🏢 ${cust}</div>`;
+        
+        for (const [soNum, items] of Object.entries(sos)) {
+            html += `<div style="padding:8px 10px 8px 25px; background:#f8fafc; font-weight:600; color:#475569; border-bottom:1px dashed #e2e8f0;">📄 SO: ${soNum}</div>`;
+            
+            items.forEach(item => {
+                const isSelected = SELECTED_TDCS.some(x => x.id === item.id);
+                html += `
+                <div class="tdc-select-item ${isSelected ? 'selected':''}" onclick="toggleTDC(${item.id})" style="padding-left:40px;">
+                    <div style="font-weight:700; color:#334155;">${item.thick} x ${item.width}</div>
+                    <div style="font-size:0.85em; color:#64748b;">${item.qty_req} cuộn • ${item.req_weight} T</div>
+                </div>`;
+            });
+        }
+    }
+    div.innerHTML = html || '<div style="padding:20px;text-align:center;">Trống</div>';
+}
+
+function updateQty(id, val, type) {
+    const item = SELECTED_TDCS.find(x => x.id === id);
+    if(item) {
+        if(type === 'qty') item.qty_req = parseInt(val);
+        if(type === 'weight') item.req_weight = parseFloat(val);
+        updateSelectionUI(); 
+    }
+}
+
+function toggleTDC(id) {
+    const item = TDC_LIST.find(x => x.id === id);
+    const idx = SELECTED_TDCS.findIndex(x => x.id === id);
+    
+    if (idx !== -1) SELECTED_TDCS.splice(idx, 1); // Bỏ chọn
+    else SELECTED_TDCS.push(item); // Chọn thêm
+    
+    renderTDCList(); // Vẽ lại để cập nhật màu
+}
+
+
+async function runSelectedTDC() {
+    if(SELECTED_TDCS.length === 0) return alert("Vui lòng chọn ít nhất 1 đơn hàng TDC!");
+    
+    const btn = document.querySelector('button[onclick="runSelectedTDC()"]');
+    const oldTxt = btn.innerText; btn.innerText = "⏳ Đang quét kho..."; btn.disabled = true;
+    
+    // [SỬA Ở ĐÂY]: Thêm dòng so_number
+    const payload = SELECTED_TDCS.map(tdc => ({
+        customer_name: tdc.customer_name,
+        so_number: tdc.so_number, // <--- QUAN TRỌNG: Gửi kèm số SO
+        grade: tdc.grade,
+        qty: tdc.qty_req,
+        criteria: tdc.criteria,
+        thick: tdc.thick, width: tdc.width,
+        min_weight: tdc.min_weight, max_weight: tdc.max_weight
+    }));
+
+    try {
+        const res = await fetch('/api/run_batch_allocation', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        
+        if(data.status === 'success') {
+            ALL_CANDIDATES = data.allocated; 
+            SELECTED_INDICES.clear(); 
+
+            // Auto-tick Logic
+            let countMap = {}; 
+            ALL_CANDIDATES.forEach((item, idx) => {
+                const custName = item.customer_alloc;
+                const reqItem = SELECTED_TDCS.find(t => t.customer_name === custName);
+                if (!reqItem) return;
+                
+                if (!countMap[custName]) countMap[custName] = 0;
+                // Chỉ auto-tick hàng chuẩn (penalty=0) và chưa đủ số lượng
+                if (item.penalty === 0 && countMap[custName] < reqItem.qty_req) {
+                    SELECTED_INDICES.add(idx);
+                    countMap[custName]++;
+                }
+            });
+
+            renderCandidatesTable();
+            if(ALL_CANDIDATES.length > 0) document.getElementById('btnConfirm').style.display = 'block';
+        } else alert(data.msg);
+    } catch(e) { alert("Lỗi: " + e); }
+    btn.innerText = oldTxt; btn.disabled = false;
+}
+
+function createMiniRadarSVG(actualData, limitData) {
+    // Tọa độ chuẩn cho viewBox 0 0 100 100
+    const W = 100, H = 100, CX = 50, CY = 50;
+    const R_OUTER = 48; // Bán kính vòng ngoài
+    const R_DATA = 40;  // Bán kính vùng vẽ dữ liệu
+
+    const count = actualData.length;
+    if (count < 3) return ''; 
+
+    const getCoords = (val, i, radiusMax) => {
+        const angle = (Math.PI * 2 * i) / count - (Math.PI / 2);
+        const drawVal = Math.min(val, 6); 
+        const r = (drawVal / 6) * radiusMax;
+        return { 
+            x: CX + r * Math.cos(angle), 
+            y: CY + r * Math.sin(angle) 
+        };
+    };
+
+    let axisSvg = "";
+    let limitPath = "";
+    let actualPath = "";
+    let dotsSvg = "";
+
+    // 1. Vẽ trục
+    for(let i=0; i<count; i++) {
+        const pt = getCoords(6, i, R_OUTER);
+        axisSvg += `<line x1="${CX}" y1="${CY}" x2="${pt.x}" y2="${pt.y}" stroke="#e2e8f0" stroke-width="1"/>`;
+    }
+
+    // 2. Vẽ Limit (Xanh)
+    limitData.forEach((val, i) => {
+        const pt = getCoords(val, i, R_DATA);
+        limitPath += (i === 0 ? "M" : "L") + `${pt.x},${pt.y} `;
+    });
+    limitPath += "Z";
+
+    // 3. Vẽ Actual (Đỏ)
+    actualData.forEach((val, i) => {
+        const pt = getCoords(val, i, R_DATA);
+        actualPath += (i === 0 ? "M" : "L") + `${pt.x},${pt.y} `;
+        dotsSvg += `<circle cx="${pt.x}" cy="${pt.y}" r="3" fill="#dc2626" stroke="white" stroke-width="1"/>`;
+    });
+    actualPath += "Z";
+
+    // Trả về SVG responsive (width/height 100%)
+    return `
+        <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+            <circle cx="${CX}" cy="${CY}" r="${R_OUTER}" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+            ${axisSvg}
+            <path d="${limitPath}" fill="rgba(34, 197, 94, 0.1)" stroke="#22c55e" stroke-width="1" stroke-dasharray="3,2"/>
+            <path d="${actualPath}" fill="rgba(220, 38, 38, 0.2)" stroke="#dc2626" stroke-width="1.5" stroke-linejoin="round"/>
+            ${dotsSvg}
+        </svg>
+    `;
+}
+
+function getRadarDataForGroup(coil, config, groupName, tdcConfig) {
+    const keys = [];
+    for (const [k, v] of Object.entries(config)) {
+        if (groupName === 'prop_combined') {
+            if (v.group === 'mechanical' || v.group === 'chemical') keys.push(k);
+        } else {
+            if (v.group === groupName) keys.push(k);
+        }
+    }
+    if(keys.length < 3) while(keys.length < 3) keys.push(keys[0]); 
+
+    const actuals = keys.map(k => coil.scores[k] || 1); 
+    const limits = keys.map(k => {
+        const found = tdcConfig.criteria.find(c => c.defect === k);
+        return found ? Math.max(...found.range) : 6; 
+    });
+
+    return createMiniRadarSVG(actuals, limits);
+}
+
+function renderCandidatesTable() {
+    const total = ALL_CANDIDATES.length;
+    const warningCnt = ALL_CANDIDATES.filter(c => c.penalty > 0).length;
+    
+    document.getElementById('resCount').innerHTML = `
+        Tìm thấy: <strong style="font-size:1.1em; color:#0f172a">${total}</strong> cuộn
+        <span style="font-size:0.9em; font-weight:normal; margin-left:5px;">(${total - warningCnt} Chuẩn)</span>
+    `;
+
+    const tbody = document.getElementById('resBody');
+    tbody.innerHTML = ALL_CANDIDATES.map((item, i) => {
+        const isSuggestion = item.penalty > 0;
+        const isChecked = SELECTED_INDICES.has(i) ? 'checked' : '';
+        const selectedClass = isChecked ? 'row-selected' : '';
+
+        // Status Column
+        let statusHtml = '';
+        if (isSuggestion && item.failed) {
+            let defects = '';
+            Object.keys(item.failed).forEach(defectKey => {
+                const actualScore = item.scores[defectKey] || '?';
+                defects += `<span class="defect-pill">${defectKey}:C${actualScore}</span>`;
+            });
+            statusHtml = `
+                <div style="display:flex; flex-direction:column; align-items:flex-start; gap:3px;">
+                    <div class="status-badge st-warning">⚠️ Lệch chuẩn</div>
+                    <div style="line-height:1.2;">${defects}</div>
+                </div>`;
+        } else {
+            statusHtml = `<div class="status-badge st-success">✨ Chuẩn tuyệt đối</div>`;
+        }
+
+        // Radar Charts
+        const targetTDC = SELECTED_TDCS.find(t => t.customer_name === item.customer_alloc);
+        const gradeCfg = GRADE_CONFIGS[item.grade] || GRADE_CONFIGS['SAE1006'];
+        
+        let radarHtml = '';
+        if (targetTDC && gradeCfg) {
+            radarHtml = `
+                <div class="radar-wrapper">
+                    <div class="radar-item">
+                        <div class="mini-radar-box">${getRadarDataForGroup(item, gradeCfg, 'surface', targetTDC)}</div>
+                        <span class="mini-chart-label" style="color:#ef4444">Bề mặt</span>
+                    </div>
+                    <div class="radar-item">
+                        <div class="mini-radar-box">${getRadarDataForGroup(item, gradeCfg, 'geometry', targetTDC)}</div>
+                        <span class="mini-chart-label" style="color:#3b82f6">Kích thước</span>
+                    </div>
+                    <div class="radar-item">
+                        <div class="mini-radar-box">${getRadarDataForGroup(item, gradeCfg, 'prop_combined', targetTDC)}</div>
+                        <span class="mini-chart-label" style="color:#10b981">Cơ/Lý</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        const weightFormatted = item.weight ? item.weight.toLocaleString('vi-VN') : '0';
+
+        return `
+            <tr id="row_${i}" class="result-row ${selectedClass}" onclick="showComparison(${i})" style="cursor:pointer">
+                <td onclick="event.stopPropagation()" style="text-align:center;">
+                    <input type="checkbox" class="custom-chk" id="chk_${i}" onchange="toggleSelect(${i})" ${isChecked}>
+                </td>
+                <td style="text-align:center; color:#64748b; font-weight:bold;">${i+1}</td>
+                <td><div style="font-weight:700; color:#334155;">${item.customer_alloc}</div></td>
+                <td>
+                    <div class="coil-main">
+                        <div class="coil-id">${item.coil_id}</div>
+                        <div class="coil-meta">
+                            <span class="meta-tag">⚖️ ${weightFormatted} kg</span>
+                            <span class="meta-tag">📏 ${item.thick}x${item.width}</span>
+                        </div>
+                    </div>
+                </td>
+                <td>${statusHtml}</td>
+                <td>${radarHtml}</td>
+            </tr>
+        `;
+    }).join('');
+    
+    updateSelectionUI();
+}
+
+function toggleSelect(index) {
+    const checkbox = document.getElementById(`chk_${index}`);
+    const row = document.getElementById(`row_${index}`);
+    const item = ALL_CANDIDATES[index];
+
+    // [SỬA ĐỔI]: Tìm requirement dựa trên ID dòng TDC (tdc_line_id) thay vì chỉ tên khách
+    // Lưu ý: tdc_line_id đã được thêm ở Bước 1 (Backend)
+    const reqItem = SELECTED_TDCS.find(t => t.id === item.tdc_line_id); 
+    
+    // Fallback nếu không tìm thấy ID (cho dữ liệu cũ), dùng logic cũ hoặc bỏ qua
+    const qtyReq = reqItem ? reqItem.qty_req : 9999; 
+
+    if (checkbox.checked) {
+        // Đếm số lượng hiện tại ĐÃ CHỌN cho DÒNG TDC CỤ THỂ này
+        let currentCount = 0;
+        SELECTED_INDICES.forEach(idx => {
+            // So sánh item.tdc_line_id
+            if(ALL_CANDIDATES[idx].tdc_line_id === item.tdc_line_id) currentCount++;
+        });
+
+        if (currentCount >= qtyReq) {
+            alert(`Dòng quy cách ${item.material_desc} đã đủ ${qtyReq} cuộn.`);
+            checkbox.checked = false;
+            return;
+        }
+        SELECTED_INDICES.add(index);
+        row.classList.add('row-selected');
+    } else {
+        SELECTED_INDICES.delete(index);
+        row.classList.remove('row-selected');
+    }
+    updateSelectionUI();
+}
+
+function updateSelectionUI() {
+    let totalQtyReq = 0, totalWeightReq = 0;
+    SELECTED_TDCS.forEach(tdc => {
+        totalQtyReq += (parseInt(tdc.qty_req) || 0);
+        totalWeightReq += (parseFloat(tdc.req_weight) || 0);
+    });
+
+    let currentQty = 0, currentWeight = 0;
+    SELECTED_INDICES.forEach(idx => {
+        const item = ALL_CANDIDATES[idx];
+        if(item) {
+            currentQty++;
+            currentWeight += (parseFloat(item.weight) || 0) / 1000; 
+        }
+    });
+    
+    currentWeight = currentWeight.toFixed(2);
+    
+    document.getElementById('selectionStatus').innerHTML = `
+        <div style="display:flex; gap:15px; margin-top:5px;">
+            <span style="font-weight:bold; color:${currentQty >= totalQtyReq ? '#16a34a' : '#d97706'}">
+                📦 Cuộn: ${currentQty} / ${totalQtyReq}
+            </span>
+            <span style="font-weight:bold; color:${parseFloat(currentWeight) >= totalWeightReq ? '#16a34a' : '#d97706'}">
+                ⚖️ Tấn: ${currentWeight} / ${totalWeightReq}
+            </span>
+        </div>
+    `;
+    
+    const btn = document.getElementById('btnConfirm');
+    if (ALL_CANDIDATES.length > 0) {
+        if (currentQty === 0) btn.style.display = 'none'; 
+        else {
+            btn.style.display = 'block';
+            btn.innerText = `💾 CHỐT (${currentQty} Cuộn - ${currentWeight} Tấn)`;
+        }
+    }
+}
+
+// --- THAY THẾ HÀM confirmMapping TRONG allocation_run.html ---
+
+async function confirmMapping() {
+    // 1. Lấy danh sách cuộn đã tick chọn
+    let finalCoils = Array.from(SELECTED_INDICES).map(idx => ALL_CANDIDATES[idx]);
+    if (finalCoils.length === 0) return alert("Chưa chọn cuộn nào!");
+
+    if(!confirm(`Xác nhận phân bổ ${finalCoils.length} cuộn?`)) return;
+
+    // 2. Gom nhóm theo [KHÁCH HÀNG + SO] để gửi đúng SO cho từng cuộn
+    const grouped = {};
+    finalCoils.forEach(c => {
+        // Tạo key duy nhất: TênKhách + Dấu ngăn cách + SốSO
+        // Ví dụ: "HOA SEN|||SO-2024-001"
+        const key = c.customer_alloc + "|||" + (c.order_alloc || "");
+        
+        if(!grouped[key]) grouped[key] = [];
+        grouped[key].push(c.coil_id);
+    });
+
+    try {
+        // 3. Gửi từng nhóm lên Server
+        for (const [key, ids] of Object.entries(grouped)) {
+            // Tách lại Tên và SO từ key
+            const parts = key.split("|||");
+            const custName = parts[0];
+            const soNum = parts.length > 1 ? parts[1] : ""; 
+
+            await fetch('/api/confirm_allocation', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ 
+                    coil_ids: ids, 
+                    tdc_name: custName,
+                    so_number: soNum // [QUAN TRỌNG]: Gửi kèm số SO
+                })
+            });
+        }
+        
+        alert(`✅ Thành công! Đã lưu vào lịch sử.`);
+        
+        // Reset giao diện
+        ALL_CANDIDATES = []; 
+        SELECTED_INDICES.clear();
+        document.getElementById('resBody').innerHTML = '';
+        document.getElementById('btnConfirm').style.display = 'none';
+        updateSelectionUI();
+        
+    } catch(e) { alert("Lỗi khi lưu: " + e); }
+}
+function showComparison(index) {
+    const coil = ALL_CANDIDATES[index];
+    if(!coil) return;
+    const targetTDC = TDC_LIST.find(t => t.customer_name === coil.customer_alloc);
+    if (!targetTDC) return;
+    const config = GRADE_CONFIGS[targetTDC.grade];
+    if(!config) return;
+
+    document.getElementById('modalTitle').innerText = `${targetTDC.customer_name} vs ${coil.coil_id}`;
+    document.getElementById('compareModal').style.display = 'flex';
+    
+    const groups = { surface: [], geometry: [], prop: [] };
+    for (const [key, val] of Object.entries(config)) {
+        if (val.group === 'surface') groups.surface.push(key);
+        else if (val.group === 'geometry') groups.geometry.push(key);
+        else groups.prop.push(key);
+    }
+
+    const buildLimit = (keys) => keys.map(k => {
+        const found = targetTDC.criteria.find(c => c.defect === k);
+        return found ? Math.max(...found.range) : 6;
+    });
+    const buildActual = (keys) => keys.map(k => coil.scores[k] || 1);
+
+    const updateCmp = (chart, keys) => {
+        chart.data.labels = keys;
+        chart.data.datasets = [ 
+            { label: 'TDC', data: buildLimit(keys), borderColor: '#16a34a', backgroundColor: 'rgba(22, 163, 74, 0.05)', borderWidth: 3, pointRadius: 0, borderDash: [5, 5] }, 
+            { label: 'Thực tế', data: buildActual(keys), borderColor: '#dc2626', backgroundColor: 'rgba(220, 38, 38, 0.2)', borderWidth: 2 } 
+        ];
+        chart.update();
+    };
+    updateCmp(COMPARE_CHARTS.surf, groups.surface);
+    updateCmp(COMPARE_CHARTS.geo, groups.geometry);
+    updateCmp(COMPARE_CHARTS.prop, groups.prop);
+}
+function closeModal(e) { document.getElementById('compareModal').style.display = 'none'; }
+</script>
+{% endblock %}
+

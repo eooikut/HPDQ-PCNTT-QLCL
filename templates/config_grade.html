@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+
+{% block title %}Cấu Hình Mác Thép{% endblock %}
+
+{% block head %}
+    <style>
+        /* CSS Riêng cho trang Config */
+        /* Lưu ý: body height 100vh đã được xử lý ở base.html, ở đây ta chỉ chỉnh config-layout */
+        
+        .config-layout { display: grid; grid-template-columns: 250px 1fr; gap: 1px; background: #e2e8f0; border-radius: 8px; overflow: hidden; height: 100%; }
+        
+        /* Sidebar Mác Thép */
+        .grade-sidebar { background: white; padding: 15px; display: flex; flex-direction: column; overflow-y: auto; }
+        .grade-item {
+            padding: 12px; margin-bottom: 8px; background: #f8fafc; border: 1px solid #e2e8f0;
+            border-radius: 8px; cursor: pointer; font-weight: 600; color: #475569;
+            display: flex; justify-content: space-between; align-items: center; transition: 0.2s;
+        }
+        .grade-item:hover { background: #e2e8f0; }
+        .grade-item.active { background: #3b82f6; color: white; border-color: #3b82f6; box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.5); }
+        .btn-add-grade { width: 100%; padding: 10px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
+        .btn-del-grade { color: #ef4444; cursor: pointer; padding: 2px 6px; border-radius: 4px; background: white; font-size: 0.8em; }
+
+        /* Main Content */
+        .config-main { background: #f1f5f9; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
+        .config-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        
+        /* Tab Config Group */
+        .cfg-tabs { display: flex; gap: 10px; margin-bottom: 15px; }
+        .cfg-tab { padding: 8px 20px; border-radius: 20px; border: 1px solid #cbd5e1; cursor: pointer; background: white; color: #64748b; font-weight: 600; }
+        .cfg-tab.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+
+        /* Table */
+        .cfg-table-wrap { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+        .cfg-row { display: grid; grid-template-columns: 100px 150px 1fr 100px; border-bottom: 1px solid #f1f5f9; padding: 15px; align-items: center; }
+        .cfg-row:hover { background: #f8fafc; }
+        .cfg-head { background: #1e293b; color: white; font-weight: bold; border-bottom: none; }
+        .badge-grp { padding: 4px 8px; border-radius: 4px; font-size: 0.8em; text-transform: uppercase; font-weight: bold; }
+        .grp-surface { background: #fee2e2; color: #dc2626; }
+        .grp-geo { background: #e0f2fe; color: #0284c7; }
+        .grp-prop { background: #dcfce7; color: #16a34a; }
+
+        /* Modal Edit Bins */
+        .bin-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .bin-input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; width: 100px; text-align: center; }
+        .bin-label { flex: 1; font-weight: bold; color: #334155; padding: 8px; background: #f1f5f9; border-radius: 4px; text-align: center; }
+    </style>
+{% endblock %} 
+{% block content %}
+<div class="app-header" style="margin: 0 0 15px 0; border-radius: 0; z-index: 10; padding: 10px 0; background: transparent; box-shadow: none;">
+    <div class="app-title-row" style="margin-bottom:0; border:none; padding-bottom:0;">
+        <div class="app-info">
+            <h1 style="color: #1e293b;">⚙️ CẤU HÌNH ĐA MÁC THÉP</h1>
+        </div>
+        <div>
+            <button onclick="saveAllConfigs()" class="btn-upload btn-surf" style="margin-left: 10px;">💾 LƯU TOÀN BỘ</button>
+        </div>
+    </div>
+</div>
+
+<div class="config-layout">
+    <div class="grade-sidebar">
+        <button class="btn-add-grade" onclick="addNewGrade()">+ THÊM MÁC MỚI</button>
+        <div id="gradeList">
+            </div>
+    </div>
+
+    <div class="config-main">
+        <div id="emptyState" class="empty-state" style="display:none">
+            <div class="empty-icon">👈</div>
+            <h3>Chọn Mác thép để chỉnh sửa</h3>
+        </div>
+
+        <div id="configContent">
+            <div class="config-header">
+                <h2 id="currentGradeTitle" style="margin:0; color:#334155">---</h2>
+                <div class="cfg-tabs">
+                    <div class="cfg-tab active" onclick="switchTab('surface')">Bề mặt</div>
+                    <div class="cfg-tab" onclick="switchTab('geometry')">Hình học</div>
+                    <div class="cfg-tab" onclick="switchTab('mechanical')">Cơ/Lý/Hóa</div>
+                </div>
+            </div>
+
+            <div class="cfg-table-wrap">
+                <div class="cfg-row cfg-head">
+                    <div>Mã Lỗi</div>
+                    <div>Nhóm</div>
+                    <div>Cấu hình hiện tại (Preview)</div>
+                    <div>Tác vụ</div>
+                </div>
+                <div id="defectList">
+                    </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="editModal" class="modal-overlay">
+    <div class="modal-box" style="width: 700px; height: auto; max-height: 90vh;">
+        <div class="modal-header">
+            <span id="modalDefectName">Chỉnh sửa thông số</span>
+            <span class="close-btn" onclick="closeEditModal()">✕</span>
+        </div>
+        <div class="modal-body" style="display:block; padding: 20px; overflow-y:auto;">
+            <p style="color:#64748b; font-style:italic; margin-bottom:15px;">
+                Định nghĩa các khoảng giá trị (Bins) để tính điểm C0-C5. <br>
+                Lưu ý: "inf" đại diện cho vô cực (>).
+            </p>
+            
+            <div id="binsContainer">
+                </div>
+            
+            <div style="margin-top:20px; text-align:right; border-top:1px solid #eee; padding-top:15px;">
+                <button onclick="closeEditModal()" class="btn-reset">Hủy</button>
+                <button onclick="applyChanges()" class="btn-upload btn-prop" style="margin-left:10px;">✅ Áp dụng</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let ALL_CONFIGS = {}; 
+let CURRENT_GRADE = null;
+let CURRENT_TAB = 'surface';
+let EDITING_KEY = null; 
+
+// 1. INIT & FETCH DATA
+window.onload = async function() {
+    await fetchConfigs();
+}
+
+async function fetchConfigs() {
+    try {
+        const res = await fetch('/api/grade_configs');
+        ALL_CONFIGS = await res.json();
+        renderGradeList();
+        
+        const grades = Object.keys(ALL_CONFIGS);
+        if(grades.length > 0) selectGrade(grades[0]);
+    } catch(err) {
+        alert('Lỗi tải config: ' + err);
+    }
+}
+
+// 2. RENDER SIDEBAR
+function renderGradeList() {
+    const div = document.getElementById('gradeList');
+    div.innerHTML = Object.keys(ALL_CONFIGS).map(grade => `
+        <div class="grade-item ${CURRENT_GRADE === grade ? 'active' : ''}" onclick="selectGrade('${grade}')">
+            <span>${grade}</span>
+            ${grade !== 'SAE1006' ? `<button class="btn-del-grade" onclick="deleteGrade(event, '${grade}')">✕</button>` : ''}
+        </div>
+    `).join('');
+}
+
+function selectGrade(grade) {
+    CURRENT_GRADE = grade;
+    document.getElementById('currentGradeTitle').innerText = `Mác thép: ${grade}`;
+    renderGradeList(); 
+    renderDefectTable();
+}
+
+function addNewGrade() {
+    const name = prompt("Nhập tên Mác thép mới (VD: SS400):");
+    if(!name) return;
+    if(ALL_CONFIGS[name]) return alert("Tên đã tồn tại!");
+    
+    // Copy config từ SAE1006
+    ALL_CONFIGS[name] = JSON.parse(JSON.stringify(ALL_CONFIGS['SAE1006'] || {}));
+    selectGrade(name);
+}
+
+function deleteGrade(e, grade) {
+    e.stopPropagation();
+    if(confirm(`Xóa cấu hình ${grade}?`)) {
+        delete ALL_CONFIGS[grade];
+        if(CURRENT_GRADE === grade) CURRENT_GRADE = Object.keys(ALL_CONFIGS)[0] || null;
+        renderGradeList();
+        if(CURRENT_GRADE) selectGrade(CURRENT_GRADE);
+    }
+}
+
+// 3. RENDER MAIN TABLE
+function switchTab(tab) {
+    CURRENT_TAB = tab;
+    document.querySelectorAll('.cfg-tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    renderDefectTable();
+}
+
+function renderDefectTable() {
+    if(!CURRENT_GRADE) return;
+    const config = ALL_CONFIGS[CURRENT_GRADE];
+    const tbody = document.getElementById('defectList');
+    
+    const keys = Object.keys(config).filter(k => {
+        const grp = config[k].group;
+        if(CURRENT_TAB === 'surface') return grp === 'surface';
+        if(CURRENT_TAB === 'geometry') return grp === 'geometry';
+        if(CURRENT_TAB === 'mechanical') return grp === 'mechanical' || grp === 'chemical';
+        return false;
+    });
+
+    tbody.innerHTML = keys.map(key => {
+        const item = config[key];
+        const binsStr = item.bins ? item.bins.map(b => b === 'inf' ? '∞' : b).join(' | ') : '---';
+        const badgeClass = item.group === 'surface' ? 'grp-surface' : (item.group === 'geometry' ? 'grp-geo' : 'grp-prop');
+        
+        return `
+            <div class="cfg-row">
+                <div style="font-weight:bold">${key}</div>
+                <div><span class="badge-grp ${badgeClass}">${item.group}</span></div>
+                <div style="color:#64748b; font-size:0.9em;">Phân giải: [ ${binsStr} ]</div>
+                <div>
+                    <button class="btn-reset" onclick="openEditModal('${key}')">✎ Sửa</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// 4. LOGIC MODAL & EDIT BINS
+function openEditModal(key) {
+    EDITING_KEY = key;
+    const item = ALL_CONFIGS[CURRENT_GRADE][key];
+    document.getElementById('modalDefectName').innerText = `Sửa: ${key} (${CURRENT_GRADE})`;
+    document.getElementById('editModal').style.display = 'flex';
+    
+    renderBinInputs(item);
+}
+
+function renderBinInputs(item) {
+    const container = document.getElementById('binsContainer');
+    const bins = item.bins; 
+    const labels = item.labels; 
+    
+    let html = '';
+    for(let i=0; i < bins.length - 1; i++) {
+        let start = bins[i];
+        let end = bins[i+1];
+        let label = labels[i] || `Score ${i+1}`;
+        
+        html += `
+            <div class="bin-row">
+                <span>Từ</span>
+                <input type="text" class="bin-input bin-start" value="${start}" onchange="syncBins(${i}, 'start', this.value)">
+                <span>đến</span>
+                <input type="text" class="bin-input bin-end" value="${end}" onchange="syncBins(${i}, 'end', this.value)">
+                <span style="margin:0 10px">➔</span>
+                <div class="bin-label">${label}</div>
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+}
+
+function syncBins(idx, type, val) {
+    const inputsStart = document.querySelectorAll('.bin-start');
+    const inputsEnd = document.querySelectorAll('.bin-end');
+    
+    if(type === 'end') {
+        if(idx + 1 < inputsStart.length) {
+            inputsStart[idx+1].value = val;
+        }
+    } else if(type === 'start') {
+        if(idx - 1 >= 0) {
+            inputsEnd[idx-1].value = val;
+        }
+    }
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+}
+
+function applyChanges() {
+    if(!EDITING_KEY || !CURRENT_GRADE) return;
+    
+    const inputsStart = document.querySelectorAll('.bin-start');
+    const inputsEnd = document.querySelectorAll('.bin-end');
+    
+    let newBins = [];
+    newBins.push(parseVal(inputsStart[0].value));
+    
+    inputsEnd.forEach(inp => {
+        newBins.push(parseVal(inp.value));
+    });
+    
+    ALL_CONFIGS[CURRENT_GRADE][EDITING_KEY].bins = newBins;
+    
+    closeEditModal();
+    renderDefectTable();
+}
+
+function parseVal(v) {
+    if(v === 'inf' || v === '∞') return 'inf';
+    return parseFloat(v);
+}
+
+// 5. SAVE TO BACKEND
+async function saveAllConfigs() {
+    if(!confirm('Lưu toàn bộ thay đổi?')) return;
+    
+    try {
+        const res = await fetch('/api/grade_configs', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(ALL_CONFIGS)
+        });
+        const d = await res.json();
+        alert(d.msg);
+    } catch(e) {
+        alert('Lỗi lưu: ' + e);
+    }
+}
+</script>
+{% endblock %}

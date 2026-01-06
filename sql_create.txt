@@ -1,0 +1,92 @@
+
+USE factory;
+GO
+
+-- Bảng lưu cấu hình app
+CREATE TABLE app_configs (
+    [key] NVARCHAR(255) PRIMARY KEY,
+    [value] NVARCHAR(MAX)
+);
+
+-- Bảng dữ liệu Cuộn (Core Table)
+CREATE TABLE coil_data (
+    coil_id NVARCHAR(50) PRIMARY KEY,
+    grade NVARCHAR(50) DEFAULT 'SAE1006',
+    raw_data NVARCHAR(MAX), -- JSON string
+    scores NVARCHAR(MAX),   -- JSON string
+    is_checked BIT DEFAULT 0, -- Boolean trong SQL là BIT
+    weight FLOAT,
+    target_thick FLOAT,
+    target_width FLOAT,
+    production_date DATETIME,
+    slab_grade NVARCHAR(50),
+    allocated_to NVARCHAR(255),
+    allocated_order NVARCHAR(255),
+    allocated_at DATETIME,
+    updated_at DATETIME DEFAULT GETDATE()
+);
+
+-- Bảng Master TDC
+CREATE TABLE tdc_master (
+    id INT IDENTITY(1,1) PRIMARY KEY, -- Thay AUTOINCREMENT bằng IDENTITY
+    tdc_code NVARCHAR(100) UNIQUE,
+    customer_name NVARCHAR(255),
+    usage_purpose NVARCHAR(255),
+    grade NVARCHAR(100),
+    criteria_json NVARCHAR(MAX),
+    pdf_path NVARCHAR(500),
+    created_at DATETIME DEFAULT GETDATE()
+);
+
+-- Bảng Đơn hàng (Header)
+CREATE TABLE sales_orders (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    so_number NVARCHAR(100) UNIQUE,
+    tdc_id INT,
+    customer_name NVARCHAR(255), -- Thêm cột này để khớp code cũ
+    order_date DATETIME,
+    status NVARCHAR(50) DEFAULT 'OPEN',
+    created_at DATETIME DEFAULT GETDATE(),
+    -- Các cột optional cho schema update
+    target_thick FLOAT,
+    target_width FLOAT,
+    min_weight FLOAT,
+    max_weight FLOAT,
+    req_weight_total FLOAT,
+    FOREIGN KEY(tdc_id) REFERENCES tdc_master(id)
+);
+
+-- Bảng Chi tiết Đơn hàng
+CREATE TABLE so_details (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    so_id INT,
+    thick FLOAT, 
+    width FLOAT,
+    min_weight FLOAT, 
+    max_weight FLOAT,
+    qty INT, 
+    total_weight FLOAT,
+    FOREIGN KEY(so_id) REFERENCES sales_orders(id)
+);
+
+-- Bảng Audit Log
+CREATE TABLE audit_log_qlcl (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    coil_id NVARCHAR(50),
+    user_name NVARCHAR(100),
+    defect_key NVARCHAR(50),
+    old_value FLOAT,
+    new_value FLOAT,
+    changed_at DATETIME DEFAULT GETDATE()
+);
+
+-- Bảng System Logs
+CREATE TABLE system_logs (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    title NVARCHAR(255),
+    message NVARCHAR(MAX),
+    log_type NVARCHAR(50),
+    is_read INT DEFAULT 0,
+    created_at DATETIME DEFAULT GETDATE()
+);
+CREATE INDEX idx_sys_logs_read ON system_logs(is_read);

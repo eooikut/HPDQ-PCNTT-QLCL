@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block title %}Quản Lý Đơn Hàng & Lịch Sử{% endblock %}
+
+{% block head %}
+<style>
+    /* === LAYOUT CHIA 2 CỘT === */
+    /* Sửa tên class .sidebar -> .history-sidebar để không trùng base.html */
+    .hist-layout { 
+        display: grid; 
+        grid-template-columns: 320px 1fr; 
+        height: calc(100vh - 80px); /* Trừ đi header của base.html */
+        overflow: hidden; 
+        background: #fff; 
+        border: 1px solid #e2e8f0; /* Thêm viền cho gọn */
+        border-radius: 8px;
+        margin: 10px; /* Cách lề một chút */
+    }
+    
+    /* === CỘT TRÁI (History Sidebar) === */
+    .history-sidebar { 
+        background: #f8fafc; 
+        border-right: 1px solid #e2e8f0; 
+        display: flex; flex-direction: column; 
+    }
+    .sidebar-search { padding: 15px; border-bottom: 1px solid #e2e8f0; background: white; }
+    .inp-search { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; }
+    
+    .so-list { flex: 1; overflow-y: auto; }
+    .so-card { padding: 12px 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: 0.2s; background: white; border-left: 4px solid transparent; }
+    .so-card:hover { background: #f1f5f9; }
+    .so-card.active { background: #eff6ff; border-left-color: #2563eb; }
+    
+    .so-top { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .so-code { font-weight: 700; color: #334155; font-size: 0.95em; }
+    .so-date { font-size: 0.75em; color: #94a3b8; }
+    .so-cust { font-size: 0.85em; color: #64748b; font-weight: 600; display: block; margin-bottom: 8px; }
+
+    /* Progress Bar Mini */
+    .prog-track { height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden; }
+    .prog-fill { height: 100%; background: #22c55e; transition: width 0.3s; }
+    .so-stats { display: flex; justify-content: space-between; font-size: 0.75em; color: #64748b; margin-top: 4px; }
+
+    /* === MAIN CONTENT (CHI TIẾT) === */
+    .main-view { display: flex; flex-direction: column; background: white; position: relative; height: 100%; }
+    
+    /* Header Chi tiết */
+    .detail-header { padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #fff; }
+    .dh-title h2 { margin: 0; font-size: 1.4em; color: #1e293b; }
+    .dh-sub { color: #64748b; font-size: 0.9em; margin-top: 2px; }
+    
+    /* Thông số tổng quan */
+    .kpi-row { display: flex; gap: 30px; padding: 15px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 0.9em; }
+    .kpi-box strong { display: block; font-size: 1.2em; color: #0f172a; }
+    .kpi-box span { color: #64748b; font-size: 0.85em; text-transform: uppercase; }
+
+    /* Bảng */
+    .table-wrap { flex: 1; overflow: auto; }
+    .coil-tbl { width: 100%; border-collapse: collapse; }
+    .coil-tbl th { background: #f1f5f9; color: #475569; padding: 10px 15px; text-align: left; font-size: 0.8em; font-weight: 700; text-transform: uppercase; border-bottom: 1px solid #cbd5e1; position: sticky; top: 0; }
+    .coil-tbl td { padding: 10px 15px; border-bottom: 1px solid #f1f5f9; color: #334155; font-size: 0.9em; }
+    .coil-tbl tr:hover { background: #f8fafc; }
+
+    .empty-state { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #cbd5e1; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hist-layout">
+    <div class="history-sidebar">
+        <div class="sidebar-search">
+            <input type="text" class="inp-search" placeholder="🔍 Tìm SO, Khách hàng..." onkeyup="filterSO(this.value)">
+        </div>
+        <div class="so-list" id="soList">
+            </div>
+    </div>
+
+    <div class="main-view">
+        <div id="emptyView" class="empty-state">
+            <div style="font-size:3em;">👈</div>
+            <p>Chọn một đơn hàng để xem chi tiết</p>
+        </div>
+
+        <div id="detailView" style="display:none; flex-direction:column; height:100%;">
+            <div class="detail-header">
+                <div class="dh-title">
+                    <h2 id="lblSO">SO-000</h2>
+                    <div class="dh-sub" id="lblCust">Khách Hàng</div>
+                </div>
+                <div>
+                    <button onclick="releaseSO()" style="background:#fee2e2; color:#ef4444; border:1px solid #fca5a5; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:bold;">✕ Gỡ Đơn Hàng</button>
+                </div>
+            </div>
+
+            <div class="kpi-row">
+                <div class="kpi-box">
+                    <span id="txtTarget">Mục Tiêu</span>
+                    <strong id="valTarget">0 Tấn</strong>
+                </div>
+                <div class="kpi-box">
+                    <span>Đã Gán (Thực tế)</span>
+                    <strong id="valActual" style="color:#2563eb">0 Tấn</strong>
+                </div>
+                <div class="kpi-box">
+                    <span>Tiến độ</span>
+                    <strong id="valPct" style="color:#16a34a">0%</strong>
+                </div>
+                <div class="kpi-box">
+                    <span>Số lượng cuộn</span>
+                    <strong id="valQty">0</strong>
+                </div>
+            </div>
+
+            <div class="table-wrap">
+                <table class="coil-tbl">
+                    <thead>
+                        <tr>
+                            <th width="50">#</th>
+                            <th width="150">Mã Cuộn</th>
+                            <th>Mác Thép</th>
+                            <th>Quy cách (Dày x Rộng)</th>
+                            <th>Khối lượng</th>
+                            <th width="80" style="text-align:center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tblBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+
+<script>
+    let ALL_DATA = { orders: [], coils: [] };
+    let CURRENT_SO_ID = null;
+
+    window.onload = loadData;
+
+    async function loadData() {
+        const res = await fetch('/api/get_history_summary');
+        ALL_DATA = await res.json();
+        renderSOList(ALL_DATA.orders);
+    }
+
+    function renderSOList(list) {
+        const div = document.getElementById('soList');
+        div.innerHTML = list.map(o => {
+            // Tính toán %
+            const pct = o.target_weight > 0 ? (o.actual_weight / o.target_weight * 100) : 0;
+            const pctShow = Math.min(pct, 100).toFixed(0);
+            const color = pct >= 100 ? '#22c55e' : (pct > 50 ? '#eab308' : '#3b82f6'); // Xanh lá, Vàng, Xanh dương
+
+            return `
+            <div class="so-card" onclick="selectSO('${o.so_number}')" id="card-${o.so_number}">
+                <div class="so-top">
+                    <span class="so-code">${o.so_number}</span>
+                    <span class="so-date">${o.date || ''}</span>
+                </div>
+                <span class="so-cust">${o.customer_name}</span>
+                
+                <div class="prog-track">
+                    <div class="prog-fill" style="width:${pctShow}%; background:${color}"></div>
+                </div>
+                <div class="so-stats">
+                    <span>${(o.actual_weight/1000).toFixed(1)} / ${(o.target_weight/1000).toFixed(1)} T</span>
+                    <span>${pctShow}%</span>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function selectSO(soNum) {
+        // UI Active
+        document.querySelectorAll('.so-card').forEach(e => e.classList.remove('active'));
+        const card = document.getElementById(`card-${soNum}`);
+        if(card) card.classList.add('active');
+
+        CURRENT_SO_ID = soNum;
+        const order = ALL_DATA.orders.find(o => o.so_number === soNum);
+        const coils = ALL_DATA.coils.filter(c => c.allocated_order === soNum);
+
+        // Render Header
+        document.getElementById('emptyView').style.display = 'none';
+        document.getElementById('detailView').style.display = 'flex';
+        
+        document.getElementById('lblSO').innerText = order.so_number;
+        document.getElementById('lblCust').innerText = order.customer_name;
+        
+        document.getElementById('valTarget').innerText = (order.target_weight/1000).toFixed(2) + " Tấn";
+        document.getElementById('valActual').innerText = (order.actual_weight/1000).toFixed(2) + " Tấn";
+        document.getElementById('valQty').innerText = coils.length + " Cuộn";
+        
+        const pct = order.target_weight > 0 ? (order.actual_weight / order.target_weight * 100).toFixed(1) : 0;
+        document.getElementById('valPct').innerText = pct + "%";
+
+        // Render Table
+        const tbody = document.getElementById('tblBody');
+        tbody.innerHTML = coils.map((c, i) => `
+            <tr>
+                <td>${i+1}</td>
+                <td style="font-weight:bold; color:#2563eb">${c.coil_id}</td>
+                <td>${c.grade}</td>
+                <td>${c.target_thick} x ${c.target_width}</td>
+                <td>${c.weight.toLocaleString()} kg</td>
+                <td style="text-align:center">
+                    <button onclick="releaseOne('${c.coil_id}')" style="border:none; background:none; color:#ef4444; cursor:pointer; font-weight:bold;">Gỡ</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function filterSO(txt) {
+        const term = txt.toLowerCase();
+        const filtered = ALL_DATA.orders.filter(o => 
+            o.so_number.toLowerCase().includes(term) || 
+            o.customer_name.toLowerCase().includes(term)
+        );
+        renderSOList(filtered);
+    }
+    
+    async function releaseOne(coilId) {
+        if(!confirm(`Gỡ cuộn ${coilId}?`)) return;
+        await fetch('/api/release_coils', { 
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ coil_ids: [coilId] })
+        });
+        loadData(); // Reload lại toàn bộ để cập nhật progress
+    }
+
+    async function releaseSO() {
+        if(!confirm("CẢNH BÁO: Gỡ toàn bộ cuộn khỏi đơn hàng này?")) return;
+        const coils = ALL_DATA.coils.filter(c => c.allocated_order === CURRENT_SO_ID);
+        const ids = coils.map(c => c.coil_id);
+        
+        await fetch('/api/release_coils', { 
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ coil_ids: ids })
+        });
+        loadData();
+        document.getElementById('detailView').style.display = 'none';
+        document.getElementById('emptyView').style.display = 'flex';
+    }
+</script>
+{% endblock %}

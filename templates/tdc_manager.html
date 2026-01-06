@@ -1,0 +1,1187 @@
+{% extends "base.html" %}
+
+{% block title %}Quản lý Tiêu Chuẩn (TDC){% endblock %}
+
+{% block head %}
+    <style>
+    /* === RESET & LAYOUT CHUNG === */
+    body { background: #f1f5f9; height: 100vh; display: flex; flex-direction: column; margin: 0; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+    .app-header { flex-shrink: 0; }
+    
+    /* [SỬA 1] Mở rộng cột bên phải từ 500px -> 700px, thu hẹp cột trái 1 chút */
+    .main-layout { 
+        display: grid; 
+        grid-template-columns: 280px 1fr 600px; /* <--- ĐÃ SỬA: Cột phải rộng 700px */
+        gap: 15px; 
+        flex: 1; 
+        overflow: hidden; 
+        padding: 15px; 
+    }
+
+    .panel { background: white; border: 1px solid #e2e8f0; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .panel-head { padding: 10px 15px; background: #fff; border-bottom: 1px solid #e2e8f0; font-weight: bold; color: #334155; display: flex; justify-content: space-between; align-items: center; height: 45px; flex-shrink: 0;}
+
+    /* CỘT 1: CÂY KHÁCH HÀNG */
+    .tree-cust { 
+        padding: 10px 15px; 
+        background: #1e293b; 
+        color: #f8fafc; 
+        font-weight: 700; 
+        border-bottom: 1px solid #334155;
+        display: flex; justify-content: space-between; align-items: center; 
+        cursor: pointer;
+        transition: 0.2s;
+    }
+    .tree-cust:hover { background: #334155; }
+    .tree-grade { 
+        padding: 8px 15px 8px 30px; 
+        background: #f1f5f9; 
+        color: #475569;
+        font-weight: 700;
+        border-bottom: 1px solid #e2e8f0; 
+        display: flex; justify-content: space-between; align-items: center; 
+        cursor: pointer;
+        font-size: 0.95em;
+    }
+    .tree-grade:hover { background: #e2e8f0; color: #0f172a; }
+    .tree-item { 
+        padding: 8px 15px 8px 45px;
+        border-bottom: 1px solid #f8fafc; 
+        border-left: 4px solid transparent;
+        cursor: pointer; 
+        font-size: 0.9em;
+        background: #fff;
+    }
+    .tree-item:hover { background: #eff6ff; color: #0284c7; }
+    .tree-item.active { background: #dbeafe; border-left-color: #2563eb; color: #1e40af; font-weight: 700; }
+    .item-sub { font-size: 0.85em; color: #94a3b8; margin-top: 2px; }
+    .btn-mini-add {
+        width: 24px; height: 24px; 
+        border-radius: 4px; border: none; 
+        background: rgba(255,255,255,0.2); color: #fff;
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        font-weight: bold; font-size: 16px; margin-right: 8px;
+        transition: 0.2s;
+    }
+    .btn-mini-add:hover { background: #22c55e; color: white; transform: scale(1.1); }
+    .badge-count { font-size: 0.8em; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; }
+
+    /* FORM & MIDDLE */
+    .mid-content { display: flex; flex-direction: column; height: 100%; overflow-y: auto; padding: 20px; gap: 20px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-label { font-size: 0.75em; font-weight: 700; color: #64748b; text-transform: uppercase; }
+    .form-input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: 600; color: #0f172a; }
+    .pdf-area { flex: 1; border: 2px dashed #e2e8f0; border-radius: 6px; background: #f8fafc; display: flex; align-items: center; justify-content: center; overflow: hidden; min-height: 300px; position: relative; }
+    .pdf-iframe { width: 100%; height: 100%; border: none; }
+    
+    /* RIGHT PANEL */
+    .right-content { display: flex; flex-direction: column; height: 100%; overflow: hidden; background: #fff; }
+    .add-crit-box { padding: 10px 15px; border-bottom: 1px solid #eee; background: #fff; display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+    .crit-list-container { flex: 1; overflow-y: auto; padding: 0 15px 15px 15px; background: #fff; }
+    .crit-row { display: flex; justify-content: space-between; align-items: center; background: white; padding: 8px 10px; margin-bottom: 6px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.9em; cursor: grab; }
+    .mini-select { padding: 4px 2px; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: 600; font-size: 0.9em; color: #334155; cursor: pointer; background: #fff; min-width: 45px; }
+    .btn-x { color: #94a3b8; background: none; border: none; cursor: pointer; font-size: 1.2em; margin-left: 8px; }
+    
+    /* [SỬA 2] RADAR SECTION: Chuyển sang Grid 2x2 thay vì Flex ngang */
+    .radar-section { 
+        height: 360px; /* Tăng chiều cao lên để chứa 2 hàng */
+        border-top: 4px solid #f1f5f9; 
+        padding: 10px 15px; 
+        background: #fff; 
+        flex-shrink: 0;
+        
+        display: grid; /* Dùng Grid */
+        grid-template-columns: 1fr 1fr; /* 2 cột */
+        grid-template-rows: 1fr 1fr;    /* 2 hàng */
+        gap: 10px;
+    }
+    
+    .mini-radar-item { 
+        background: white; 
+        border: 1px solid #e2e8f0; 
+        border-radius: 8px; 
+        position: relative; 
+        display: flex; 
+        flex-direction: column; 
+        overflow: hidden; 
+        /* Không cần flex: 1 nữa vì đã dùng grid */
+    }
+    /* === CỘT 1: CÂY KHÁCH HÀNG (MODERN STYLE) === */
+    
+    /* Container danh sách: Tùy chỉnh thanh cuộn cho đẹp */
+    #tdcListContainer::-webkit-scrollbar { width: 6px; }
+    #tdcListContainer::-webkit-scrollbar-track { background: transparent; }
+    #tdcListContainer::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    #tdcListContainer::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Nhóm Khách hàng: Dạng thẻ nổi (Card) */
+    .cust-group {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px; /* Bo tròn mềm mại */
+        margin-bottom: 10px; /* Khoảng cách giữa các khách */
+        overflow: hidden;
+        transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    .cust-group:hover {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); /* Hiệu ứng nổi khi di chuột */
+        border-color: #cbd5e1;
+    }
+
+    /* Header Khách hàng */
+    .tree-cust { 
+        padding: 12px 15px; 
+        background: #fff; /* Chuyển sang nền trắng cho sạch sẽ */
+        color: #1e293b; 
+        font-weight: 700; 
+        border-bottom: 1px solid transparent;
+        display: flex; justify-content: space-between; align-items: center; 
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.95em;
+    }
+    .tree-cust:hover { background: #f8fafc; }
+    /* Khi mở ra thì header đậm hơn chút để phân biệt */
+    .cust-group.open .tree-cust {
+        background: #f1f5f9;
+        border-bottom: 1px solid #e2e8f0;
+        color: #0f172a;
+    }
+
+    /* Icon Tên Khách hàng */
+    .cust-icon {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 32px; height: 32px;
+        background: #e0f2fe; color: #0284c7;
+        border-radius: 6px; margin-right: 10px;
+        font-size: 1.1em;
+    }
+
+    /* Nút cộng (+) mới */
+    .btn-quick-add {
+        width: 28px; height: 28px;
+        background: white; border: 1px solid #e2e8f0; color: #64748b;
+        border-radius: 50%; /* Tròn */
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        font-size: 16px; margin-right: 8px;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .btn-quick-add:hover { 
+        background: #2563eb; border-color: #2563eb; color: white; 
+        transform: rotate(90deg); /* Xoay nhẹ khi hover tạo cảm giác mượt */
+    }
+
+    /* Badge số lượng */
+    .badge-count { 
+        font-size: 0.75em; font-weight: 700;
+        background: #f1f5f9; color: #64748b; 
+        padding: 4px 8px; border-radius: 12px; 
+        min-width: 24px; text-align: center;
+        transition: 0.2s;
+    }
+    .badge-active { background: #dcfce7; color: #15803d; } /* Xanh lá nếu có dữ liệu */
+
+    /* Phần Body (Chứa Mác thép & Item) */
+    .tree-body { 
+        display: none; 
+        background: #fff;
+        animation: slideDown 0.3s ease-out; /* Hiệu ứng trượt xuống */
+    }
+    @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-5px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Header Mác thép */
+    .tree-grade { 
+        padding: 8px 15px 8px 58px; /* Thụt vào thẳng hàng với tên khách */
+        background: #fff;
+        color: #64748b;
+        font-weight: 600;
+        font-size: 0.85em;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-top: 1px solid #f1f5f9;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .tree-grade::before { content: "•"; color: #cbd5e1; font-size: 1.5em; line-height: 0; }
+
+    /* TDC Item (Con cuối cùng) */
+    .tree-item { 
+        padding: 10px 15px 10px 58px;
+        cursor: pointer; 
+        font-size: 0.9em;
+        background: #fff;
+        border-left: 3px solid transparent; /* Chuẩn bị cho hover */
+        transition: all 0.2s;
+    }
+    .tree-item:hover { 
+        background: #f8fafc; 
+        border-left-color: #3b82f6; /* Viền xanh bên trái khi hover */
+        padding-left: 62px; /* Dịch nhẹ sang phải */
+    }
+    .tree-item.active { 
+        background: #eff6ff; 
+        border-left-color: #2563eb; 
+        color: #1e40af; 
+        font-weight: 600; 
+    }
+    
+    .code-pill {
+        display: inline-block; 
+        background: #e0e7ff; color: #4338ca; 
+        padding: 2px 6px; border-radius: 4px; 
+        font-size: 0.8em; font-family: monospace; font-weight: 700;
+        margin-top: 4px;
+    }
+    /* === CỘT 1: DANH SÁCH KHÁCH HÀNG (ENTERPRISE FLAT STYLE) === */
+    
+    /* Container: Bỏ padding thừa để list sát cạnh */
+    #tdcListContainer { padding: 0; }
+
+    /* Nhóm Khách hàng: Dạng danh sách liền mạch, không tách card */
+    .cust-group {
+        background: #fff;
+        border-bottom: 1px solid #e2e8f0; /* Chỉ có gạch chân mờ */
+        margin: 0; /* Bỏ khoảng cách giữa các dòng */
+    }
+    .cust-group:last-child { border-bottom: none; }
+
+    /* Header Khách hàng */
+    .tree-cust { 
+        padding: 10px 15px; /* Giảm padding cho gọn */
+        background: #fff;
+        color: #334155; 
+        font-weight: 600; 
+        font-size: 0.9em;
+        display: flex; justify-content: space-between; align-items: center; 
+        cursor: pointer;
+        transition: background 0.1s;
+    }
+    .tree-cust:hover { background: #f8fafc; color: #0f172a; }
+    
+    /* Khi đang mở */
+    .cust-group.open .tree-cust {
+        background: #f1f5f9;
+        font-weight: 700;
+        color: #0369a1;
+        border-left: 3px solid #0369a1; /* Điểm nhấn bên trái */
+        padding-left: 12px; /* Bù lại 3px border */
+    }
+
+    /* Nút (+) nhỏ gọn tinh tế hơn */
+    .btn-quick-add {
+        width: 24px; height: 24px;
+        background: transparent;
+        border: 1px solid #cbd5e1; color: #64748b;
+        border-radius: 4px;
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        font-size: 14px; margin-right: 6px;
+        transition: all 0.2s;
+    }
+    .btn-quick-add:hover { 
+        background: #0ea5e9; border-color: #0ea5e9; color: white; 
+    }
+
+    /* Badge số lượng: Nhỏ gọn */
+    .badge-count { 
+        font-size: 0.75em; font-weight: 600;
+        color: #94a3b8; background: #f1f5f9;
+        padding: 2px 6px; border-radius: 4px;
+        min-width: 20px; text-align: center;
+    }
+    .badge-active { background: #dbeafe; color: #1d4ed8; } /* Xanh đậm nếu có dữ liệu */
+
+    /* Body (Danh sách con) */
+    .tree-body { 
+        display: none; 
+        background: #fff;
+        box-shadow: inset 0 4px 6px -4px rgba(0,0,0,0.1); /* Bóng đổ nhẹ bên trong */
+    }
+
+    /* Mác thép header */
+    .tree-grade { 
+        padding: 6px 15px 6px 35px; /* Thụt đầu dòng */
+        background: #f8fafc;
+        color: #64748b;
+        font-weight: 700;
+        font-size: 0.8em;
+        border-top: 1px solid #f1f5f9;
+        display: flex; align-items: center;
+    }
+    .tree-grade::before { content: "⚙"; margin-right: 6px; opacity: 0.5; font-size:0.9em; }
+
+    /* Item TDC cuối cùng */
+    .tree-item { 
+        padding: 8px 15px 8px 35px;
+        cursor: pointer; 
+        font-size: 0.9em;
+        border-left: 3px solid transparent;
+        border-bottom: 1px solid #f8fafc;
+    }
+    .tree-item:hover { 
+        background: #eff6ff; 
+        color: #0284c7; 
+    }
+    .code-pill {
+        display: inline-block; 
+        background: #e2e8f0; color: #475569; 
+        padding: 1px 5px; border-radius: 3px; 
+        font-size: 0.75em; font-family: monospace;
+        margin-left: 5px;
+    }
+    .chart-label { position: absolute; top: 5px; left: 5px; font-size: 11px; font-weight: bold; color: #64748b; background: rgba(255,255,255,0.95); padding: 2px 6px; z-index: 10; border-radius: 4px; border: 1px solid #eee; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+    .canvas-wrapper { flex: 1; position: relative; width: 100%; min-height: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="app-header" style="margin:0; border-radius:0;">
+    <div class="app-title-row" style="border:none; margin:0; padding:0;">
+        <h1>📚 THƯ VIỆN TIÊU CHUẨN (TDC MASTER)</h1>
+        <div>
+            <button onclick="createNewTDC()" class="btn-upload" style="background:#16a34a; border:none;">+ Tạo Tiêu Chuẩn Mới</button>
+        </div>
+    </div>
+</div>
+
+<div class="main-layout">
+    <div class="panel">
+        <div class="panel-head" style="flex-direction:column; align-items:stretch; height:auto; gap:10px; padding-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span>Danh sách Tiêu chuẩn</span>
+                <button onclick="loadTDCList()" class="btn-reset" title="Tải lại">↻</button>
+            </div>
+            <input type="text" id="searchCust" onkeyup="filterCustList()" 
+                placeholder="🔍 Lọc tên khách, mác thép..." 
+                style="width:100%; padding:6px; border:1px solid #cbd5e1; border-radius:4px; font-size:0.9em;">
+        </div>
+        <div style="flex:1; overflow-y:auto;" id="tdcListContainer"></div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head">
+            <span id="detailTitle" style="color:#2563eb;">Chi tiết Tiêu chuẩn</span>
+            <button onclick="saveTDC()" class="btn-upload btn-prop" style="padding:4px 15px; font-size: 0.9em;">💾 LƯU MASTER</button>
+        </div>
+        <div class="mid-content">
+            <input type="hidden" id="tdcId"> 
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">1. KHÁCH HÀNG (SAP)</label>
+                    <div style="display:flex; gap:5px;">
+                        <input list="sapCustList" id="custName" class="form-input" placeholder="🔍 Chọn hoặc gõ tên..." onchange="onSapCustChange()" style="flex:1;">
+                        <datalist id="sapCustList"></datalist>
+                        <button onclick="loadSapCustomers()" title="Tải lại danh sách" class="btn-reset" style="border:1px solid #cbd5e1;">↻</button>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">2. MÁC THÉP (SAP)</label>
+                    <select id="gradeSelect" class="form-input" onchange="onGradeChange()">
+                        <option value="">-- Vui lòng chọn Khách trước --</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">3. MỤC ĐÍCH SỬ DỤNG</label>
+                    <input type="text" id="usagePurpose" class="form-input" placeholder="VD: Ống thép, Mạ, Cán nguội...">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">4. MÃ TDC (TỰ ĐẶT)</label>
+                    <input type="text" id="tdcCode" class="form-input" placeholder="VD: HP-ONG-01" style="color:#2563eb; font-weight:bold;">
+                </div>
+            </div>
+
+            <hr style="border:0; border-top:1px solid #eee; width:100%;">
+
+            <div style="display:flex; flex-direction:column; gap:10px; flex:1;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <label class="form-label">📄 TÀI LIỆU GỐC (PDF)</label>
+                    <div style="display:flex; gap:5px;">
+                        <input type="file" id="pdfInput" accept="application/pdf" style="display:none;" onchange="handlePdfSelect()">
+                        <button onclick="document.getElementById('pdfInput').click()" class="btn-reset" style="font-size:0.85em;">⬆️ Upload PDF</button>
+                        <button onclick="clearPDF()" class="btn-reset" style="color:#ef4444; font-size:0.85em;">✕ Xóa</button>
+                    </div>
+                </div>
+                <div class="pdf-area" id="pdfPreview">
+                    <span style="color:#94a3b8;">(Chưa có file PDF)</span>
+                </div>
+                <input type="hidden" id="pdfPathVal">
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head">
+            <span>Tiêu chuẩn Lỗi (Radar)</span>
+            <button onclick="addAllDefects()" style="font-size:0.8em; color:#2563eb; border:none; background:none; cursor:pointer; font-weight:bold;">⚡ Thêm Hết</button>
+        </div>
+        <div class="right-content">
+    
+            <div class="add-crit-box" style="background:#f1f5f9; border-bottom:1px solid #e2e8f0;">
+                <div style="flex:1; display:flex; flex-direction:column;">
+                    <label style="font-size:0.7em; font-weight:bold; color:#64748b;">CHỌN LỖI (AUTO & MANUAL)</label>
+                    <select id="unifiedDefectSelect" class="form-input" style="font-weight:bold; color:#0f172a;"></select>
+                </div>
+
+                <div style="display:flex; align-items:center; gap:5px; margin-top:14px;">
+                    <select id="rangeStart" class="form-input" style="width: 60px">
+                        <option value="1">C1</option>
+                        <option value="2">C2</option>
+                        <option value="3">C3</option>
+                        <option value="4">C4</option>
+                        <option value="5">C5</option>
+                        <option value="6">C6</option>
+                    </select>
+                    <span style="font-size: 0.8em; color: #999">➔</span>
+                    <select id="rangeEnd" class="form-input" style="width: 60px">
+                        <option value="1">C1</option>
+                        <option value="2">C2</option>
+                        <option value="3">C3</option>
+                        <option value="4">C4</option>
+                        <option value="5">C5</option>
+                        <option value="6">C6</option>
+                    </select>
+                    <button onclick="addUnifiedCrit()" class="btn-upload btn-geo" style="width:35px; padding:0; height:32px;" title="Thêm Lỗi">+</button>
+                </div>
+            </div>
+            
+            <div id="critList" class="crit-list-container"></div>
+            
+            <div class="radar-section">
+                <div class="mini-radar-item">
+                    <span class="chart-label" style="color:#dc2626">BỀ MẶT</span>
+                    <div class="canvas-wrapper"><canvas id="radarSurf"></canvas></div>
+                </div>
+                <div class="mini-radar-item">
+                    <span class="chart-label" style="color:#2563eb">HÌNH HỌC</span>
+                    <div class="canvas-wrapper"><canvas id="radarGeo"></canvas></div>
+                </div>
+                <div class="mini-radar-item">
+                    <span class="chart-label" style="color:#16a34a">CƠ LÝ HÓA</span>
+                    <div class="canvas-wrapper"><canvas id="radarProp"></canvas></div>
+                </div>
+                <div class="mini-radar-item">
+                    <span class="chart-label" style="color:#9333ea">NGOẠI QUAN</span>
+                    <div class="canvas-wrapper"><canvas id="radarApp"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %} 
+<script>
+const MANUAL_LIB = [
+    // Bề mặt
+    { code: 'oil', name: 'Gấp nếp', group: 'surface' },
+    { code: 'rust', name: 'Nếp Nhăn', group: 'surface' },
+    { code: 'scratch_m', name: 'Vết hằn Pinch Roll', group: 'surface' },
+    { code: 'dirt', name: 'Gãy mặt', group: 'surface' },
+    { code: 'mark', name: 'Xỉ thứ cấp', group: 'surface' },
+    { code: 'scale', name: 'Xỉ cán', group: 'surface' },
+    { code: 'other_s', name: 'Xỉ muối tiêu', group: 'surface' },
+    // Hình học
+    { code: 'telescope', name: 'Cong cạnh', group: 'geometry' },
+    // Ngoại quan (App)
+    { code: 'strap', name: 'Khuyết biên', group: 'app' },
+    { code: 'label_tag', name: 'Bava biên', group: 'app' },
+    { code: 'packaging', name: 'Vỡ biên', group: 'app' },
+    { code: 'edge_cond', name: 'Sổ vòng', group: 'app' },
+    { code: 'coil_shape', name: 'Loa cuộn', group: 'app' }
+];
+let GRADE_CONFIGS = {};
+let TDC_LIBRARY = {}; // Dữ liệu thư viện TDC tải từ server
+let CURRENT_CRITERIA = []; // Lưu danh sách lỗi đang cấu hình
+let CHARTS = { surf: null, geo: null, prop: null };
+let CURRENT_PDF_PATH = "";
+
+// 1. KHỞI TẠO
+window.onload = async () => {
+    // A. Load Config lỗi (Để dùng cho việc map lỗi tự động sau này)
+    const res = await fetch('/api/grade_configs');
+    GRADE_CONFIGS = await res.json();
+
+    // B. Load Danh sách Khách hàng từ SAP (Mới)
+    await loadSapCustomers();
+
+    // C. Load Danh sách TDC đã lưu
+    loadTDCList(); 
+    
+    // D. Init Radar
+    setTimeout(initRadars, 200); 
+};
+async function loadSapCustomers() {
+    const list = document.getElementById('sapCustList');
+    try {
+        const res = await fetch('/api/sap/get_customers');
+        const json = await res.json();
+        if(json.status === 'success') {
+            list.innerHTML = json.data.map(c => `<option value="${c}">`).join('');
+        }
+    } catch(e) { console.error(e); }
+}
+
+async function onSapCustChange() {
+    const custName = document.getElementById('custName').value;
+    const gradeSel = document.getElementById('gradeSelect');
+    
+    gradeSel.innerHTML = '<option>Đang tải mác thép...</option>';
+    
+    if(!custName) {
+        gradeSel.innerHTML = '<option value="">-- Chọn Khách trước --</option>';
+        return;
+    }
+
+    try {
+        // Gọi API lấy Grade theo Customer
+        const res = await fetch('/api/sap/get_grades_by_cust', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ customer_name: custName })
+        });
+        const json = await res.json();
+        
+        if(json.status === 'success' && json.data.length > 0) {
+            gradeSel.innerHTML = json.data.map(g => `<option value="${g}">${g}</option>`).join('');
+            // Sau khi load xong grade, trigger logic load lỗi
+            onGradeChange(); 
+        } else {
+            gradeSel.innerHTML = '<option value="">Khách này chưa có lịch sử Mác thép</option>';
+            // Nếu không có trên SAP, cho phép nhập tay bằng cách biến thành input (Optional)
+            // Hoặc add option "Khác"
+            gradeSel.innerHTML += '<option value="OTHER">Mác khác (Nhập tay Criteria)</option>';
+        }
+    } catch(e) { 
+        alert('Lỗi lấy Mác thép: ' + e);
+        gradeSel.innerHTML = '<option value="">Lỗi kết nối</option>';
+    }
+}
+
+function onGradeChange() {
+    // Khi Mác thép thay đổi -> Load lại danh sách lỗi gợi ý (Unified Dropdown)
+    loadUnifiedDropdown();
+}
+function loadUnifiedDropdown() {
+    const grade = document.getElementById('gradeSelect').value;
+    
+    // Tìm config trong thư viện đã định nghĩa (GRADE_CONFIGS)
+    // Lưu ý: Mác từ SAP có thể là "SPHC", trong Config có thể là "SPHC" -> Khớp thì ngon
+    // Nếu SAP trả về "SPHC-1" mà Config chỉ có "SPHC" -> Cần logic mapping gần đúng nếu muốn xịn hơn
+    
+    const config = GRADE_CONFIGS[grade] || {}; 
+    
+    const select = document.getElementById('unifiedDefectSelect');
+    let html = '';
+
+    // Nhóm 1: Tự động (Chỉ hiện nếu tìm thấy Config khớp với tên Mác SAP)
+    if(Object.keys(config).length > 0) {
+        html += `<optgroup label="GỢI Ý (THEO CONFIG ${grade})">`;
+        Object.keys(config).forEach(k => {
+            html += `<option value="${k}" data-type="auto">${k}</option>`;
+        });
+        html += `</optgroup>`;
+    } else {
+        html += `<option disabled>-- Chưa có Config mẫu cho ${grade} --</option>`;
+    }
+
+    // Nhóm 2: Thủ công (Luôn hiện)
+    html += `<optgroup label="THƯ VIỆN LỖI CHUNG">`;
+    MANUAL_LIB.forEach(m => {
+        html += `<option value="${m.code}" data-type="manual">${m.name}</option>`;
+    });
+    html += `</optgroup>`;
+
+    select.innerHTML = html;
+    updateAllCharts();
+}
+
+function addUnifiedCrit() {
+    const select = document.getElementById('unifiedDefectSelect');
+    const selectedOption = select.options[select.selectedIndex];
+    if(!selectedOption) return; 
+
+    const defectCode = select.value;
+    const type = selectedOption.getAttribute('data-type');
+    
+    // 1. LẤY RANGE TỪ GIAO DIỆN (Áp dụng cho cả Auto và Manual)
+    const s = parseInt(document.getElementById('rangeStart').value);
+    const e = parseInt(document.getElementById('rangeEnd').value);
+    const range = (s <= e) ? Array.from({length: e-s+1}, (_, i) => s + i) : Array.from({length: s-e+1}, (_, i) => s - i);
+
+    let newItem = {
+        defect: defectCode,
+        target: s,
+        range: range, // Manual bây giờ cũng lưu range đầy đủ
+        type: type
+    };
+
+    // Nếu là Manual thì bổ sung thêm tên tiếng Việt và Group để vẽ Radar
+    if (type === 'manual') {
+        const libItem = MANUAL_LIB.find(x => x.code === defectCode);
+        newItem.name_vi = libItem.name;
+        newItem.manual_group = libItem.group;
+    }
+
+    // Check trùng và thêm
+    const idx = CURRENT_CRITERIA.findIndex(c => c.defect === newItem.defect);
+    if(idx >= 0) CURRENT_CRITERIA[idx] = newItem; 
+    else CURRENT_CRITERIA.push(newItem);
+    
+    renderCriteriaList();
+}
+// --- LOGIC CỘT 1: DANH SÁCH TDC (SỬA LẠI: Group theo Khách -> Mục đích) ---
+async function loadTDCList() {
+    const container = document.getElementById('tdcListContainer');
+    container.innerHTML = '<div style="text-align:center; padding:20px;">⏳ Đang tải dữ liệu từ SAP...</div>';
+
+    try {
+        // 1. Gọi song song 2 API: Lấy TDC hiện có (DB) và Lấy Khách hàng (SAP)
+        const [resTdc, resSap] = await Promise.all([
+            fetch('/api/get_tdc_library'),
+            fetch('/api/sap/get_customers')
+        ]);
+
+        const dbData = await resTdc.json();
+        const sapRes = await resSap.json();
+        const sapCustomers = sapRes.data || []; // List string tên khách
+
+        // 2. Cấu trúc dữ liệu Tree
+        // Master Tree: Key là Tên khách hàng
+        const tree = {};
+
+        // BƯỚC A: Khởi tạo khung từ SAP (Để đảm bảo khách nào trên SAP cũng hiện ra)
+        sapCustomers.forEach(cust => {
+            tree[cust] = { 
+                has_data: false, // Đánh dấu chưa có TDC
+                grades: {}       // Chứa các mác thép
+            };
+        });
+
+        // BƯỚC B: Đổ dữ liệu DB vào Tree
+        dbData.forEach(item => {
+            const cust = item.customer_name || 'KHÁCH LẺ';
+            
+            // Nếu khách có trong DB mà không có trong SAP (Dữ liệu cũ), vẫn tạo mới
+            if (!tree[cust]) tree[cust] = { has_data: true, grades: {} };
+            
+            tree[cust].has_data = true; // Đánh dấu là đã có TDC
+            
+            const grade = item.grade || 'KHÁC';
+            if (!tree[cust].grades[grade]) tree[cust].grades[grade] = [];
+            tree[cust].grades[grade].push(item);
+        });
+
+        // 3. Render HTML
+        let html = '';
+        // Sắp xếp tên khách hàng A-Z
+        const sortedCusts = Object.keys(tree).sort();
+
+        sortedCusts.forEach(cust => {
+            const data = tree[cust];
+            const gradeKeys = Object.keys(data.grades);
+            
+            let totalTDC = 0;
+            gradeKeys.forEach(g => totalTDC += data.grades[g].length);
+            
+            const badgeClass = totalTDC > 0 ? 'badge-active' : '';
+            // Icon tòa nhà hoặc avatar chữ cái đầu
+            const firstLetter = cust.charAt(0).toUpperCase();
+
+            html += `
+            <div class="cust-group" id="grp_${cust}">
+                <div class="tree-cust" onclick="toggleDisplay(this)">
+                    <div style="display:flex; align-items:center;">
+                        <span class="cust-icon">${firstLetter}</span>
+                        <span style="line-height:1.2;">${cust}</span>
+                    </div>
+                    <div style="display:flex; align-items:center;">
+                        <button class="btn-quick-add" onclick="quickAddTDC('${cust}', event)" title="Thêm tiêu chuẩn cho ${cust}">+</button>
+                        <span class="badge-count ${badgeClass}">${totalTDC}</span>
+                    </div>
+                </div>
+                
+                <div class="tree-body">`;
+            
+            if (gradeKeys.length === 0) {
+                html += `<div style="padding:15px; font-style:italic; color:#94a3b8; font-size:0.85em; text-align:center;">
+                            Chưa có thiết lập nào.<br>Bấm <b style="color:#2563eb">+</b> để tạo mới.
+                         </div>`;
+            } else {
+                gradeKeys.forEach(grade => {
+                    html += `<div class="tree-grade">${grade}</div>`;
+                    data.grades[grade].forEach(it => {
+                        html += `
+                        <div class="tree-item" onclick='selectTDC(${JSON.stringify(it)})'>
+                            <div style="color:#1e293b; margin-bottom:2px;">${it.usage_purpose}</div>
+                            <div class="code-pill">${it.tdc_code}</div>
+                        </div>`;
+                    });
+                });
+            }
+            html += `</div></div>`;
+        });
+
+        container.innerHTML = html;
+
+    } catch (e) {
+        console.error(e);
+        container.innerHTML = `<div style="color:red; padding:10px;">Lỗi tải dữ liệu: ${e.message}</div>`;
+    }
+}
+async function quickAddTDC(custName, event) {
+    event.stopPropagation(); // Không đóng/mở menu
+    
+    // 1. Reset Form
+    createNewTDC();
+    
+    // 2. Điền tên khách hàng (vào ô input hoặc datalist)
+    document.getElementById('custName').value = custName;
+    
+    // 3. Trigger load Mác thép ngay lập tức
+    // Giả lập sự kiện change để gọi hàm onSapCustChange (đã viết ở bước trước)
+    await onSapCustChange(); 
+    
+    // 4. Focus vào ô tiếp theo
+    document.getElementById('gradeSelect').focus();
+    
+    // 5. Cập nhật tiêu đề để người dùng biết
+    document.getElementById('detailTitle').innerHTML = `Tạo mới cho: <span style="color:#e11d48">${custName}</span>`;
+}
+function addTdcForCust(custName, event) {
+    event.stopPropagation();
+    createNewTDC();
+    document.getElementById('custName').value = custName;
+    document.getElementById('usagePurpose').focus();
+}
+function toggleDisplay(element) {
+    const parent = element.parentElement;
+    const body = parent.querySelector('.tree-body');
+    const icon = element.querySelector('span'); // Mũi tên
+    
+    // Nếu không có body (do chưa có dữ liệu) thì thoát luôn
+    if (!body) return;
+
+    if (body.style.display === 'block') {
+        body.style.display = 'none';
+        parent.classList.remove('open');
+        if(icon) icon.style.transform = 'rotate(0deg)';
+    } else {
+        body.style.display = 'block';
+        parent.classList.add('open');
+        if(icon) icon.style.transform = 'rotate(90deg)'; // Xoay mũi tên xuống
+    }
+}
+// --- LOGIC CỘT 2: FORM & PDF ---
+function createNewTDC() {
+    document.getElementById('tdcId').value = ''; // ID rỗng = Tạo mới
+    document.getElementById('custName').value = '';
+    document.getElementById('usagePurpose').value = '';
+    document.getElementById('tdcCode').value = '';
+    
+    CURRENT_CRITERIA = [];
+    renderCriteriaList(); // Xóa sạch list lỗi
+    clearPDF(); // Xóa PDF
+    document.getElementById('detailTitle').innerText = "Tạo Tiêu Chuẩn Mới";
+}
+
+function selectTDC(item) {
+    // 1. Fill thông tin
+    document.getElementById('tdcId').value = item.id;
+    document.getElementById('custName').value = item.customer_name;
+    document.getElementById('usagePurpose').value = item.usage_purpose;
+    document.getElementById('tdcCode').value = item.tdc_code;
+
+    // 2. Xử lý Mác thép
+    const gradeSel = document.getElementById('gradeSelect');
+    gradeSel.innerHTML = `<option value="${item.grade}" selected>${item.grade}</option>`;
+
+    fetch('/api/sap/get_grades_by_cust', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ customer_name: item.customer_name })
+    }).then(r => r.json()).then(json => {
+        if(json.status === 'success') {
+            const currentGrade = item.grade;
+            let opts = json.data.map(g => `<option value="${g}" ${g===currentGrade?'selected':''}>${g}</option>`).join('');
+            // Nếu mác hiện tại không nằm trong list SAP trả về (do lịch sử cũ), append nó vào
+            if(!json.data.includes(currentGrade)) {
+                opts += `<option value="${currentGrade}" selected>${currentGrade} (Lịch sử)</option>`;
+            }
+            gradeSel.innerHTML = opts;
+        }
+    });
+
+    loadUnifiedDropdown(); 
+
+    // 3. Criteria & PDF (Giữ nguyên)
+    CURRENT_CRITERIA = item.criteria || [];
+    renderCriteriaList(); 
+    document.getElementById('detailTitle').innerText = `Sửa: ${item.tdc_code}`;
+    CURRENT_PDF_PATH = item.pdf_path || "";
+    renderPDF();
+}
+
+async function handlePdfSelect() {
+    const file = document.getElementById('pdfInput').files[0];
+    if(!file) return;
+
+    // Upload ngay khi chọn file
+    const fd = new FormData();
+    fd.append('file', file);
+    
+    // Gọi API upload
+    try {
+        const res = await fetch('/api/upload_tdc_pdf', { method:'POST', body:fd });
+        const d = await res.json();
+        if(d.status === 'success') {
+            CURRENT_PDF_PATH = d.path;
+            renderPDF();
+        } else {
+            alert('Lỗi upload PDF: ' + d.msg);
+        }
+    } catch(e) { alert('Lỗi: ' + e); }
+}
+
+function renderPDF() {
+    const div = document.getElementById('pdfPreview');
+    if(CURRENT_PDF_PATH) {
+        div.innerHTML = `<iframe src="${CURRENT_PDF_PATH}#navpanes=0&toolbar=0&view=FitH" class="pdf-iframe"></iframe>`;
+        document.getElementById('pdfPathVal').value = CURRENT_PDF_PATH;
+    } else {
+        div.innerHTML = `<span style="color:#94a3b8;">(Chưa có file PDF)</span>`;
+        document.getElementById('pdfPathVal').value = "";
+    }
+}
+
+function clearPDF() {
+    CURRENT_PDF_PATH = "";
+    renderPDF();
+    document.getElementById('pdfInput').value = "";
+}
+
+// --- LOGIC CỘT 3: RADAR & CRITERIA (GIỮ NGUYÊN CODE CŨ CỦA BẠN) ---
+function loadGradeConfig() {
+    const g = document.getElementById('gradeSelect').value;
+    const cfg = GRADE_CONFIGS[g];
+    if(!cfg) return;
+    document.getElementById('defectSelect').innerHTML = Object.keys(cfg).map(k => `<option value="${k}">${k}</option>`).join('');
+    updateAllCharts();
+}
+
+function addCrit() {
+    const d = document.getElementById('defectSelect').value;
+    const s = parseInt(document.getElementById('rangeStart').value);
+    const e = parseInt(document.getElementById('rangeEnd').value);
+    const range = (s <= e) ? Array.from({length: e-s+1}, (_, i) => s + i) : Array.from({length: s-e+1}, (_, i) => s - i);
+    
+    const idx = CURRENT_CRITERIA.findIndex(c => c.defect === d);
+    if(idx >= 0) CURRENT_CRITERIA[idx].range = range; // Update nếu đã có
+    else CURRENT_CRITERIA.push({ defect: d, target: s, range: range });
+    
+    renderCriteriaList();
+}
+
+function addAllDefects() {
+    const g = document.getElementById('gradeSelect').value;
+    const cfg = GRADE_CONFIGS[g];
+    if(!cfg) return;
+
+    // Lấy Range hiện tại đang chọn trên giao diện
+    const s = parseInt(document.getElementById('rangeStart').value);
+    const e = parseInt(document.getElementById('rangeEnd').value);
+    const range = (s <= e) ? Array.from({length: e-s+1}, (_, i) => s + i) : Array.from({length: s-e+1}, (_, i) => s - i);
+
+    // 1. Thêm Auto
+    Object.keys(cfg).forEach(k => {
+        if(!CURRENT_CRITERIA.find(c => c.defect === k)) {
+            CURRENT_CRITERIA.push({ defect: k, target: s, range: [...range], type: 'auto' });
+        }
+    });
+
+    // 2. Thêm Manual (Cũng dùng range C1-C6 y hệt)
+    MANUAL_LIB.forEach(m => {
+        if(!CURRENT_CRITERIA.find(c => c.defect === m.code)) {
+            CURRENT_CRITERIA.push({ 
+                defect: m.code, 
+                name_vi: m.name, 
+                type: 'manual', 
+                manual_group: m.group,
+                target: s,
+                range: [...range] // <--- QUAN TRỌNG: Lưu range giống hệt Auto
+            });
+        }
+    });
+
+    renderCriteriaList();
+}
+// Render danh sách lỗi (Có Kéo Thả)
+function renderCriteriaList() {
+    const div = document.getElementById('critList');
+    
+    div.innerHTML = CURRENT_CRITERIA.map((c, i) => {
+        let style = '';
+        let labelHtml = '';
+
+        // Tạo chuỗi Option cho dropdown C1-C6
+        const s = c.range[0];
+        const e = c.range[c.range.length - 1];
+        const opts = (val) => [1,2,3,4,5,6].map(v => `<option value="${v}" ${v===val?'selected':''}>C${v}</option>`).join('');
+        
+        // Dropdown chọn Range (Dùng chung cho cả 2 loại)
+        const rangeSelectHtml = `
+            <div style="margin-left:auto; display:flex; align-items:center; gap:2px;">
+                <select class="mini-select" onchange="updCrit(${i},'s',this.value)">${opts(s)}</select> ➔ 
+                <select class="mini-select" onchange="updCrit(${i},'e',this.value)">${opts(e)}</select>
+            </div>
+        `;
+
+        if (c.type === 'manual') {
+            // Manual: Màu Cam + Tên Tiếng Việt
+            style = 'border-left: 4px solid #ea580c; background: #fff7ed;';
+            labelHtml = `<b style="color:#c2410c;">👁️ ${c.name_vi || c.defect}</b>`;
+        } else {
+            // Auto: Màu Xanh + Tên Code
+            style = 'border-left: 4px solid #2563eb; background: #fff;';
+            labelHtml = `<b style="color:#0f172a;">${c.defect}</b>`;
+        }
+
+        return `
+        <div class="crit-row" draggable="true" data-index="${i}" style="${style} display:flex; align-items:center; padding:8px; margin-bottom:5px; border-radius:4px; border:1px solid #e2e8f0;">
+            <span style="color:#cbd5e1; cursor:grab; margin-right:8px;" title="Kéo để sắp xếp">☰</span>
+            <div style="flex:1;">${labelHtml}</div>
+            ${rangeSelectHtml}
+            <button onclick="CURRENT_CRITERIA.splice(${i},1); renderCriteriaList()" class="btn-x" style="color:#ef4444; margin-left:10px;" title="Xóa">✕</button>
+        </div>`;
+    }).join('');
+
+    addDragEvents();
+    updateAllCharts();
+}
+function addDragEvents() {
+    const rows = document.querySelectorAll('.crit-row');
+    rows.forEach(row => {
+        row.addEventListener('dragstart', handleDragStart);
+        row.addEventListener('dragover', handleDragOver);
+        row.addEventListener('dragleave', handleDragLeave);
+        row.addEventListener('drop', handleDrop);
+        row.addEventListener('dragend', handleDragEnd);
+    });
+}
+let dragSrcIndex = null;
+
+function handleDragStart(e) { this.classList.add('dragging'); dragSrcIndex = parseInt(this.getAttribute('data-index')); e.dataTransfer.effectAllowed = 'move'; }
+function handleDragOver(e) { if (e.preventDefault) e.preventDefault(); this.classList.add('drag-over'); e.dataTransfer.dropEffect = 'move'; return false; }
+function handleDragLeave(e) { this.classList.remove('drag-over'); }
+function handleDrop(e) {
+    if (e.stopPropagation) e.stopPropagation();
+    const targetIndex = parseInt(this.getAttribute('data-index'));
+    if (dragSrcIndex !== null && dragSrcIndex !== targetIndex) {
+        const itemToMove = CURRENT_CRITERIA.splice(dragSrcIndex, 1)[0];
+        CURRENT_CRITERIA.splice(targetIndex, 0, itemToMove);
+        renderCriteriaList();
+    }
+    return false;
+}
+function handleDragEnd(e) { this.classList.remove('dragging'); document.querySelectorAll('.crit-row').forEach(row => row.classList.remove('drag-over')); }
+
+function updCrit(i, type, val) {
+    const item = CURRENT_CRITERIA[i];
+    
+    // Không còn dòng chặn manual ở đây nữa -> Cho phép sửa hết
+    let s = item.range[0];
+    let e = item.range[item.range.length - 1];
+    
+    if(type==='s') s = parseInt(val); else e = parseInt(val);
+    
+    // Tính lại mảng range
+    item.range = (s <= e) ? Array.from({length: e-s+1}, (_, k) => s + k) : Array.from({length: s-e+1}, (_, k) => s - k);
+    item.target = s;
+    
+    updateAllCharts();
+}
+
+// Vẽ Radar
+function initRadars() {
+    const opts = { scales: { r: { min: 0, max: 6, ticks: { display: false } } }, plugins: { legend: { display: false } }, maintainAspectRatio: false, responsive: true };
+    CHARTS.surf = new Chart(document.getElementById('radarSurf'), { type: 'radar', options: opts, data: { labels: [], datasets: [] } });
+    CHARTS.geo = new Chart(document.getElementById('radarGeo'), { type: 'radar', options: opts, data: { labels: [], datasets: [] } });
+    CHARTS.prop = new Chart(document.getElementById('radarProp'), { type: 'radar', options: opts, data: { labels: [], datasets: [] } });
+    CHARTS.app = new Chart(document.getElementById('radarApp'), { type: 'radar', options: opts, data: { labels: [], datasets: [] } });
+}
+
+function updateAllCharts() {
+    const grade = document.getElementById('gradeSelect').value;
+    const config = GRADE_CONFIGS[grade];
+    
+    const groups = { surface: [], geometry: [], prop: [], app: [] };
+
+    // 1. Phân loại Auto
+    if (config) {
+        for (const [key, val] of Object.entries(config)) {
+            if (val.group === 'surface') groups.surface.push(key);
+            else if (val.group === 'geometry') groups.geometry.push(key);
+            else if (val.group === 'mechanical' || val.group === 'chemical') groups.prop.push(key);
+        }
+    }
+
+    // 2. Phân loại Manual
+    CURRENT_CRITERIA.forEach(c => {
+        if (groups.surface.includes(c.defect) || groups.geometry.includes(c.defect) || groups.prop.includes(c.defect)) return;
+        if (c.type === 'manual') {
+            if (c.manual_group === 'surface') groups.surface.push(c.defect);
+            else if (c.manual_group === 'geometry') groups.geometry.push(c.defect);
+            else if (c.manual_group === 'app') groups.app.push(c.defect);
+        }
+    });
+
+    const getDisplayName = (keys) => keys.map(k => {
+        const manualItem = MANUAL_LIB.find(m => m.code === k);
+        return manualItem ? manualItem.name.split(' (')[0] : k;
+    });
+
+    // [LOGIC MỚI] Tính toán Min và Max cho từng tiêu chí
+    const buildMinMax = (keys) => {
+        const mins = [], maxs = [];
+        keys.forEach(k => {
+            const f = CURRENT_CRITERIA.find(c => c.defect === k);
+            if (f && f.range && f.range.length) {
+                mins.push(Math.min(...f.range));
+                maxs.push(Math.max(...f.range));
+            } else {
+                // Nếu không có config, mặc định là 0-6 (hoặc 0-0 tùy logic của bạn, ở đây để 0-6 cho dễ nhìn)
+                mins.push(0);
+                maxs.push(6);
+            }
+        });
+        return { mins, maxs };
+    };
+
+    const updateOne = (chart, keys, color) => {
+        if (!chart) return; 
+        const { mins, maxs } = buildMinMax(keys);
+
+        chart.data.labels = getDisplayName(keys); 
+        chart.data.datasets = [
+            // Dataset 1: Max Limit (Đường đứt nét bên ngoài)
+            { 
+                label: 'Max',
+                data: maxs, 
+                borderColor: '#16a34a', // Màu xanh lá chuẩn TDC
+                borderWidth: 1, 
+                borderDash: [5, 5],
+                fill: false, // Không tô xuống tâm
+                pointRadius: 0
+            },
+            // Dataset 2: Min Limit (Đường đứt nét bên trong - Tô màu lên Max)
+            { 
+                label: 'Min',
+                data: mins, 
+                borderColor: '#16a34a',
+                borderWidth: 1, 
+                borderDash: [5, 5],
+                fill: '-1', // [QUAN TRỌNG] Tô màu khoảng cách đến dataset trước đó (Max)
+                backgroundColor: 'rgba(22, 163, 74, 0.1)', // Màu nền xanh nhạt giữa 2 đường
+                pointRadius: 0
+            }
+        ];
+        
+        // Cấu hình lại scale để đảm bảo 0 nằm ở tâm và max là 6
+        chart.options.scales.r.min = 0;
+        chart.options.scales.r.max = 6;
+        
+        chart.update();
+    };
+
+    updateOne(CHARTS.surf, groups.surface, 'rgba(220, 38, 38, 1)');
+    updateOne(CHARTS.geo,  groups.geometry, 'rgba(37, 99, 235, 1)');
+    updateOne(CHARTS.prop, groups.prop,     'rgba(22, 163, 74, 1)');
+    updateOne(CHARTS.app,  groups.app,      'rgba(147, 51, 234, 1)');
+}
+
+// --- LOGIC LƯU TRỮ (GIỮ NGUYÊN) ---
+async function saveTDC() {
+    const payload = {
+        id: document.getElementById('tdcId').value || null, 
+        customer_name: document.getElementById('custName').value,
+        usage_purpose: document.getElementById('usagePurpose').value,
+        tdc_code: document.getElementById('tdcCode').value,
+        grade: document.getElementById('gradeSelect').value,
+        criteria: CURRENT_CRITERIA,
+        pdf_path: CURRENT_PDF_PATH
+    };
+
+    if(!payload.customer_name || !payload.usage_purpose) return alert("Thiếu Tên Khách hoặc Mục đích sử dụng!");
+    
+    try {
+        const res = await fetch('/api/save_tdc_master', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify(payload) 
+        });
+        const d = await res.json();
+        if(d.status === 'success') { 
+            alert(d.msg); 
+            loadTDCList(); 
+            if(!payload.id) createNewTDC(); 
+        }
+    } catch(e) { alert("Lỗi kết nối: " + e); }
+}
+
+// --- LOGIC LƯU TRỮ (GỌI API MỚI) ---
+async function saveTDC() {
+    const payload = {
+        id: document.getElementById('tdcId').value || null, 
+        customer_name: document.getElementById('custName').value,
+        usage_purpose: document.getElementById('usagePurpose').value,
+        tdc_code: document.getElementById('tdcCode').value,
+        grade: document.getElementById('gradeSelect').value,
+        criteria: CURRENT_CRITERIA,
+        pdf_path: CURRENT_PDF_PATH
+    };
+
+    if(!payload.customer_name || !payload.usage_purpose) return alert("Thiếu Tên Khách hoặc Mục đích sử dụng!");
+    
+    try {
+        const res = await fetch('/api/save_tdc_master', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify(payload) 
+        });
+        const d = await res.json();
+        
+        if(d.status === 'success') { 
+            alert(d.msg); 
+            loadTDCList(); 
+            if(!payload.id) createNewTDC(); 
+            alert(d.msg); 
+        }
+    } catch(e) { alert("Lỗi kết nối: " + e); }
+}
+// --- LOGIC LỌC DANH SÁCH (CLIENT-SIDE SEARCH) ---
+function filterCustList() {
+    // 1. Lấy từ khóa, chuyển về chữ thường
+    const term = document.getElementById('searchCust').value.toLowerCase();
+    
+    // 2. Lấy tất cả các nhóm khách hàng
+    const groups = document.querySelectorAll('.cust-group');
+    
+    groups.forEach(group => {
+        // Lấy nội dung text của cả nhóm (Bao gồm Tên khách, Mác thép, Code...)
+        const textContent = group.innerText.toLowerCase();
+        
+        // 3. Kiểm tra: Nếu từ khóa xuất hiện trong nội dung -> Hiện, ngược lại -> Ẩn
+        if (textContent.includes(term)) {
+            group.style.display = 'block';
+        } else {
+            group.style.display = 'none';
+        }
+    });
+}
+</script>
+{% endblock %}

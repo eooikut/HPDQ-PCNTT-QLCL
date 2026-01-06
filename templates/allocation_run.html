@@ -1,0 +1,572 @@
+{% extends "base.html" %}
+{% block title %}Phân Bổ Đơn Hàng (Order Fulfillment){% endblock %}
+
+{% block head %}
+<style>
+    /* === LAYOUT CHUNG === */
+    .run-layout { display: flex; flex-direction: column; gap: 15px; padding: 15px; height: 100vh; overflow: hidden; background: #f8fafc; }
+    .panel { background: white; border: 1px solid #cbd5e1; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    
+    /* === SAP PANEL STYLE === */
+    .sap-panel { background: #f0f9ff; border: 1px solid #bae6fd; padding: 15px; flex: 0 0 auto; }
+    .sap-label { font-size: 0.75em; font-weight: 700; color: #0369a1; text-transform: uppercase; margin-bottom: 4px; display: block; }
+    
+    /* === INPUT SECTION === */
+    .input-table { width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; }
+    .input-table th { background: #f8fafc; padding: 8px; font-size: 0.8em; color: #64748b; border: 1px solid #e2e8f0; text-align: left; }
+    .input-table td { padding: 0; border: 1px solid #e2e8f0; }
+    .inp-cell { width: 100%; border: none; padding: 8px; font-size: 0.9em; outline: none; }
+    .inp-select { width: 100%; border: none; padding: 8px; font-size: 0.9em; outline: none; background: #fff; cursor: pointer; }
+    .inp-select:focus, .inp-cell:focus { background: #eff6ff; }
+
+    /* === RESULT TABLE STYLE === */
+    .table-container { flex: 1; overflow: auto; background: #fff; }
+    .result-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1200px; }
+    
+    .result-table th { 
+        position: sticky; top: 0; z-index: 10;
+        background: #f1f5f9; color: #475569; padding: 10px 15px; 
+        font-weight: 700; font-size: 0.85em; text-transform: uppercase; 
+        border-bottom: 2px solid #cbd5e1; 
+    }
+    .result-table td { 
+        padding: 8px 15px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; font-size: 0.9em; color: #334155;
+    }
+    .result-table tr { cursor: pointer; transition: background 0.1s; }
+    .result-table tr:hover { background-color: #f0f9ff; }
+
+    /* === BADGES TRẠNG THÁI === */
+    .badge-std { background: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; border: 1px solid #bbf7d0; display: inline-block;}
+    .badge-warn { background: #fef9c3; color: #854d0e; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; border: 1px solid #fde047; display: inline-block;}
+    .defect-pill { 
+        display: inline-block; font-size: 10px; padding: 2px 6px; 
+        border-radius: 4px; background: #fef2f2; color: #dc2626; 
+        border: 1px solid #fee2e2; margin-right: 4px; margin-bottom: 4px; font-weight: 600; 
+    }
+
+    /* === RADAR SVG STYLES === */
+    .radar-wrapper { 
+        display: flex; gap: 10px; align-items: center; justify-content: flex-start; 
+        padding: 5px 0;
+    }
+    .radar-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    
+    .mini-radar-box { 
+        width: 65px; height: 65px; 
+        position: relative; display: flex; align-items: center; justify-content: center;
+    }
+    .mini-radar-box svg { width: 100%; height: 100%; overflow: visible; }
+    .mini-radar-box:hover { transform: scale(1.3); z-index: 100; transition: transform 0.2s; }
+    
+    .mini-chart-label { font-size: 9px; font-weight: 700; text-transform: uppercase; margin-top: 2px; color: #64748b; }
+
+    /* === MODAL STYLES === */
+    .chart-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: none; justify-content: center; align-items: center; }
+    .chart-box { background: white; width: 95%; max-width: 1100px; height: 85vh; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; }
+    .chart-grid { 
+        display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 20px; flex: 1; min-height: 0; padding: 10px;
+    }
+    .chart-container h4 { margin: 5px 0 10px 0; text-transform: uppercase; font-size: 0.95em; letter-spacing: 0.5px; }
+    .chart-container { position: relative; border: 1px solid #eee; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; }
+    .chart-container canvas { flex: 1; }
+
+    .coil-meta { font-size: 0.85em; color: #64748b; display: flex; gap: 8px; margin-top: 2px; }
+    .meta-tag { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; border: 1px solid #e2e8f0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="run-layout">
+    
+    <div class="panel sap-panel">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+            <h3 style="margin:0; color:#0369a1; font-size:1.1em;">📥 NHẬP TỪ SAP (SQL SERVER)</h3>
+            <span style="font-size:0.85em; color:#0c4a6e;">Tự động lấy dữ liệu Đơn hàng, Mác thép và Kích thước</span>
+        </div>
+        
+        <div style="display:flex; gap: 15px; align-items: flex-end;">
+            <div style="flex: 1;">
+                <label class="sap-label">1. Tìm Đơn Hàng (SO) / Khách Hàng</label>
+                <div style="display:flex; gap:5px;">
+                    <input list="sapSoList" id="sapSoInput" class="inp-cell" 
+                        placeholder="🔍 Nhập số SO hoặc tên khách..." 
+                        onchange="onSapSoChange()"
+                        style="width:100%; border:1px solid #38bdf8; border-radius:4px; padding:8px;">
+                    
+                    <datalist id="sapSoList"></datalist>
+
+                    <button onclick="loadSapSoList()" class="btn-reset" title="Tải lại danh sách" style="border:1px solid #7dd3fc; color:#0369a1;">↻</button>
+                </div>
+            </div>
+
+            <div style="flex: 1;">
+                <label class="sap-label">2. Chọn Mã Material (Quy cách)</label>
+                <select id="sapItemSelect" class="inp-select" style="width:100%; border:1px solid #38bdf8; border-radius:4px;" disabled>
+                    <option value="">-- Vui lòng chọn SO trước --</option>
+                </select>
+            </div>
+            <div>
+                <button onclick="addFromSap()" class="btn-upload" style="background:#0ea5e9; border:none; color:white; height:34px; padding:0 20px;">
+                    ⬇ THÊM VÀO LIST
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel" style="flex: 0 0 auto; max-height: 40vh;">
+        <div style="padding:10px 15px; background:#f1f5f9; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; color:#1e293b; font-size:1.1em;">📋 DANH SÁCH CẦN PHÂN BỔ (BACKLOG)</h3>
+            <div>
+                <button onclick="runBatchSearch()" class="btn-upload btn-geo" style="margin-left:10px;">🚀 CHẠY PHÂN BỔ</button>
+            </div>
+        </div>
+        
+        <div style="overflow-y:auto;">
+            <table class="input-table">
+                <thead>
+                    <tr>
+                        <th width="10%">Số SO</th>
+                        <th width="15%">Khách Hàng</th>
+                        <th width="8%">Mác Thép</th>
+                        <th width="12%">TDC Code</th>
+                        <th width="8%">Dày</th>
+                        <th width="8%">Rộng</th>
+                        <th width="8%">Min Kg</th>
+                        <th width="8%">Max Kg</th>
+                        <th width="10%">Tổng Cần (Kg)</th>
+                        <th width="5%" style="text-align:center">X</th>
+                    </tr>
+                </thead>
+                <tbody id="inputBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel" style="flex: 1;">
+        <div style="padding:10px 15px; background:#fff; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+            <span id="resCount" style="font-weight:700; color:#475569;">Kết quả: 0 cuộn</span>
+            <button id="btnConfirm" onclick="confirmAll()" style="display:none; background:#ea580c; color:white; border:none; padding:6px 15px; border-radius:4px; font-weight:bold; cursor:pointer;">💾 CHỐT ĐƠN HÀNG</button>
+        </div>
+        
+        <div class="table-container">
+            <table class="result-table">
+                <thead>
+                    <tr>
+                        <th width="40" style="text-align: center;">#</th>
+                        <th width="100">Sales Order</th> 
+                        <th width="120">Khách Hàng</th>  
+                        <th width="200">Thông tin Cuộn</th>
+                        <th width="120">Trạng thái</th>
+                        <th width="60" style="text-align: center;">Điểm</th>
+                        <th width="320">Biểu đồ Chất lượng</th>
+                        <th>Chi tiết Lỗi</th>
+                    </tr>
+                </thead>
+                <tbody id="resBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="compareModal" class="chart-modal" onclick="closeModal(event)">
+    <div class="chart-box" onclick="event.stopPropagation()">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h2 id="modalTitle" style="margin:0; color:#1e293b;">So sánh Chi tiết</h2>
+            <button onclick="closeModal()" class="btn-reset" style="font-size:1.5em; cursor:pointer;">✕</button>
+        </div>
+        <div class="chart-grid">
+            <div class="chart-container"><h4 style="text-align:center; color:#dc2626; margin:0 0 10px 0;">Bề Mặt</h4><div style="flex:1"><canvas id="cmpSurf"></canvas></div></div>
+            <div class="chart-container"><h4 style="text-align:center; color:#2563eb; margin:0 0 10px 0;">Kích Thước</h4><div style="flex:1"><canvas id="cmpGeo"></canvas></div></div>
+            <div class="chart-container"><h4 style="text-align:center; color:#16a34a; margin:0 0 10px 0;">Cơ/Lý/Hóa</h4><div style="flex:1"><canvas id="cmpProp"></canvas></div></div>
+            <div class="chart-container"><h4 style="text-align:center; color:#9333ea; margin:0 0 10px 0;">Ngoại Quan</h4><div style="flex:1"><canvas id="cmpApp"></canvas></div></div>
+        </div>
+        <div style="text-align:center; margin-top:10px; font-size:0.9em; color:#64748b;">
+            <span style="color:#16a34a; font-weight:bold; border-bottom:2px dashed #16a34a;">--- Giới hạn TDC</span> &nbsp;&nbsp;|&nbsp;&nbsp; 
+            <span style="color:#dc2626; font-weight:bold;">● Thực tế cuộn</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    let MASTER_TDCS = [];     
+    let CANDIDATES = [];      
+    let COMPARE_CHARTS = { surf: null, geo: null, prop: null, app: null };
+    let SAP_ITEMS_CACHE = []; // Cache lưu items của SO đang chọn
+
+    // --- KEYS DEFINITION & MAPS ---
+    const KEYS_MAP = {
+        surface: ['MI', 'HPrScale', 'PRScale', 'HOLE', 'RIP', 'BRUS', 'LC', 'SCRT', 'oil', 'rust', 'scratch_m', 'dirt', 'mark', 'scale', 'other_s'],
+        geometry: ['Flatness', 'Crown', 'Wedge', 'ThickDiff', 'WidthDiff', 'telescope'],
+        prop: ['YieldPoint', 'Tensile', 'Elongation', 'Hardness', 'C', 'Mn', 'Si', 'P', 'S'],
+        app: ['strap', 'label_tag', 'packaging', 'edge_cond', 'coil_shape']
+    };
+    const DEFECT_NAMES = {
+        'MI': 'Ngậm xỉ đúc', 'HPrScale': 'Xỉ sơ cấp HP', 'PRScale': 'Xỉ sơ cấp PR', 'HOLE': 'Lỗ thủng', 
+        'RIP': 'Rách bề mặt', 'BRUS': 'Vết Hằn trục', 'LC': 'Nứt dọc', 'SCRT': 'Xước bề mặt',
+        'oil': 'Gấp nếp', 'rust': 'Nếp Nhăn', 'scratch_m': 'Vết hằn Pinch Roll', 'dirt': 'Gãy mặt', 
+        'mark': 'Xỉ thứ cấp', 'scale': 'Xỉ cán', 'other_s': 'Xỉ muối tiêu', 'Flatness': 'Độ phẳng', 
+        'Crown': 'Độ vồng', 'Wedge': 'Độ nêm', 'ThickDiff': 'Sai lệch dày', 'WidthDiff': 'Sai lệch rộng',
+        'telescope': 'Cong cạnh', 'YieldPoint': 'GH Chảy', 'Tensile': 'GH Bền', 'Elongation': 'Độ giãn',
+        'Hardness': 'Độ cứng', 'C': 'Carbon', 'Mn': 'Mangan', 'Si': 'Silic', 'P': 'Photpho', 'S': 'Lưu huỳnh',
+        'strap': 'Khuyết biên', 'label_tag': 'Bava biên', 'packaging': 'Vỡ biên', 'edge_cond': 'Sổ vòng', 'coil_shape': 'Loa cuộn'
+    };
+
+    window.onload = async () => {
+        const [resTdc] = await Promise.all([ fetch('/api/get_tdc_library') ]);
+        MASTER_TDCS = await resTdc.json();
+        
+        initCompareCharts();
+        loadSapSoList(); // Load danh sách SO từ SAP
+        addRowWithData(null); // Thêm 1 dòng trống mặc định
+    };
+
+    // --- SAP LOGIC ---
+    async function loadSapSoList() {
+    const dataList = document.getElementById('sapSoList');
+    const input = document.getElementById('sapSoInput');
+    
+    input.placeholder = "Đang tải dữ liệu...";
+    
+    try {
+        const res = await fetch('/api/sap/get_so_list');
+        const json = await res.json();
+        
+        if(json.status === 'success') {
+            SAP_SO_DATA = json.data; // Lưu lại để dùng sau
+            dataList.innerHTML = json.data.map(i => 
+                `<option value="${i.so_number} | ${i.customer_name}">PO: ${i.po_number || '---'}</option>`
+            ).join('');
+            
+            input.placeholder = "🔍 Nhập số SO hoặc tên khách...";
+        } else { 
+            input.placeholder = "Lỗi tải dữ liệu"; 
+        }
+    } catch(e) { console.error(e); input.placeholder = "Lỗi kết nối"; }
+}
+
+    async function onSapSoChange() {
+    const rawValue = document.getElementById('sapSoInput').value; // VD: "200003087 | TÔN HÒA PHÁT"
+    const itemSel = document.getElementById('sapItemSelect');
+    
+    // Reset dropdown item
+    itemSel.innerHTML = '<option>Đang lấy dữ liệu...</option>';
+    itemSel.disabled = true;
+    SAP_ITEMS_CACHE = [];
+
+    if(!rawValue) { 
+        itemSel.innerHTML = '<option value="">-- Vui lòng chọn SO trước --</option>'; 
+        return; 
+    }
+    let soNum = rawValue.split('|')[0].trim();
+    
+    const isValid = SAP_SO_DATA.some(x => x.so_number.toString() === soNum);
+    if (!isValid) {
+        // Cố gắng tìm số trong chuỗi (Fallback)
+        const match = rawValue.match(/\d{8,10}/); // Tìm chuỗi số 8-10 ký tự
+        if(match) soNum = match[0];
+        else {
+            itemSel.innerHTML = '<option value="">❌ Không tìm thấy mã SO hợp lệ</option>';
+            return;
+        }
+    }
+
+    try {
+        const res = await fetch('/api/sap/get_so_items', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({ so_number: soNum }) 
+        });
+        const json = await res.json();
+        
+        if(json.status === 'success') {
+            SAP_ITEMS_CACHE = json.data;
+            if(SAP_ITEMS_CACHE.length === 0) { 
+                itemSel.innerHTML = '<option>SO đã hoàn thành hoặc không có item</option>'; 
+                return; 
+            }
+            
+            itemSel.innerHTML = '<option value="">-- Chọn Material --</option>' + 
+                SAP_ITEMS_CACHE.map((item, index) => {
+                    return `<option value="${index}">[${item.material_code}] ${item.description} (Cần: ${item.req_weight.toLocaleString()} kg)</option>`;
+                }).join('');
+            itemSel.disabled = false;
+        }
+    } catch(e) { alert("Lỗi lấy chi tiết SO: " + e); }
+}
+
+    function addFromSap() {
+    const idx = document.getElementById('sapItemSelect').value;
+    if(idx === "") return alert("Vui lòng chọn Material cần chạy phân bổ!");
+    
+    const item = SAP_ITEMS_CACHE[parseInt(idx)];
+    
+    // Lấy số SO từ input (đã tách)
+    const rawValue = document.getElementById('sapSoInput').value;
+    let soNum = rawValue.split('|')[0].trim();
+    // Fallback nếu user xóa mất SO trên input
+    if(!soNum) soNum = "N/A";
+
+    addRowWithData({
+        so: soNum,
+        cust: item.customer_name,
+        grade: item.grade,
+        thick: item.thick,
+        width: item.width,
+        weight: item.req_weight
+    });
+}
+
+function addRowWithData(data) {
+    // Nếu không có data (tức là gọi thêm dòng trống), chặn lại ngay
+    if (!data) return alert("Vui lòng chọn đơn hàng từ SAP ở trên!");
+
+    const tr = document.createElement('tr');
+    
+    // Style cho ô bị khóa (Read-only styling)
+    const lockStyle = 'background:#f1f5f9; color:#64748b; cursor:not-allowed; border:1px solid #e2e8f0;';
+    const highlightStyle = 'font-weight:bold; color:#0284c7; border:1px solid #bae6fd;'; // Style cho ô được phép nhập
+
+    // Tạo options cho select Khách hàng (để hiển thị đúng tên)
+    // Lưu ý: Dù disable nhưng vẫn cần append option vào để nó hiện text
+    const custOpts = `<option value="${data.cust}" selected>${data.cust}</option>`;
+
+    tr.innerHTML = `
+        <td><input type="text" class="inp-cell inp-so" value="${data.so}" readonly style="${lockStyle}"></td>
+        
+        <td><select class="inp-select sel-cust" disabled style="${lockStyle}">${custOpts}</select></td>
+        
+        <td><select class="inp-select sel-grade" disabled style="${lockStyle} font-weight:bold; color:#334155;">
+            <option value="${data.grade}" selected>${data.grade}</option>
+        </select></td>
+        
+        <td><select class="inp-select sel-tdc" style="${highlightStyle}"><option value="">-- Chọn --</option></select></td>
+        
+        <td><input type="number" class="inp-cell inp-thick" value="${data.thick}" readonly style="${lockStyle}"></td>
+        <td><input type="number" class="inp-cell inp-width" value="${data.width}" readonly style="${lockStyle}"></td>
+        
+        <td><input type="number" class="inp-cell inp-min-w" placeholder="0" style="border:1px solid #cbd5e1;"></td>
+        <td><input type="number" class="inp-cell inp-max-w" placeholder="0" style="border:1px solid #cbd5e1;"></td>
+        
+        <td><input type="number" class="inp-cell inp-weight" value="${data.weight}" readonly style="${lockStyle} font-weight:bold; color:#2563eb;"></td>
+        
+        <td style="text-align:center;"><button style="border:none; background:none; color:red; cursor:pointer;" onclick="this.closest('tr').remove()">✕</button></td>
+    `;
+    document.getElementById('inputBody').appendChild(tr);
+
+    // --- LOGIC TỰ ĐỘNG LOAD TDC ---
+    // Ngay khi thêm dòng, ta gọi logic tìm TDC phù hợp với Khách & Mác này
+    // Lưu ý: Vì select cust/grade đang bị disabled, ta lấy giá trị trực tiếp từ biến data
+    loadTdcOptionsForLockedRow(tr, data.cust, data.grade);
+}
+function loadTdcOptionsForLockedRow(tr, custName, grade) {
+    const tdcSel = tr.querySelector('.sel-tdc');
+    
+    // Lọc trong thư viện Master TDC
+    // (So sánh không phân biệt hoa thường để chắc ăn)
+    const codes = MASTER_TDCS.filter(x => 
+        x.customer_name.toLowerCase() === custName.toLowerCase() && 
+        x.grade.toLowerCase() === grade.toLowerCase()
+    );
+
+    if (codes.length > 0) {
+        tdcSel.innerHTML = codes.map(c => `<option value="${c.id}">${c.tdc_code} (${c.usage_purpose})</option>`).join('');
+        // Nếu chỉ có 1 TDC thì chọn luôn
+        if(codes.length === 1) tdcSel.selectedIndex = 0;
+    } else {
+        tdcSel.innerHTML = '<option value="">⚠️ Không có TDC khớp</option>';
+        tdcSel.style.color = 'red';
+    }
+}
+    function onCustChange(el) {
+        const tr = el.closest('tr');
+        const custName = el.value;
+        const gradeSel = tr.querySelector('.sel-grade');
+        const tdcSel = tr.querySelector('.sel-tdc');
+        gradeSel.innerHTML = '<option value="">-- Mác --</option>'; tdcSel.innerHTML = '<option value="">-- Code --</option>'; tdcSel.disabled = true;
+        if(!custName) { gradeSel.disabled = true; return; }
+        
+        const relevant = MASTER_TDCS.filter(x => x.customer_name === custName);
+        const grades = [...new Set(relevant.map(x => x.grade))].sort();
+        gradeSel.innerHTML += grades.map(g => `<option value="${g}">${g}</option>`).join('');
+        gradeSel.disabled = false;
+    }
+
+    function onGradeChange(el) {
+        const tr = el.closest('tr');
+        const custName = tr.querySelector('.sel-cust').value;
+        const grade = el.value;
+        const tdcSel = tr.querySelector('.sel-tdc');
+        tdcSel.innerHTML = '<option value="">-- Code --</option>';
+        if(!grade) { tdcSel.disabled = true; return; }
+        
+        const codes = MASTER_TDCS.filter(x => x.customer_name === custName && x.grade === grade);
+        tdcSel.innerHTML += codes.map(c => `<option value="${c.id}">${c.tdc_code} (${c.usage_purpose})</option>`).join('');
+        tdcSel.disabled = false;
+        
+        // Nếu chỉ có 1 TDC duy nhất -> Chọn luôn cho nhanh
+        if(codes.length === 1) tdcSel.selectedIndex = 1;
+    }
+
+    // --- API SEARCH & CONFIRM (GIỮ NGUYÊN) ---
+    async function runBatchSearch() {
+        const items = [];
+        const rows = document.querySelectorAll('#inputBody tr');
+        rows.forEach(tr => {
+            const so = tr.querySelector('.inp-so').value;
+            const tdcId = tr.querySelector('.sel-tdc').value;
+            const thick = parseFloat(tr.querySelector('.inp-thick').value || 0);
+            const width = parseFloat(tr.querySelector('.inp-width').value || 0);
+            const weight = parseFloat(tr.querySelector('.inp-weight').value || 0);
+            const minW = parseFloat(tr.querySelector('.inp-min-w').value || 0);
+            const maxW = parseFloat(tr.querySelector('.inp-max-w').value || 0);
+            if(tdcId && weight > 0) items.push({ so_number: so || 'N/A', tdc_id: tdcId, thick, width, req_weight: weight, min_weight: minW, max_weight: maxW });
+        });
+
+        if(items.length === 0) return alert("Vui lòng nhập đầy đủ thông tin!");
+        document.getElementById('resCount').innerText = "Đang xử lý...";
+        
+        try {
+            const res = await fetch('/api/run_batch_allocation', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ items: items }) });
+            const data = await res.json();
+            if(data.status === 'success') {
+                CANDIDATES = data.allocated;
+                renderResultTable();
+                document.getElementById('btnConfirm').style.display = 'block';
+            } else { alert(data.msg); }
+        } catch(e) { alert("Lỗi: " + e); }
+    }
+
+    function renderResultTable() {
+        const tbody = document.getElementById('resBody');
+        const total = CANDIDATES.length;
+        document.getElementById('resCount').innerHTML = `Kết quả: <strong style="color:#0f172a">${total}</strong> cuộn`;
+        
+        tbody.innerHTML = CANDIDATES.map((item, i) => {
+            let statusBadge = (item.penalty === 0) 
+                ? `<span class="badge-std">✅ Chuẩn tuyệt đối</span>` 
+                : `<span class="badge-warn">⚠️ ${item.match_type}</span>`;
+            const targetTDC = MASTER_TDCS.find(t => t.customer_name === item.customer_alloc);
+            let tdcCrit = [];
+            if(targetTDC && targetTDC.criteria_json) { try { tdcCrit = JSON.parse(targetTDC.criteria_json); } catch(e){} }
+            const getGroupData = (groupKey) => {
+                const keys = KEYS_MAP[groupKey] || [];
+                if(keys.length < 3) while(keys.length < 3) keys.push(keys[0]);
+                const actuals = keys.map(k => item.scores[k] || 1);
+                const limits = keys.map(k => { const f = tdcCrit.find(c => c.defect === k); return f ? Math.max(...f.range) : 6; });
+                return createMiniRadarSVG(actuals, limits);
+            };
+            const radarHtml = `
+                <div class="radar-wrapper">
+                    <div class="radar-item"><div class="mini-radar-box">${getGroupData('surface')}</div><span class="mini-chart-label" style="color:#ef4444">Bề mặt</span></div>
+                    <div class="radar-item"><div class="mini-radar-box">${getGroupData('geometry')}</div><span class="mini-chart-label" style="color:#2563eb">Hình học</span></div>
+                    <div class="radar-item"><div class="mini-radar-box">${getGroupData('prop')}</div><span class="mini-chart-label" style="color:#16a34a">Cơ/Lý</span></div>
+                    <div class="radar-item"><div class="mini-radar-box">${getGroupData('app')}</div><span class="mini-chart-label" style="color:#9333ea">Ngoại quan</span></div>
+                </div>`;
+            let errorDetails = '';
+            if (item.penalty > 0 && item.failed_msg) {
+                errorDetails = item.failed_msg.split(',').map(e => {
+                    const parts = e.trim().split(':'); if (parts.length < 2) return ''; 
+                    const code = parts[0]; let val = parts[1]; const nameVI = DEFECT_NAMES[code] || code;
+                    if (val.includes('Missing') || val.includes('C0')) val = `<span style="color:#999">Thiếu</span>`; else val = `<b style="color:#dc2626">${val}</b>`;
+                    return `<span class="defect-pill">${nameVI}: ${val}</span>`;
+                }).join('');
+            } else { errorDetails = '<span style="color:#cbd5e1; font-style:italic; font-size:0.85em;">Không có lỗi</span>'; }
+
+            return `<tr onclick="showComparison(${i})">
+                <td style="text-align: center; font-weight: bold; color: #64748b;">${i+1}</td>
+                <td style="font-weight:bold; color:#2563eb;">${item.so_number}</td>
+                <td style="font-size:0.9em; font-weight:600;">${item.customer_alloc}</td>
+                <td><div style="font-weight:700; color:#0f172a; font-size:1em;">${item.coil_id}</div><div class="coil-meta"><span class="meta-tag">⚖️ ${item.weight.toLocaleString()} kg</span><span class="meta-tag">📏 ${item.thick} x ${item.width}</span></div></td>
+                <td>${statusBadge}</td>
+                <td style="text-align: center; font-weight:bold; color:${item.penalty>0?'#d97706':'#16a34a'}">${item.penalty}</td>
+                <td>${radarHtml}</td>
+                <td><div style="display:flex; flex-wrap:wrap; gap:2px;">${errorDetails}</div></td>
+            </tr>`;
+        }).join('');
+    }
+
+    // --- CHART & UTILS (GIỮ NGUYÊN) ---
+    function initCompareCharts() {
+        const cfg = { type: 'radar', options: { scales: { r: { min: 0, max: 6, ticks: { display: false }, pointLabels: { font: { size: 11, weight: 'bold' } } } }, plugins: { legend: { display: false } }, maintainAspectRatio: false } };
+        COMPARE_CHARTS.surf = new Chart(document.getElementById('cmpSurf'), { ...cfg, data: { labels: [], datasets: [] } });
+        COMPARE_CHARTS.geo = new Chart(document.getElementById('cmpGeo'), { ...cfg, data: { labels: [], datasets: [] } });
+        COMPARE_CHARTS.prop = new Chart(document.getElementById('cmpProp'), { ...cfg, data: { labels: [], datasets: [] } });
+        COMPARE_CHARTS.app = new Chart(document.getElementById('cmpApp'), { ...cfg, data: { labels: [], datasets: [] } });
+    }
+    function createMiniRadarSVG(actualData, limitData) {
+        const W = 100, H = 100, CX = 50, CY = 50, R_OUTER = 45, R_DATA = 45, count = actualData.length;
+        if (count < 3) return ''; 
+        const getCoords = (val, i, radiusMax) => { const angle = (Math.PI * 2 * i) / count - (Math.PI / 2); const drawVal = Math.min(val, 6); const r = (drawVal / 6) * radiusMax; return { x: CX + r * Math.cos(angle), y: CY + r * Math.sin(angle) }; };
+        let axisSvg = "", limitPath = "", actualPath = "", dotsSvg = "";
+        for(let i=0; i<count; i++) { const pt = getCoords(6, i, R_OUTER); axisSvg += `<line x1="${CX}" y1="${CY}" x2="${pt.x}" y2="${pt.y}" stroke="#e2e8f0" stroke-width="0.5"/>`; }
+        limitData.forEach((val, i) => { const pt = getCoords(val, i, R_DATA); limitPath += (i === 0 ? "M" : "L") + `${pt.x},${pt.y} `; }); limitPath += "Z";
+        actualData.forEach((val, i) => { const pt = getCoords(val, i, R_DATA); actualPath += (i === 0 ? "M" : "L") + `${pt.x},${pt.y} `; dotsSvg += `<circle cx="${pt.x}" cy="${pt.y}" r="2" fill="#dc2626"/>`; }); actualPath += "Z";
+        return `<svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"><circle cx="${CX}" cy="${CY}" r="${R_OUTER}" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>${axisSvg}<path d="${limitPath}" fill="rgba(34, 197, 94, 0.1)" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2"/><path d="${actualPath}" fill="rgba(220, 38, 38, 0.2)" stroke="#dc2626" stroke-width="1.5"/>${dotsSvg}</svg>`;
+    }
+    function showComparison(index) {
+        const item = CANDIDATES[index]; if(!item) return;
+        const targetTDC = MASTER_TDCS.find(t => t.customer_name === item.customer_alloc);
+        let tdcCrit = []; 
+        if(targetTDC && targetTDC.criteria_json) try { tdcCrit = JSON.parse(targetTDC.criteria_json); } catch(e){}
+        
+        document.getElementById('modalTitle').innerText = `${item.customer_alloc} vs ${item.coil_id}`;
+        document.getElementById('compareModal').style.display = 'flex';
+        
+        const updateChart = (chart, groupKey, color) => {
+            const keys = KEYS_MAP[groupKey]; 
+            const labels = keys.map(k => DEFECT_NAMES[k] || k);
+            const actuals = keys.map(k => item.scores[k] || 1); // Giá trị thực tế của cuộn
+            
+            // Tính Min/Max TDC
+            const limitsMax = keys.map(k => { const f = tdcCrit.find(c => c.defect === k); return f ? Math.max(...f.range) : 6; });
+            const limitsMin = keys.map(k => { const f = tdcCrit.find(c => c.defect === k); return f ? Math.min(...f.range) : 0; });
+
+            chart.data.labels = labels;
+            chart.data.datasets = [
+                // 1. TDC Max
+                { 
+                    label: 'TDC Max', 
+                    data: limitsMax, 
+                    borderColor: '#16a34a', 
+                    borderWidth: 2, 
+                    pointRadius: 0, 
+                    borderDash: [5, 5],
+                    fill: false 
+                },
+                // 2. TDC Min (Tô màu vùng giữa Max và Min)
+                { 
+                    label: 'TDC Min', 
+                    data: limitsMin, 
+                    borderColor: '#16a34a', 
+                    borderWidth: 2, 
+                    pointRadius: 0, 
+                    borderDash: [5, 5],
+                    fill: '-1', // Fill tới TDC Max
+                    backgroundColor: 'rgba(22, 163, 74, 0.1)' 
+                },
+                // 3. Thực tế Cuộn (Vẽ đè lên trên cùng)
+                { 
+                    label: 'Thực tế Cuộn', 
+                    data: actuals, 
+                    borderColor: color, 
+                    backgroundColor: color.replace('1)', '0.2)'), 
+                    borderWidth: 2,
+                    fill: true 
+                }
+            ];
+            chart.update();
+        };
+        
+        updateChart(COMPARE_CHARTS.surf, 'surface', 'rgba(220, 38, 38, 1)'); 
+        updateChart(COMPARE_CHARTS.geo, 'geometry', 'rgba(37, 99, 235, 1)'); 
+        updateChart(COMPARE_CHARTS.prop, 'prop', 'rgba(22, 163, 74, 1)'); 
+        updateChart(COMPARE_CHARTS.app, 'app', 'rgba(147, 51, 234, 1)');
+    }
+    function closeModal(e) { if(e) e.stopPropagation(); document.getElementById('compareModal').style.display = 'none'; }
+    async function confirmAll() {
+        if(!confirm("Xác nhận lưu phân bổ?")) return;
+        const payload = { allocations: CANDIDATES.map(c => ({ coil_id: c.coil_id, so_number: c.so_number })), tdc_id: CANDIDATES[0].tdc_id || 0 };
+        try { const res = await fetch('/api/confirm_multi_so', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }); const d = await res.json(); alert(d.msg); if(d.status === 'success') { CANDIDATES = []; renderResultTable(); document.getElementById('btnConfirm').style.display = 'none'; } } catch(e) { alert(e); }
+    }
+</script>
+{% endblock %}

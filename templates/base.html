@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Hệ Thống QC{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/qlcl.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {% block head %}{% endblock %}
+</head>
+<style>
+    const fVal = document.getElementById('globalFactorySelect').value;
+    const headerTitle = document.querySelector('.app-title-row h1');
+    
+    if(fVal === 'HRC1') {
+        headerTitle.style.borderLeft = "5px solid #3b82f6"; // Xanh dương
+        headerTitle.style.paddingLeft = "10px";
+    } else {
+        headerTitle.style.borderLeft = "5px solid #f97316"; // Cam
+        headerTitle.style.paddingLeft = "10px";
+    }
+    /* --- TOAST NOTIFICATION MODERN --- */
+    .toast-notification {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: rgba(15, 23, 42, 0.95); /* Màu tối sang trọng */
+        backdrop-filter: blur(10px);
+        color: white;
+        padding: 0;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1);
+        display: none;
+        z-index: 9999;
+        animation: slideInRight 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        max-width: 400px;
+        overflow: hidden;
+        border-left: 6px solid #22c55e; /* Vạch xanh Success */
+    }
+
+    .toast-body {
+        padding: 16px 20px;
+        display: flex;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    .toast-icon {
+        font-size: 1.5rem;
+        background: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .toast-info h4 { margin: 0 0 4px 0; font-size: 1rem; font-weight: 700; color: #fff; }
+    .toast-info p { margin: 0; font-size: 0.9rem; color: #94a3b8; line-height: 1.4; }
+
+    .toast-close {
+        background: transparent; border: none; color: #64748b;
+        font-size: 1.2rem; cursor: pointer; margin-left: auto;
+    }
+    .toast-close:hover { color: #fff; }
+
+    /* --- BELL BADGE ANIMATION --- */
+    .notification-wrapper { position: relative; cursor: pointer; }
+    
+    .notification-badge {
+        position: absolute;
+        top: -6px; right: -6px;
+        background: #ef4444;
+        color: white;
+        font-size: 0.7rem;
+        font-weight: 800;
+        min-width: 18px; height: 18px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        border: 2px solid #fff;
+        box-shadow: 0 2px 5px rgba(239, 68, 68, 0.5);
+        animation: pulse-red 2s infinite;
+    }
+
+    /* Hiệu ứng rung chuông khi có tin mới */
+    .bell-shake { animation: bellShake 0.8s cubic-bezier(.36,.07,.19,.97) both; }
+
+    @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+    @keyframes bellShake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
+</style>
+<body>
+
+<div id="updateToast" class="toast-notification">
+    <div class="toast-body">
+        <div class="toast-icon">✨</div>
+        <div class="toast-info">
+            <h4 id="toastTitle">Cập nhật dữ liệu</h4>
+            <p id="toastMsg">Hệ thống vừa cập nhật dữ liệu mới.</p>
+        </div>
+        <button class="toast-close" onclick="closeToast()">✕</button>
+    </div>
+</div>
+
+<div class="app-container">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2>🏭 QC SYSTEM</h2>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <a href="/qlcl" class="nav-item {{ 'active' if request.endpoint == 'qlcl' else '' }}">
+                <span class="icon">📊</span> Dashboard QC
+            </a>
+            
+            <div class="nav-divider">QUẢN LÝ ĐƠN HÀNG</div>
+            
+            <a href="/tdc_manager" class="nav-item {{ 'active' if request.endpoint == 'tdc_manager' else '' }}">
+                <span class="icon">📑</span> Quản lý TDC
+            </a>
+            <a href="/allocation_run" class="nav-item {{ 'active' if request.endpoint == 'allocation_run' else '' }}">
+                <span class="icon">🚀</span> Chạy Phân Bổ
+            </a>
+            <a href="/allocation_history" class="nav-item {{ 'active' if request.endpoint == 'allocation_history' else '' }}">
+                <span class="icon">📦</span> Lịch sử Mapping
+            </a>
+
+            <a href="#" class="nav-item" onclick="openLogModal()">
+                <div class="notification-wrapper">
+                    <span class="icon">🔔</span>
+                    <span id="notifBadge" class="notification-badge">0</span>
+                </div>
+                <span style="margin-left: 10px;">Thông báo</span>
+            </a>
+
+            <div class="nav-divider">CẤU HÌNH</div>
+
+            <a href="/config_page" class="nav-item {{ 'active' if request.endpoint == 'config_page' else '' }}">
+                <span class="icon">⚙️</span> Cấu hình Mác Thép
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <span>👤 Admin User</span>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+</div>
+
+<div id="logModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; justify-content:center; align-items:center;">
+    <div style="background:white; width:600px; height:80vh; border-radius:8px; display:flex; flex-direction:column; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+        
+        <div style="padding:15px 20px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; color:#1e293b;">📜 Lịch sử Hoạt động Hệ thống</h3>
+            <div style="display:flex; gap:10px;">
+                <button onclick="fetchLogs()" class="btn-reset" title="Làm mới">↻</button>
+                <button onclick="document.getElementById('logModal').style.display='none'" class="btn-reset" style="font-size:1.5em;">✕</button>
+            </div>
+        </div>
+        
+        <div style="flex:1; overflow-y:auto; padding:0;" id="logListBody">
+            </div>
+        
+        <div style="padding:10px; background:#f8fafc; text-align:center; color:#64748b; font-size:0.85em; border-top:1px solid #eee;">
+            Hiển thị 50 thông báo gần nhất
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- BIẾN TOÀN CỤC ---
+    let localLastUpdateTS = 0; // Lưu thời gian cập nhật cuối cùng client biết
+    let isFirstLoad = true;    // Cờ đánh dấu lần tải đầu tiên
+
+    // --- 1. HÀM HIỂN THỊ TOAST ---
+    function showToast(msg, title="Thông báo hệ thống") {
+        const t = document.getElementById('updateToast');
+        document.getElementById('toastMsg').innerText = msg;
+        document.getElementById('toastTitle').innerText = title;
+        
+        t.style.display = 'block';
+        
+        // Phát âm thanh (nếu muốn)
+        // try { new Audio('/static/sound/ding.mp3').play(); } catch(e){}
+
+        // Tự ẩn sau 10 giây
+        if(window.toastTimeout) clearTimeout(window.toastTimeout);
+        window.toastTimeout = setTimeout(() => { 
+            t.style.display = 'none'; 
+        }, 10000);
+    }
+    
+    function closeToast() { 
+        document.getElementById('updateToast').style.display = 'none'; 
+    }
+
+    // --- 2. HÀM CẬP NHẬT BADGE (SỐ LƯỢNG CHƯA ĐỌC) ---
+    async function updateUnreadCount() {
+        try {
+            const res = await fetch('/api/get_unread_count');
+            const data = await res.json();
+            const badge = document.getElementById('notifBadge');
+            
+            if (data.count > 0) {
+                badge.style.display = 'flex'; // Dùng flex để căn giữa số
+                badge.innerText = data.count > 99 ? '99+' : data.count;
+                
+                // Hiệu ứng rung chuông khi có tin mới
+                const bell = document.querySelector('.notification-wrapper .icon');
+                if(bell) {
+                    bell.classList.remove('bell-shake');
+                    void bell.offsetWidth; // Trigger reflow để chạy lại animation
+                    bell.classList.add('bell-shake');
+                }
+            } else {
+                badge.style.display = 'none';
+            }
+        } catch(e) {}
+    }
+
+    // --- 3. LONG-POLLING (TỐI ƯU CHO PRODUCTION) ---
+    // Gọi mỗi 5 giây - Cực nhẹ vì Server chỉ trả về JSON từ RAM
+    setInterval(() => {
+        fetch('/api/check_new_data') 
+        .then(response => response.json())
+        .then(data => {
+            // data format: { 'timestamp': 1704153000.123, 'message': 'Title: Content...' }
+            
+            // Nếu là lần đầu load trang -> Lưu lại mốc thời gian, không thông báo
+            if (isFirstLoad) {
+                localLastUpdateTS = data.timestamp;
+                isFirstLoad = false;
+                updateUnreadCount(); // Cập nhật số badge ban đầu
+                return;
+            }
+
+            // Nếu Server có thời gian mới hơn Client đang nhớ
+            if (data.timestamp > localLastUpdateTS) {
+                console.log("🔥 Phát hiện dữ liệu mới:", data.message);
+                
+                // 1. Cập nhật mốc thời gian
+                localLastUpdateTS = data.timestamp;
+
+                // 2. Tách Title và Message (Do backend ghép bằng dấu ": ")
+                let parts = data.message.split(': ');
+                let title = parts.length > 1 ? parts[0] : 'Hệ Thống';
+                let content = parts.length > 1 ? parts.slice(1).join(': ') : data.message;
+
+                // 3. Hiện thông báo
+                showToast(content, title);
+
+                // 4. Cập nhật lại số Badge trên chuông
+                updateUnreadCount();
+                
+                // 5. Nếu người dùng đang mở bảng Modal Log -> Refresh luôn danh sách
+                if (document.getElementById('logModal').style.display === 'flex') {
+                    fetchLogs(); 
+                }
+                
+                // [TÙY CHỌN] Nếu đang ở Dashboard -> Reload một phần dữ liệu
+                // if (typeof calculateSummary === "function") { calculateSummary(); }
+            }
+        })
+        .catch(err => console.error("Polling error (có thể bỏ qua):", err));
+
+    }, 10000); // 10000ms = 10 giây
+
+    // --- CÁC HÀM MODAL CŨ GIỮ NGUYÊN ---
+    function openLogModal() {
+        document.getElementById('logModal').style.display = 'flex';
+        fetchLogs();
+        // Mở ra là đánh dấu đã đọc hết -> Badge biến mất
+        fetch('/api/mark_all_read', {method: 'POST'})
+            .then(() => {
+                document.getElementById('notifBadge').style.display = 'none';
+            });
+    }
+
+    async function fetchLogs() {
+        // ... (Giữ nguyên logic fetchLogs cũ của bạn) ...
+        const div = document.getElementById('logListBody');
+        div.innerHTML = '<div style="padding:20px; text-align:center;">⏳ Đang tải...</div>';
+        try {
+            const res = await fetch('/api/get_system_logs');
+            const logs = await res.json();
+            if (logs.length === 0) {
+                div.innerHTML = '<div style="padding:40px; text-align:center; color:#94a3b8;">Chưa có thông báo nào.</div>';
+                return;
+            }
+            let html = '';
+            logs.forEach(log => {
+                let icon = 'ℹ️'; let bg = '#f1f5f9';
+                if (log.type === 'success') { icon = '✅'; bg = '#f0fdf4'; }
+                if (log.type === 'warning') { icon = '⚠️'; bg = '#fffbeb'; }
+                if (log.type === 'error')   { icon = '❌'; bg = '#fef2f2'; }
+
+                html += `
+                <div style="padding:12px 20px; border-bottom:1px solid #f1f5f9; display:flex; gap:15px; align-items:start;">
+                    <div style="background:${bg}; width:35px; height:35px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-size:1.1em; flex-shrink:0;">${icon}</div>
+                    <div style="flex:1;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                            <span style="font-weight:700; color:#334155;">${log.title || 'Thông báo'}</span>
+                            <span style="font-size:0.8em; color:#94a3b8;">${log.time}</span>
+                        </div>
+                        <div style="font-size:0.95em; color:#475569; line-height:1.4;">${log.message}</div>
+                    </div>
+                </div>`;
+            });
+            div.innerHTML = html;
+        } catch(e) { div.innerHTML = `<div style="padding:20px; text-align:center; color:red;">Lỗi: ${e}</div>`; }
+    }
+</script>
+{% block scripts %}
+{% endblock %}
+
+</body>
+</html>

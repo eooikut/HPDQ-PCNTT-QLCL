@@ -401,7 +401,7 @@ def save_backlog_item():
         req = request.json
         so = req.get('so_number')
         mat = req.get('material_code')
-        
+        desc = req.get('description', '')
         # Các thông số cần lưu
         cust = req.get('customer_name')
         grade = req.get('grade')
@@ -441,9 +441,9 @@ def save_backlog_item():
         else:
             # INSERT: Nếu chưa có thì thêm mới
             cursor.execute("""
-                INSERT INTO so_details (so_number, material_code, customer_name, grade, thickness, width, total_weight, min_weight, max_weight, tdc_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (so, mat, cust, grade, thick, width, weight, min_w, max_w, tdc_id))
+                INSERT INTO so_details (so_number, material_code, description, grade, thickness, width, total_weight, min_weight, max_weight, tdc_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (so, mat, desc, grade, thick, width, weight, min_w, max_w, tdc_id))
             
             # Lấy ID vừa tạo
             try:

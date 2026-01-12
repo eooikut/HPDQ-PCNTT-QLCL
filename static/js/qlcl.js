@@ -452,7 +452,12 @@ function selectInputCoil(id) {
     
     // 1. Lấy dữ liệu ngay lập tức từ biến toàn cục (RAM) -> KHÔNG CÓ ĐỘ TRỄ
     const coilData = RADAR_DATA[id] || {};
-
+    document.getElementById('txtInputQuality').value = coilData['quality_level'] || '';
+    
+    // 2. Nhiệt độ & Tốc độ
+    const temp = coilData['Temperature'] ? parseFloat(coilData['Temperature']).toFixed(0) : '--';
+    const speed = coilData['Speed'] ? parseFloat(coilData['Speed']).toFixed(2) : '--';
+    
     // 2. Thiết lập dữ liệu Gốc (Tham chiếu - Nét đứt)
     // Backend đã gửi sẵn trong auto_scores ở Bước 1
     ORIGINAL_SNAPSHOT = coilData['auto_scores'] ? JSON.parse(JSON.stringify(coilData['auto_scores'])) : {};
@@ -477,7 +482,8 @@ function selectInputCoil(id) {
     // 4. Update UI ngay lập tức
     document.querySelectorAll('.coil-item').forEach(e => e.classList.remove('active'));
     document.getElementById(`in_${id}`)?.classList.add('active');
-    
+    document.getElementById('lblInputTemp').innerText = temp;
+    document.getElementById('lblInputSpeed').innerText = speed;
     document.getElementById('inputEmpty').style.display = 'none';
     document.getElementById('radarInputArea').style.display = 'grid'; 
     document.getElementById('radarInputArea').style.opacity = '1'; // Bỏ hiệu ứng mờ loading
@@ -545,6 +551,7 @@ function resetCurrentInput() {
 // Hàm lưu dữ liệu nhập tay
 function saveManualData() {
     if(!CURRENT_INPUT_COIL) return;
+    const qualityVal = document.getElementById('txtInputQuality').value.trim();
     const cleanScores = {};
     const allDefectKeys = [
         ...UNIFIED_KEYS.SURFACE, ...UNIFIED_KEYS.GEO, 
@@ -562,7 +569,7 @@ function saveManualData() {
     fetch('/save_manual_data', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ coil_id: CURRENT_INPUT_COIL, scores: cleanScores, user: 'QC_User' }) 
+        body: JSON.stringify({ coil_id: CURRENT_INPUT_COIL, scores: cleanScores, user: 'QC_User',quality_level: qualityVal }) 
     }).then(r=>r.json()).then(d => {
         hideLoading();
         alert(d.msg);
@@ -572,6 +579,7 @@ function saveManualData() {
                 RADAR_DATA[CURRENT_INPUT_COIL][key] = value;
             }
             RADAR_DATA[CURRENT_INPUT_COIL]['IS_CHECKED'] = true;
+            RADAR_DATA[CURRENT_INPUT_COIL]['quality_level'] = qualityVal;
         }
         
         renderInputList();
@@ -954,6 +962,15 @@ function selectCoil(id){
     document.getElementById(`c_${id}`)?.classList.add('active');
     document.getElementById('emptyView').style.display='none';
     document.getElementById('radarView').style.display='flex';
+    const d = RADAR_DATA[id] || {};
+    const qual = d['quality_level'] || '---';
+    const temp = d['Temperature'] ? parseFloat(d['Temperature']).toFixed(0) : '--';
+    const speed = d['Speed'] ? parseFloat(d['Speed']).toFixed(2) : '--';
+    document.getElementById('modalStats').style.display = 'flex'; 
+    document.getElementById('valModalQual').innerText = qual;
+    document.getElementById('valModalTemp').innerText = temp;
+    document.getElementById('valModalSpeed').innerText = speed;
+
     setTimeout(() => drawCoilRadar(id), 50);
 }
 function drawCoilRadar(id){

@@ -325,7 +325,8 @@ def render_dashboard_logic(msg=None):
     cursor = conn.cursor()
     sql = """
         SELECT coil_id, grade, raw_data, scores, is_checked, 
-               production_date, updated_at, factory 
+               production_date, updated_at, factory ,
+               Temperature, Speed, quality_level        
         FROM coil_data WITH (NOLOCK) 
         WHERE factory = ? 
     """
@@ -358,7 +359,10 @@ def render_dashboard_logic(msg=None):
             'GRADE': r['grade'], 
             'IS_CHECKED': r['is_checked'],
             'updated_at': r['updated_at'],
-            'production_date': str(r['production_date']) if r['production_date'] else ''
+            'production_date': str(r['production_date']) if r['production_date'] else '',
+            'Temperature': r['Temperature'] if r['Temperature'] else 0,
+            'Speed': r['Speed'] if r['Speed'] else 0,
+            'quality_level': r['quality_level'] if r['quality_level'] else ''
         } 
         for r in rows
     }
@@ -425,7 +429,9 @@ def regenerate_dashboard_data(all_data, selected_grade):
         frontend_obj['IS_CHECKED'] = d.get('IS_CHECKED', False)
         prod_date = d.get('production_date', '')
         frontend_obj['production_date'] = str(prod_date) if prod_date else ''
-
+        frontend_obj['Temperature'] = d.get('Temperature', 0)
+        frontend_obj['Speed'] = d.get('Speed', 0)
+        frontend_obj['quality_level'] = d.get('quality_level', '')
         final_radar_data[cid] = frontend_obj
         # --- C. LỌC ĐỂ TÍNH TOÁN TAB (Chỉ tính thống kê cho Mác đang chọn) ---
         if selected_grade == 'ALL' or db_grade_clean == selected_grade:
@@ -610,9 +616,7 @@ def save_manual_data():
         coil_id = req.get('coil_id')
         new_scores = req.get('scores')
         user_name = req.get('user', 'User')
-
-        # [LOGIC MỚI]: Kiểm tra xem đây là hành động RESET hay LƯU
-        # Nếu Frontend gửi lên cờ 'is_reset': True thì ta sẽ trả về chế độ Auto (is_checked = 0)
+        new_quality = req.get('quality_level', '')
         is_reset = req.get('is_reset', False)
 
         if not coil_id: return jsonify({'status':'error', 'msg': 'Thiếu ID cuộn'})
@@ -624,7 +628,6 @@ def save_manual_data():
         cursor.execute("SELECT scores FROM coil_data WITH (NOLOCK) WHERE coil_id=?", (coil_id,))
         curr_row = cursor.fetchone()
         
-        # [FIX 2]: Lấy index 0 thay vì string key
         old_scores = json.loads(curr_row[0]) if curr_row and curr_row[0] else {}
 
         # 2. Ghi Log thay đổi (Audit)
@@ -638,20 +641,16 @@ def save_manual_data():
                 logs.append((coil_id, user_name, key, float(old_val), float(new_val), now))
 
         if logs:
-            # [FIX 3]: Dùng cursor.executemany thay vì conn.executemany
             cursor.executemany("INSERT INTO audit_log_qlcl (coil_id, user_name, defect_key, old_value, new_value, changed_at) VALUES (?, ?, ?, ?, ?, ?)", logs)
 
         # 3. Cập nhật dữ liệu
         final_scores = old_scores.copy()
         final_scores.update(new_scores)
-        
-        # [LOGIC MỚI]: Nếu là reset thì is_checked = 0, ngược lại là 1
         new_is_checked = 0 if is_reset else 1
 
-        # [FIX 4]: Dùng cursor.execute để update
         cursor.execute(
-            "UPDATE coil_data SET scores = ?, is_checked = ? WHERE coil_id = ?", 
-            (json.dumps(final_scores), new_is_checked, coil_id)
+            "UPDATE coil_data SET scores = ?, is_checked = ?, quality_level = ? WHERE coil_id = ?", 
+            (json.dumps(final_scores), new_is_checked, new_quality, coil_id)
         )
         
         conn.commit() 

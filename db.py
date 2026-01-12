@@ -1,5 +1,5 @@
 import pyodbc
-import json
+import orjson
 import os
 from datetime import datetime
 
@@ -43,7 +43,7 @@ def get_config(key, default=None):
         cursor = conn.cursor()
         cursor.execute("SELECT value FROM app_configs WHERE [key] = ?", (key,))
         row = cursor.fetchone()
-        return json.loads(row[0]) if row else default
+        return orjson.loads(row[0]) if row else default
     except Exception as e:
         print(f"Get Config Error: {e}")
         return default
@@ -64,7 +64,7 @@ def save_config(key, value):
         WHEN NOT MATCHED THEN
             INSERT ([key], [value]) VALUES (source.[key], source.[value]);
         """
-        cursor.execute(query, (key, json.dumps(value)))
+        cursor.execute(query, (key, orjson.dumps(value).decode('utf-8')))
         conn.commit()
     finally:
         conn.close()
@@ -105,8 +105,8 @@ def save_batch_coils_v2(batch_data):
             params.append((
                 item['id'], 
                 item['grade'], 
-                json.dumps(item['raw']), 
-                json.dumps(item['scores']), 
+                orjson.dumps(item['raw']).decode('utf-8'), 
+                orjson.dumps(item['scores']).decode('utf-8'), 
                 item['is_checked'],
                 item.get('weight', 0), 
                 item.get('target_thick', 0), 
@@ -151,12 +151,12 @@ def save_tdc_master(data):
                 UPDATE tdc_master 
                 SET tdc_code=?, customer_name=?, usage_purpose=?, grade=?, criteria_json=?, pdf_path=?
                 WHERE id=?
-            """, (data['code'], data['cust'], data['purpose'], data['grade'], json.dumps(data['criteria']), data['pdf'], data['id']))
+            """, (data['code'], data['cust'], data['purpose'], data['grade'], orjson.dumps(data['criteria']).decode('utf-8'), data['pdf'], data['id']))
         else:
             cursor.execute("""
                 INSERT INTO tdc_master (tdc_code, customer_name, usage_purpose, grade, criteria_json, pdf_path)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (data['code'], data['cust'], data['purpose'], data['grade'], json.dumps(data['criteria']), data['pdf']))
+            """, (data['code'], data['cust'], data['purpose'], data['grade'], orjson.dumps(data['criteria']).decode('utf-8'), data['pdf']))
         conn.commit()
         return True
     except Exception as e:

@@ -407,6 +407,7 @@ async function addFromSap() {
                 body: JSON.stringify({
                     so_number: rowData.so,
                     material_code: rowData.material,
+                    description: item.description,
                     customer_name: rowData.cust,
                     grade: rowData.grade,
                     thick: rowData.thick,

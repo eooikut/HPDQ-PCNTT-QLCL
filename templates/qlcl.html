@@ -192,7 +192,17 @@
         <div class="filter-tools" style="margin-bottom:15px; background:#f8fafc; padding:10px; border-radius:6px; border:1px solid #e2e8f0; display:flex; gap:15px; align-items:center; flex-wrap:wrap;">
             <select id="f_surf" onchange="applyFilters()" class="filter-select-sm" style="background:#fef2f2;color:#dc2626;border-color:#fca5a5"><option value="ALL">Bề Mặt: Tất cả</option><option value="YES">✅ Có Bề Mặt</option><option value="NO">❌ Thiếu Bề Mặt</option></select>
             <select id="f_geo" onchange="applyFilters()" class="filter-select-sm" style="background:#f0f9ff;color:#0284c7;border-color:#bae6fd"><option value="ALL">Hình Học: Tất cả</option><option value="YES">✅ Có Hình Học</option><option value="NO">❌ Thiếu Hình Học</option></select>
-            <select id="f_prop" onchange="applyFilters()" class="filter-select-sm" style="background:#f0fdf4;color:#16a34a;border-color:#bbf7d0"><option value="ALL">Cơ/Lý: Tất cả</option><option value="YES">✅ Có Cơ/Lý</option><option value="NO">❌ Thiếu Cơ/Lý</option></select>
+            <select id="f_chem" onchange="applyFilters()" class="filter-select-sm" style="background:#fffbeb;color:#d97706;border-color:#fcd34d">
+                <option value="ALL">Hóa học: Tất cả</option>
+                <option value="YES">✅ Có TPHH</option>
+                <option value="NO">❌ Thiếu TPHH</option>
+            </select>
+
+            <select id="f_mech" onchange="applyFilters()" class="filter-select-sm" style="background:#f0fdf4;color:#16a34a;border-color:#bbf7d0">
+                <option value="ALL">Cơ tính: Tất cả</option>
+                <option value="YES">✅ Có Cơ tính</option>
+                <option value="NO">❌ Thiếu Cơ tính</option>
+            </select>            
             <select id="f_app" onchange="applyFilters()" class="filter-select-sm" style="background:#f3e8ff;color:#7e22ce;border-color:#d8b4fe"><option value="ALL">Ngoại quan: Tất cả</option><option value="YES">✅ Có Ngoại quan</option><option value="NO">❌ Thiếu Ngoại quan</option></select>
             <div style="flex:1; display:flex; justify-content:flex-end; gap:5px;">
                 <input type="text" id="s_full" onkeyup="applyFilters()" placeholder="🔍 Tìm ID cuộn..." style="padding:8px; border:1px solid #ccc; border-radius:4px; width: 200px;">

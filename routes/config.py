@@ -22,7 +22,7 @@ def api_save_configs():
 def reset_configs(): 
     conn = db.get_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM coil_data") # SQL Server: TRUNCATE TABLE coil_data (nhanh hơn)
+    cursor.execute("DELETE FROM coil_data")
     conn.commit()
     conn.close()
     return jsonify({'status': 'success'})

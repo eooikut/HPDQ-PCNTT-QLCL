@@ -274,14 +274,29 @@
     }, 10000); // 10000ms = 10 giây
 
     // --- CÁC HÀM MODAL CŨ GIỮ NGUYÊN ---
+// --- CÁC HÀM MODAL ---
     function openLogModal() {
+        // 1. Mở Modal ngay lập tức
         document.getElementById('logModal').style.display = 'flex';
+
+        // 2. [OPTIMISTIC UI] Ẩn số thông báo ĐỎ ngay lập tức (QUAN TRỌNG: Làm giả kết quả trước)
+        // Việc này giúp người dùng cảm thấy "mượt", không cần chờ Server phản hồi.
+        const badge = document.getElementById('notifBadge');
+        if (badge) {
+            badge.innerText = '0';
+            badge.style.display = 'none';
+            
+            // Tắt hiệu ứng rung chuông (nếu có)
+            const bell = document.querySelector('.notification-wrapper .icon');
+            if(bell) bell.classList.remove('bell-shake');
+        }
+
+        // 3. Tải nội dung danh sách log vào Modal
         fetchLogs();
-        // Mở ra là đánh dấu đã đọc hết -> Badge biến mất
-        fetch('/api/mark_all_read', {method: 'POST'})
-            .then(() => {
-                document.getElementById('notifBadge').style.display = 'none';
-            });
+
+        // 4. Gửi lệnh "Đã đọc" xuống Server chạy ngầm (Fire & Forget)
+        // Lưu ý: Không dùng 'await', không cần '.then' cập nhật UI vì ta đã ẩn badge ở bước 2 rồi.
+        fetch('/api/mark_all_read', { method: 'POST' }).catch(err => console.error("Lỗi mark_read ngầm:", err));
     }
 
     async function fetchLogs() {

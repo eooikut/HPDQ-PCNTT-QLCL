@@ -77,8 +77,8 @@ def save_batch_coils_v2(batch_data):
         # [SỬA 2]: Thêm cột 'factory' vào danh sách cột định nghĩa source (...)
         merge_query = """
         MERGE coil_data AS target
-        USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)) 
-            AS source (coil_id, grade, raw_data, scores, is_checked, weight, target_thick, target_width, production_date, slab_grade, factory)
+        USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)) 
+            AS source (coil_id, grade, raw_data, scores, is_checked, weight, target_thick, target_width, production_date, slab_grade, factory, Temperature, Speed)
         ON target.coil_id = source.coil_id
         WHEN MATCHED THEN
             UPDATE SET 
@@ -90,11 +90,13 @@ def save_batch_coils_v2(batch_data):
                 target_width = source.target_width,
                 production_date = source.production_date,
                 slab_grade = source.slab_grade,
-                factory = source.factory  -- [SỬA 3]: Cập nhật factory
+                factory = source.factory,
+                Temperature = source.Temperature, 
+                Speed = source.Speed  
         WHEN NOT MATCHED THEN
             -- [SỬA 4]: Thêm cột factory vào câu lệnh INSERT
-            INSERT (coil_id, grade, raw_data, scores, is_checked, weight, target_thick, target_width, production_date, slab_grade, factory)
-            VALUES (source.coil_id, source.grade, source.raw_data, source.scores, source.is_checked, source.weight, source.target_thick, source.target_width, source.production_date, source.slab_grade, source.factory);
+            INSERT (coil_id, grade, raw_data, scores, is_checked, weight, target_thick, target_width, production_date, slab_grade, factory, Temperature, Speed)
+            VALUES (source.coil_id, source.grade, source.raw_data, source.scores, source.is_checked, source.weight, source.target_thick, source.target_width, source.production_date, source.slab_grade, source.factory, source.Temperature, source.Speed);
         """
         
         params = []
@@ -111,7 +113,9 @@ def save_batch_coils_v2(batch_data):
                 item.get('target_width', 0),
                 item.get('production_date'),
                 item.get('slab_grade'),
-                item.get('factory', 'HRC1') 
+                item.get('factory', 'HRC1') ,
+                item.get('Temperature', 0), 
+                item.get('Speed', 0)
             ))
             
         cursor.executemany(merge_query, params)
@@ -211,3 +215,25 @@ def fetchall_as_dict(cursor):
     """
     columns = [column[0] for column in cursor.description]
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
+def log_audit(action_type, ref_id, description, user_name='Admin'):
+    """
+    Hàm ghi lại lịch sử thao tác của người dùng
+    - action_type: Loại hành động (ALLOCATE, DELETE, UPDATE...)
+    - ref_id: Mã đối tượng bị tác động (Số SO, Mã Cuộn...)
+    - description: Mô tả chi tiết
+    """
+    conn = None
+    try:
+        conn = get_connection() # Sử dụng hàm kết nối có sẵn của bạn
+        cursor = conn.cursor()
+        
+        sql = """
+            INSERT INTO action_history (action_type, ref_id, description, user_name)
+            VALUES (?, ?, ?, ?)
+        """
+        cursor.execute(sql, (action_type, str(ref_id), str(description), user_name))
+        conn.commit()
+    except Exception as e:
+        print(f"❌ LỖI GHI LOG: {str(e)}")
+    finally:
+        if conn: conn.close()

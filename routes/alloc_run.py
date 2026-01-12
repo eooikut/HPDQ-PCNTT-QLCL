@@ -170,31 +170,38 @@ def run_batch_allocation():
                     total_penalty = 0
                     failed_reasons = [] 
                     match_type = 'PERFECT'
-                    sort_diffs = []
+                    sort_diffs = [] # Danh sách các khoảng cách để so sánh chi tiết
                     scores = coil['scores']
                     
                     for crit in criteria_list:
                         defect = crit['defect']
+                        
+                        # Target: Là điểm "Mơ ước" (Ví dụ C6 là tốt nhất thì set Target=6)
                         target = crit.get('target', 1) 
-                        val = scores.get(defect, 1)
+                        val = scores.get(defect, 1) # Nếu thiếu data coi như là 1 (hoặc 0 tùy bạn)
                         allowed_range = crit.get('range', [])
+
+                        diff_from_target = abs(val - target)
+
                         if val == 0:
-                            # Nếu thiếu dữ liệu: Phạt nhẹ (20 điểm) và BỎ QUA tính toán khoảng cách
+                            # Xử lý thiếu dữ liệu (Giữ nguyên)
                             total_penalty += 20 
                             failed_reasons.append(f"{defect}:Missing(C0)")
-                            match_type = 'PROP_MISMATCH' # Đánh dấu là không khớp hoàn hảo
+                            match_type = 'PROP_MISMATCH'
+                            sort_diffs.append(99) 
                             continue
-                        dist = 0
+                        
                         if val not in allowed_range:
-                            dist = abs(val - target)
-                            if dist == 1: penalty = 20; reason = f"{defect}:C{val}"
-                            elif dist == 2: penalty = 50; reason = f"{defect}:C{val} (Lệch 2)"
+                            dist_error = abs(val - target) # Khoảng cách lỗi
+                            if dist_error == 1: penalty = 20; reason = f"{defect}:C{val}"
+                            elif dist_error == 2: penalty = 50; reason = f"{defect}:C{val} (Lệch 2)"
                             else: penalty = 999; reason = "FAIL"
+                            
                             total_penalty += penalty
                             if penalty < 999:
                                 match_type = 'PROP_MISMATCH'
                                 failed_reasons.append(reason)
-                        sort_diffs.append(dist)
+                        sort_diffs.append(diff_from_target)
 
                     if total_penalty < 800:
                         c_item = coil.copy()
@@ -228,14 +235,16 @@ def run_batch_allocation():
         return jsonify({'status': 'success', 'allocated': final_results})
     except Exception as e:
         return jsonify({'status': 'error', 'msg': str(e)})
+
+
 @alloc_run_bp.route('/api/confirm_multi_so', methods=['POST'])
 def confirm_multi_so():
     conn = None
     try:
         req = request.json
-        tdc_id = req.get('tdc_id')
-        alloc_list = req.get('allocations', []) # List [{coil_id, so_number, ...}]
-
+        alloc_list = req.get('allocations', [])
+        so_meta_list = req.get('so_meta', [])
+        current_user = req.get('user_name', 'QC_User')
         if not alloc_list:
             return jsonify({'status': 'error', 'msg': 'Danh sách phân bổ trống!'})
 
@@ -245,144 +254,279 @@ def confirm_multi_so():
         import datetime
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # --- BƯỚC 1: Lấy thông tin header ---
-        # Lấy tên khách từ TDC để lưu lịch sử
-        cursor.execute("SELECT customer_name FROM tdc_master WHERE id=?", (tdc_id,))
-        row = cursor.fetchone()
-        cust_name = row['customer_name'] if row else "Unknown"
-
-        # --- BƯỚC 2: Xử lý danh sách SO (Header) ---
-        unique_sos = set(item['so_number'] for item in alloc_list if item['so_number'] != 'N/A')
-        
-        # Lưu ý: Tùy vào DB (SQLite hay SQL Server) mà cú pháp BEGIN TRANSACTION có thể khác nhau. 
-        # Python DB-API thường tự động start transaction khi có lệnh ghi, ta chỉ cần commit/rollback.
-        
-        for so in unique_sos:
-            # Tạo đơn hàng nếu chưa tồn tại
-            # Sử dụng cú pháp tương thích SQL Server/SQLite
-            check_sql = "SELECT 1 FROM customer_orders WHERE so_number = ?"
-            cursor.execute(check_sql, (so,))
-            if not cursor.fetchone():
-                cursor.execute("""
-                    INSERT INTO customer_orders (so_number, customer_name, tdc_id, created_at)
-                    VALUES (?, ?, ?, ?)
-                """, (so, cust_name, tdc_id, now))
-
-        # --- BƯỚC 3: Cập nhật từng cuộn (Có kiểm tra tranh chấp) ---
-        success_count = 0
-        
-        for item in alloc_list:
-            so = item['so_number']
-            cid = item['coil_id']
+        # --- GIAI ĐOẠN 1: CẬP NHẬT CẤU TRÚC ĐƠN HÀNG (HEADER & DETAILS) ---
+        for meta in so_meta_list:
+            so_number = str(meta.get('so_number')).strip()
+            cust_name = meta.get('customer_name')
+            material_code = meta.get('material', '')
             
-            # [QUAN TRỌNG] Chỉ update nếu cuộn đó đang trống (NULL hoặc rỗng)
-            # Điều này ngăn chặn 2 người cùng allocation 1 cuộn
+            # 1. XỬ LÝ HEADER (sales_orders)
+            cursor.execute("SELECT 1 FROM sales_orders WHERE so_number = ?", (so_number,))
+            if not cursor.fetchone():
+                # Chưa có -> Tạo mới
+                cursor.execute("""
+                    INSERT INTO sales_orders (so_number, customer_name, order_date, created_at, status)
+                    VALUES (?, ?, ?, ?, 'Processing')
+                """, (so_number, cust_name, now, now))
+            else:
+                # Đã có -> Cập nhật trạng thái sang Processing
+                cursor.execute("UPDATE sales_orders SET status = 'Processing' WHERE so_number = ?", (so_number,))
+
+            # 2. XỬ LÝ DETAIL (so_details)
+            # Kiểm tra dòng này đã có chưa (ưu tiên theo material code)
+            check_sql = "SELECT id FROM so_details WHERE so_number = ? AND material_code = ?"
+            cursor.execute(check_sql, (so_number, material_code))
+            
+            row_tdc_id = meta.get('tdc_id')
+            if row_tdc_id == '': row_tdc_id = None
+
+            if not cursor.fetchone():
+                # Chưa có Detail -> Insert
+                cursor.execute("""
+                    INSERT INTO so_details (
+                        so_number, material_code, description, grade, 
+                        thickness, width, total_weight, tdc_id  
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)             
+                """, (
+                    so_number,
+                    material_code,
+                    f"{meta.get('grade')} {meta.get('thick')}x{meta.get('width')}",
+                    meta.get('grade', ''),
+                    float(meta.get('thick', 0)),
+                    float(meta.get('width', 0)),
+                    float(meta.get('req_weight', 0)),
+                    row_tdc_id 
+                ))
+            else:
+                # Đã có Detail -> Update lại TDC ID (phòng trường hợp người dùng đổi TDC phút cuối)
+                cursor.execute("""
+                    UPDATE so_details SET tdc_id = ? 
+                    WHERE so_number = ? AND material_code = ?
+                """, (row_tdc_id, so_number, material_code))
+
+        # --- GIAI ĐOẠN 2: CẬP NHẬT KHO (coil_data) ---
+        success_count = 0
+        allocated_so_set = set()
+
+        for item in alloc_list:
+            so = str(item['so_number']).strip()
+            cid = item['coil_id']
+            user_note = item.get('note', '') # Lấy ghi chú nếu có
+            allocated_so_set.add(so)
+
+            # Tìm thông tin để update vào cuộn
+            found_meta = next((m for m in so_meta_list if str(m['so_number']) == so), {})
+            cust_name_alloc = found_meta.get('customer_name', '')
+            mat_code = found_meta.get('material', '')
+
+            # Fallback tên khách
+            if not cust_name_alloc:
+                cursor.execute("SELECT customer_name FROM sales_orders WHERE so_number = ?", (so,))
+                res = cursor.fetchone()
+                cust_name_alloc = res[0] if res else "Unknown"
+
+            # 1. Update Coil Data
             update_sql = """
                 UPDATE coil_data 
-                SET allocated_to = ?, allocated_order = ?, allocated_at = ? 
+                SET allocated_to = ?, allocated_order = ?, allocated_material = ?, 
+                    allocated_at = ?, alloc_note = ?
                 WHERE coil_id = ? AND (allocated_to IS NULL OR allocated_to = '')
             """
-            cursor.execute(update_sql, (cust_name, so, now, cid))
+            cursor.execute(update_sql, (cust_name_alloc, so, mat_code, now, user_note, cid))
             
-            # Kiểm tra xem có dòng nào thực sự được update không
-            if cursor.rowcount == 0:
-                # Nếu rowcount = 0 nghĩa là:
-                # 1. Cuộn không tồn tại
-                # 2. HOẶC Cuộn đã bị người khác lấy mất (allocated_to không null)
-                raise Exception(f"Lỗi: Cuộn {cid} đã bị thay đổi trạng thái hoặc được phân bổ bởi người khác!")
-            
-            success_count += 1
+            if cursor.rowcount > 0:
+                success_count += 1
+                
+                # 2. [MỚI] GHI LOG CHI TIẾT NGAY TẠI ĐÂY
+                # Lưu chi tiết: Ai đã gán cuộn nào vào SO nào
+                log_desc = f"Gán cuộn {cid} ({cust_name_alloc}) cho đơn {so}. Ghi chú: {user_note}"
+                
+                cursor.execute("""
+                    INSERT INTO action_history (action_type, ref_id, description, user_name, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """, ('ALLOCATE_ITEM', so, log_desc, current_user, now))
         
-        # --- BƯỚC 4: Chốt giao dịch ---
-        conn.commit() # Chỉ lưu khi TẤT CẢ các lệnh trên đều thành công
+        conn.commit()
         return jsonify({
             'status': 'success', 
-            'msg': f'Thành công! Đã phân bổ {success_count} cuộn vào {len(unique_sos)} đơn hàng.'
+            'msg': f'Thành công! Đã gán {success_count} cuộn vào {len(allocated_so_set)} đơn hàng.'
         })
 
     except Exception as e:
-        # Nếu có bất kỳ lỗi nào (kể cả lỗi cuộn đã bị lấy), hoàn tác toàn bộ
         if conn: conn.rollback()
-        print(f"ROLLBACK TRANSACTION: {str(e)}")
+        print(f"ROLLBACK: {str(e)}")
         return jsonify({'status': 'error', 'msg': str(e)})
-        
     finally:
         if conn: conn.close()
-# --- API CHỐT ĐƠN HÀNG (MỚI: Lưu vào 3 bảng) ---
-@alloc_run_bp.route('/api/confirm_allocation_v2', methods=['POST'])
-def confirm_allocation_v2():
+# [Thêm vào alloc_run.py]
+
+# 1. API Lấy danh sách Backlog (Đơn hàng đang chờ xử lý)
+@alloc_run_bp.route('/api/get_backlog', methods=['GET'])
+def get_backlog():
+    try:
+        conn = db.get_connection()
+        
+        # [CẬP NHẬT] Thêm sub-query để tính tổng khối lượng thực tế (allocated_actual)
+        # ISNULL(SUM(...), 0) để đảm bảo trả về 0 nếu chưa có cuộn nào
+        query = """
+        SELECT 
+            d.id, d.so_number, d.material_code, d.grade, 
+            d.thickness, d.width, d.total_weight, 
+            d.min_weight, d.max_weight, d.tdc_id,
+            s.customer_name,
+            (
+                SELECT ISNULL(SUM(weight), 0) 
+                FROM coil_data c 
+                WHERE c.allocated_order = d.so_number 
+                  AND c.allocated_material = d.material_code
+            ) as allocated_actual
+        FROM so_details d
+        LEFT JOIN sales_orders s ON d.so_number = s.so_number
+        WHERE s.status != 'Done' OR s.status IS NULL
+        ORDER BY d.id DESC
+        """
+        cursor = conn.cursor()
+        cursor.execute(query)
+        rows = db.fetchall_as_dict(cursor)
+        conn.close()
+        return jsonify({'status': 'success', 'data': rows})
+    except Exception as e:
+        return jsonify({'status': 'error', 'msg': str(e)})
+
+# 2. API Lưu/Cập nhật Item vào Backlog (Auto-save)
+@alloc_run_bp.route('/api/save_backlog_item', methods=['POST'])
+def save_backlog_item():
     try:
         req = request.json
-        so_number = req.get('so_number')
+        so = req.get('so_number')
+        mat = req.get('material_code')
+        
+        # Các thông số cần lưu
+        cust = req.get('customer_name')
+        grade = req.get('grade')
+        thick = float(req.get('thick', 0))
+        width = float(req.get('width', 0))
+        weight = float(req.get('req_weight', 0))
+        min_w = float(req.get('min_weight', 0))
+        max_w = float(req.get('max_weight', 0))
         tdc_id = req.get('tdc_id')
-        items = req.get('items', [])     # List quy cách
-        coil_ids = req.get('coil_ids', []) # List ID cuộn được chọn
+        if not tdc_id or tdc_id == "": tdc_id = None
 
-        if not so_number: return jsonify({'status':'error', 'msg':'Thiếu số SO!'})
-
-        # 1. Lưu Header & Detail vào DB (Lịch sử đơn hàng)
-        success, msg = db.save_sales_order(so_number, tdc_id, items)
-        if not success: return jsonify({'status':'error', 'msg': msg})
-
-        # 2. Update trạng thái cuộn trong kho
         conn = db.get_connection()
-        import datetime
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        # Cần lấy tên khách hàng từ TDC ID để lưu vào field allocated_to (cho tương thích code cũ)
-        tdc = conn.execute("SELECT customer_name FROM tdc_master WHERE id=?", (tdc_id,)).fetchone()
-        cust_name = tdc['customer_name'] if tdc else "Unknown"
+        cursor = conn.cursor()
 
-        for cid in coil_ids:
-            conn.execute("""
-                UPDATE coil_data 
-                SET allocated_to = ?, allocated_order = ?, allocated_at = ? 
-                WHERE coil_id = ?
-            """, (cust_name, so_number, now, cid))
-        
+        # B1: Đảm bảo Header (sales_orders) tồn tại
+        cursor.execute("SELECT 1 FROM sales_orders WHERE so_number = ?", (so,))
+        if not cursor.fetchone():
+            import datetime
+            now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cursor.execute("INSERT INTO sales_orders (so_number, customer_name, created_at, status) VALUES (?, ?, ?, 'Pending')", (so, cust, now))
+
+        # B2: Kiểm tra xem dòng Detail này đã có chưa (Check theo SO + Material)
+        cursor.execute("SELECT id FROM so_details WHERE so_number = ? AND material_code = ?", (so, mat))
+        row = cursor.fetchone()
+
+        item_id = None
+        if row:
+            # [SỬA LỖI 1] Truy cập bằng index 0 thay vì key string 'id'
+            item_id = row[0] 
+            
+            # UPDATE: Nếu đã có thì cập nhật lại Min/Max/Weight/TDC
+            cursor.execute("""
+                UPDATE so_details 
+                SET total_weight = ?, min_weight = ?, max_weight = ?, tdc_id = ?, thickness = ?, width = ?, grade = ?
+                WHERE id = ?
+            """, (weight, min_w, max_w, tdc_id, thick, width, grade, item_id))
+        else:
+            # INSERT: Nếu chưa có thì thêm mới
+            cursor.execute("""
+                INSERT INTO so_details (so_number, material_code, customer_name, grade, thickness, width, total_weight, min_weight, max_weight, tdc_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (so, mat, cust, grade, thick, width, weight, min_w, max_w, tdc_id))
+            
+            # Lấy ID vừa tạo
+            try:
+                item_id = cursor.lastrowid 
+            except: pass
+
+            # Với SQL Server nếu lastrowid lỗi thì query lại
+            if not item_id:
+                cursor.execute("SELECT TOP 1 id FROM so_details WHERE so_number=? AND material_code=? ORDER BY id DESC", (so, mat))
+                new_row = cursor.fetchone()
+                # [SỬA LỖI 2] Truy cập bằng index 0
+                if new_row:
+                    item_id = new_row[0]
+
         conn.commit()
         conn.close()
-        return jsonify({'status': 'success', 'msg': 'Đã tạo đơn hàng và giữ cuộn thành công!'})
+        return jsonify({'status': 'success', 'id': item_id, 'msg': 'Đã lưu'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'msg': str(e)})
+
+# 3. API Xóa khỏi Backlog (Nút X)
+@alloc_run_bp.route('/api/remove_backlog_item', methods=['POST'])
+def remove_backlog_item():
+    try:
+        req = request.json
+        # Xóa dựa trên ID dòng (Unique) hoặc SO+Material
+        item_id = req.get('id')
+        
+        conn = db.get_connection()
+        if item_id:
+            conn.execute("DELETE FROM so_details WHERE id = ?", (item_id,))
+        else:
+            # Fallback nếu không có ID
+            conn.execute("DELETE FROM so_details WHERE so_number = ? AND material_code = ?", 
+                         (req.get('so'), req.get('material')))
+        conn.commit()
+        conn.close()
+        return jsonify({'status': 'success', 'msg': 'Đã xóa'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'msg': str(e)})
+# [Thêm vào alloc_run.py]
+
+@alloc_run_bp.route('/api/check_item_status', methods=['POST'])
+def check_item_status():
+    try:
+        req = request.json
+        so = req.get('so_number')
+        mat = req.get('material_code')
+        
+        if not so or not mat: 
+            return jsonify({'status': 'error', 'msg': 'Thiếu thông tin'})
+
+        conn = db.get_connection()
+        cursor = conn.cursor()
+
+        # 1. Kiểm tra trong Backlog (Bảng so_details)
+        # Xem người dùng đã từng thêm dòng này vào danh sách chờ chưa
+        cursor.execute("""
+            SELECT SUM(total_weight) 
+            FROM so_details 
+            WHERE so_number = ? AND material_code = ?
+        """, (so, mat))
+        row_backlog = cursor.fetchone()
+        backlog_weight = row_backlog[0] if row_backlog and row_backlog[0] else 0
+
+        # 2. Kiểm tra đã phân bổ xong (Bảng coil_data)
+        # Xem thực tế đã gán được bao nhiêu tấn cho dòng này
+        cursor.execute("""
+            SELECT SUM(weight) 
+            FROM coil_data 
+            WHERE allocated_order = ? AND allocated_material = ?
+        """, (so, mat))
+        row_alloc = cursor.fetchone()
+        allocated_weight = row_alloc[0] if row_alloc and row_alloc[0] else 0
+
+        conn.close()
+        
+        return jsonify({
+            'status': 'success',
+            'backlog_weight': backlog_weight,
+            'allocated_weight': allocated_weight
+        })
 
     except Exception as e:
         return jsonify({'status': 'error', 'msg': str(e)})
 
-
-@alloc_run_bp.route('/api/update_db_schema', methods=['GET'])
-def update_db_schema():
-    try:
-        conn = db.get_connection()
-        msg = []
-
-        # 1. Cập nhật bảng coil_data (Dữ liệu cuộn)
-        try: 
-            conn.execute("ALTER TABLE coil_data ADD COLUMN allocated_to TEXT")
-            msg.append("Đã thêm allocated_to")
-        except: pass
-        
-        try: 
-            conn.execute("ALTER TABLE coil_data ADD COLUMN allocated_at TEXT")
-            msg.append("Đã thêm allocated_at")
-        except: pass
-
-        # 2. Cập nhật bảng customer_orders (Cấu hình Đơn hàng/TDC)
-        # [QUAN TRỌNG]: Thêm cột so_number để sửa lỗi "no such column: so_number"
-        try: 
-            conn.execute("ALTER TABLE customer_orders ADD COLUMN so_number TEXT")
-            msg.append("Đã thêm so_number")
-        except: pass
-
-        # 3. (Tùy chọn) Thêm các cột quy cách nếu thiếu
-        for col in ['target_thick', 'target_width', 'min_weight', 'max_weight', 'req_weight_total']:
-            try: 
-                conn.execute(f"ALTER TABLE customer_orders ADD COLUMN {col} REAL")
-            except: pass
-        try: conn.execute("ALTER TABLE coil_data ADD COLUMN allocated_order TEXT")
-        except: pass
-        conn.commit()
-        conn.close()
-        
-        if not msg: return jsonify({'msg': 'DB đã cập nhật đầy đủ, không cần sửa gì.'})
-        return jsonify({'msg': 'Cập nhật thành công: ' + ', '.join(msg)})
-        
-    except Exception as e: return jsonify({'msg': str(e)})

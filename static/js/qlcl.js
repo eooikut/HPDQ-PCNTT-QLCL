@@ -3,11 +3,14 @@
  * Định nghĩa các hằng số dùng chung toàn hệ thống
  */
 const KEYS = {
-    SURFACE_AUTO: ['MI', 'HPrScale', 'PRScale', 'HOLE', 'RIP', 'BRUS', 'LC', 'SCRT'],
-    SURFACE_MANUAL: ['oil', 'rust', 'scratch_m', 'dirt', 'mark', 'scale', 'other_s'],
+    SURFACE_AUTO: ['MI', 'HPrScale', 'EL', 'HOLE', 'RIP', 'BRUS', 'LC', 'SCRT'],
+    SURFACE_MANUAL: ['oil', 'rust', 'scratch_m', 'dirt', 'mark', 'scale', 'other_s', 'gianbien'],
     GEO_AUTO: ['Flatness', 'Crown', 'Wedge', 'ThickDiff', 'WidthDiff'],
     GEO_MANUAL: ['telescope'],
-    PROP_AUTO: ['YieldPoint', 'Tensile', 'Elongation', 'Hardness', 'C', 'Mn', 'Si', 'P', 'S'],
+
+    MECH_AUTO: ['YieldPoint', 'Tensile', 'Elongation', 'Hardness'],
+    CHEM_AUTO: ['C', 'Mn', 'Si', 'P', 'S'],
+    
     APP_MANUAL: ['strap', 'label_tag', 'packaging', 'edge_cond', 'coil_shape']
 };
 
@@ -15,18 +18,18 @@ const KEYS = {
 const UNIFIED_KEYS = {
     SURFACE: [...KEYS.SURFACE_MANUAL, ...KEYS.SURFACE_AUTO],
     GEO:     [...KEYS.GEO_MANUAL,     ...KEYS.GEO_AUTO],
-    PROP:    [...KEYS.PROP_AUTO],
+    PROP:    [...KEYS.MECH_AUTO,      ...KEYS.CHEM_AUTO],
     APP:     [...KEYS.APP_MANUAL]
 };
-
+const REAL_MECHANICAL_KEYS = ['YieldPoint', 'Tensile', 'Elongation', 'Hardness'];
 const DEFECT_NAMES = {
-    'MI': 'Ngậm xỉ đúc', 'HPrScale': 'Xỉ sơ cấp HP', 'PRScale': 'Xỉ sơ cấp PR',
+    'MI': 'Ngậm xỉ đúc', 'HPrScale': 'Xỉ sơ cấp HP', 'EL': ' Lỗi xếp lớp',
     'HOLE': 'Lỗ thủng', 
     'RIP': 'Rách bề mặt', 'BRUS': 'Vết Hằn trục',
     'LC': 'Nứt dọc', 'SCRT': 'Xước bề mặt',
     'oil': 'Gấp nếp', 'rust': 'Nếp Nhăn', 'scratch_m': 'Vết hằn Pinch Roll',
 
-    'dirt': 'Gãy mặt', 'mark': 'Xỉ thứ cấp', 'scale': 'Xỉ cán', 'other_s': 'Xỉ muối tiêu',
+    'dirt': 'Gãy mặt', 'mark': 'Xỉ thứ cấp', 'scale': 'Xỉ cán', 'other_s': 'Xỉ muối tiêu','gianbien': 'Giãn biên',
     'Flatness': 'Độ phẳng', 'Crown': 'Độ vồng', 'Wedge': 'Độ nêm',
     'ThickDiff': 'Sai lệch dày', 'WidthDiff': 'Sai lệch rộng',
     'telescope': 'Cong cạnh',
@@ -81,59 +84,79 @@ function parseDateRobust(dateStr) {
     return new Date(y, m, d, h, min, sec).getTime();
 }
 function calculateSummary() {
-
     let allIds = Object.keys(RADAR_DATA);
-    // Sắp xếp ID giảm dần (Lớn trước - Nhỏ sau) => Mới nhất lên đầu
+
+    // --- BƯỚC 1: TỐI ƯU HÓA HIỆU NĂNG (PRE-CALCULATE) ---
+    // Tạo một map tạm lưu timestamp để không phải parse lại nhiều lần khi sort
+    const dateCache = {};
+    
+    // Chỉ chạy parseDateRobust đúng 1 lần cho mỗi ID (O(N))
+    allIds.forEach(id => {
+        dateCache[id] = parseDateRobust(RADAR_DATA[id].production_date || '');
+    });
+
+    // --- BƯỚC 2: SẮP XẾP DỰA TRÊN CACHE ---
+    // Lúc này việc so sánh cực nhanh vì chỉ là trừ 2 số nguyên (O(N log N))
     allIds.sort((a, b) => {
-        // 1. Lấy dữ liệu
-        const dateA = RADAR_DATA[a].production_date  || '';
-        const dateB = RADAR_DATA[b].production_date  || '';
+        const valA = dateCache[a];
+        const valB = dateCache[b];
         
-        // 2. Chuyển đổi sang số (Timestamp)
-        const valA = parseDateRobust(dateA);
-        const valB = parseDateRobust(dateB);
-        
-        // 3. So sánh thời gian (Giảm dần: B - A)
+        // So sánh thời gian (Giảm dần)
         if (valB !== valA) {
-            return valB - valA; // Nếu B lớn hơn (mới hơn) thì B lên trước
+            return valB - valA; 
         }
-        
-        // 4. Nếu trùng ngày giờ thì so sánh ID giảm dần
+        // So sánh ID nếu trùng thời gian
         return b.localeCompare(a, undefined, { numeric: true });
     });
 
     ALL_IDS_LIST = allIds;
     document.getElementById('totalCoils').innerText = allIds.length;
 
-    // Sử dụng Set để đảm bảo unique keys
+    // --- BƯỚC 3: TÍNH TOÁN THỐNG KÊ (GIỮ NGUYÊN LOGIC CŨ) ---
     const kSurf = [...new Set([...KEYS.SURFACE_AUTO, ...KEYS.SURFACE_MANUAL])];
     const kGeo  = [...new Set([...KEYS.GEO_AUTO, ...KEYS.GEO_MANUAL])];
-    const kProp = [...new Set([...KEYS.PROP_AUTO])];
-    const kApp  = [...new Set([...KEYS.APP_MANUAL])];
+    
+    // Tách riêng Cơ tính và Hóa học (Logic mới đã sửa ở câu trước)
+    const kMech = [...new Set(KEYS.MECH_AUTO)]; 
+    const kChem = [...new Set(KEYS.CHEM_AUTO)]; 
+    const kApp  = [...new Set(KEYS.APP_MANUAL)];
+    const kPropChart = [...new Set([...KEYS.MECH_AUTO, ...KEYS.CHEM_AUTO])];
 
     let cntFull=0, cntGeoProp=0, cntSurfGeo=0, cntSurfProp=0, cntMissing=0;
     let sumSurf={}, sumGeo={}, sumProp={}, sumApp={};
     let nSurf=0, nGeo=0, nProp=0, nApp=0;
 
-    // Reset counter maps
     const initSum = (keys, map) => keys.forEach(k => map[k] = 0);
-    initSum(kSurf, sumSurf); initSum(kGeo, sumGeo); initSum(kProp, sumProp); initSum(kApp, sumApp);
+    initSum(kSurf, sumSurf); 
+    initSum(kGeo, sumGeo); 
+    initSum(kPropChart, sumProp); 
+    initSum(kApp, sumApp);
 
+    // Duyệt qua danh sách để đếm
     allIds.forEach(id => {
         const s = RADAR_DATA[id];
-        const check = (keys) => keys.some(k => (s[k]||0) > 0);
+        // Hàm check tối ưu hơn chút bằng cách kiểm tra length trước
+        const check = (keys) => {
+            for (let i = 0; i < keys.length; i++) {
+                if ((s[keys[i]] || 0) > 0) return true;
+            }
+            return false;
+        };
         
         const hasSurf = check(kSurf);
         const hasGeo  = check(kGeo);
-        const hasProp = check(kProp);
+        const hasMech = check(kMech); 
+        const hasChem = check(kChem); 
         const hasApp  = check(kApp);
 
-        if(hasSurf && hasGeo && hasProp) cntFull++;
-        else if(!hasSurf && hasGeo && hasProp) cntGeoProp++;
-        else if(hasSurf && hasGeo && !hasProp) cntSurfGeo++;
-        else if(hasSurf && !hasGeo && hasProp) cntSurfProp++;
+        // Phân loại
+        if(hasSurf && hasGeo && hasMech) cntFull++;
+        else if(!hasSurf && hasGeo && hasChem) cntGeoProp++;
+        else if(hasSurf && hasGeo && !hasMech) cntSurfGeo++;
+        else if(hasSurf && !hasGeo && hasChem) cntSurfProp++;
         else cntMissing++;
 
+        // Cộng dồn để vẽ biểu đồ
         const addSum = (has, keys, map) => {
             if(has) {
                 keys.forEach(k => map[k] += (s[k]||0));
@@ -141,19 +164,20 @@ function calculateSummary() {
             }
             return 0;
         };
+        
         nSurf += addSum(hasSurf, kSurf, sumSurf);
         nGeo  += addSum(hasGeo,  kGeo,  sumGeo);
-        nProp += addSum(hasProp, kProp, sumProp);
+        nProp += addSum(hasMech || hasChem, kPropChart, sumProp);
         nApp  += addSum(hasApp,  kApp,  sumApp);
     });
 
+    // Update UI
     document.getElementById('cntFull').innerText = cntFull;
     document.getElementById('cntGeoProp').innerText = cntGeoProp;
     document.getElementById('cntSurfGeo').innerText = cntSurfGeo;
     document.getElementById('cntSurfProp').innerText = cntSurfProp;
     document.getElementById('cntMissing').innerText = cntMissing;
 
-    // Vẽ biểu đồ trung bình dùng UNIFIED_KEYS để đồng bộ thứ tự
     drawAvgChart('avgSurf', UNIFIED_KEYS.SURFACE, sumSurf, nSurf, 'rgba(239,68,68,1)');
     drawAvgChart('avgGeo',  UNIFIED_KEYS.GEO,     sumGeo,  nGeo,  'rgba(59,130,246,1)');
     drawAvgChart('avgProp', UNIFIED_KEYS.PROP,    sumProp, nProp, 'rgba(16,185,129,1)');
@@ -166,23 +190,33 @@ function applyFilters() {
     FULL_PAGE = 1;
     const valSurf = document.getElementById('f_surf').value;
     const valGeo  = document.getElementById('f_geo').value;
-    const valProp = document.getElementById('f_prop').value;
+    
+    // [SỬA]: Lấy giá trị 2 bộ lọc mới
+    const valChem = document.getElementById('f_chem').value;
+    const valMech = document.getElementById('f_mech').value;
+    
     const valApp  = document.getElementById('f_app') ? document.getElementById('f_app').value : 'ALL';
     const search  = document.getElementById('s_full').value.toUpperCase();
     
     CURRENT_VIEW_LIST = ALL_IDS_LIST.filter(id => {
         const s = RADAR_DATA[id] || {};
-        // Helper check exist
         const chk = (keys) => keys.some(k => (s[k]||0) > 0);
         
         const hasSurf = chk([...KEYS.SURFACE_AUTO, ...KEYS.SURFACE_MANUAL]);
         const hasGeo  = chk([...KEYS.GEO_AUTO, ...KEYS.GEO_MANUAL]);
-        const hasProp = chk(KEYS.PROP_AUTO);
+        
+        const hasChem = chk(KEYS.CHEM_AUTO);
+        const hasMech = chk(KEYS.MECH_AUTO);
+        
         const hasApp  = chk(KEYS.APP_MANUAL);
 
         if (valSurf !== 'ALL' && ((valSurf === 'YES') !== hasSurf)) return false;
         if (valGeo  !== 'ALL' && ((valGeo === 'YES')  !== hasGeo))  return false;
-        if (valProp !== 'ALL' && ((valProp === 'YES') !== hasProp)) return false;
+        
+        // [SỬA]: Logic lọc riêng
+        if (valChem !== 'ALL' && ((valChem === 'YES') !== hasChem)) return false;
+        if (valMech !== 'ALL' && ((valMech === 'YES') !== hasMech)) return false;
+        
         if (valApp  !== 'ALL' && ((valApp === 'YES')  !== hasApp))  return false;
 
         if (search && !id.toUpperCase().includes(search)) return false;
@@ -205,11 +239,14 @@ function renderFullTable() {
         const s = RADAR_DATA[id] || {};
         const grade = s['GRADE'] || '---';
         const chk = (keys) => keys.some(k => (s[k]||0) > 0);
-        
         let tags = '';
+        
         if(chk([...KEYS.SURFACE_AUTO, ...KEYS.SURFACE_MANUAL])) tags += '<span class="detail-tag" style="color:#dc2626;border:1px solid #dc2626">Bề mặt</span> ';
         if(chk([...KEYS.GEO_AUTO, ...KEYS.GEO_MANUAL])) tags += '<span class="detail-tag" style="color:#0284c7;border:1px solid #0284c7">Hình học</span> ';
-        if(chk(KEYS.PROP_AUTO)) tags += '<span class="detail-tag" style="color:#16a34a;border:1px solid #16a34a">Cơ/Lý</span> ';
+
+        if(chk(KEYS.CHEM_AUTO)) tags += '<span class="detail-tag" style="color:#d97706;border:1px solid #d97706">Hóa học</span> '; // Màu cam
+        if(chk(KEYS.MECH_AUTO)) tags += '<span class="detail-tag" style="color:#16a34a;border:1px solid #16a34a">Cơ tính</span> '; // Màu xanh lá
+        
         if(chk(KEYS.APP_MANUAL)) tags += '<span class="detail-tag" style="color:#9333ea;border:1px solid #9333ea">Ngoại quan</span> ';
 
         return `<tr>
@@ -345,7 +382,7 @@ function renderInputList() {
         if (filterProp !== 'ALL') {
             const data = RADAR_DATA[id] || {};
             // Kiểm tra xem cuộn này có bất kỳ chỉ số Cơ/Lý/Hóa nào > 0 hay không
-            const hasProp = UNIFIED_KEYS.PROP.some(k => (data[k] || 0) > 0);
+            const hasProp = REAL_MECHANICAL_KEYS.some(k => (data[k] || 0) > 0);
 
             if (filterProp === 'NO' && hasProp) return false;  // Muốn tìm "Chưa có" mà cuộn này "Đã có" -> Loại
             if (filterProp === 'YES' && !hasProp) return false; // Muốn tìm "Đã có" mà cuộn này "Chưa có" -> Loại
@@ -353,7 +390,6 @@ function renderInputList() {
 
         return true;
     });
-    // --- PHẦN DƯỚI GIỮ NGUYÊN (Phân trang & Render HTML) ---
     const totalPages = Math.ceil(filteredIds.length / INPUT_PAGE_SIZE) || 1;
     if (INPUT_PAGE > totalPages) INPUT_PAGE = totalPages;
     if (INPUT_PAGE < 1) INPUT_PAGE = 1;
@@ -365,12 +401,32 @@ function renderInputList() {
         const isChecked = RADAR_DATA[id]['IS_CHECKED'] ? '✅' : '';
         const activeClass = (CURRENT_INPUT_COIL === id) ? 'active' : '';
         
-        // (Tùy chọn) Có thể thêm icon nhỏ báo trạng thái cơ tính ngay trên list
-        const hasPropRaw = UNIFIED_KEYS.PROP.some(k => (RADAR_DATA[id][k] || 0) > 0);
-        const propIcon = hasPropRaw ? '<span style="color:#16a34a; font-size:0.8em;">(Prop)</span>' : '';
+        // 1. Logic Icon Cơ tính (Giữ nguyên)
+        const hasPropRaw = REAL_MECHANICAL_KEYS.some(k => (RADAR_DATA[id][k] || 0) > 0);
+        const propIcon = hasPropRaw ? '<span style="color:#16a34a; font-weight:bold; font-size:0.8em; margin-left:5px;">(Cơ tính)</span>' : '';
 
+        // 2. [THÊM MỚI] Logic Icon Ngoại quan (Đếm số mục đã chấm)
+        let countApp = 0;
+        const totalApp = KEYS.APP_MANUAL.length;
+        KEYS.APP_MANUAL.forEach(k => {
+            if ((RADAR_DATA[id][k] || 0) > 0) countApp++;
+        });
+
+        let appIcon = '';
+        if (countApp > 0) {
+            // Style tối giản: Chữ xám, nền nhạt, ghi tắt là NQ
+            appIcon = `<span style="font-size:0.8em; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; padding:0 4px; border-radius:3px; margin-left:5px; font-weight:600;">
+                        NQ: ${countApp}/${totalApp}
+                       </span>`;
+        }
+
+        // 3. Render HTML
         return `<div class="coil-item ${activeClass}" onclick="selectInputCoil('${id}')" id="in_${id}">
-                    <span>${id} ${propIcon}</span> 
+                    <div style="display:flex; align-items:center; flex-wrap:wrap;">
+                        <span style="font-weight:600;">${id}</span> 
+                        ${propIcon} 
+                        ${appIcon}
+                    </div>
                     <span>${isChecked}</span>
                 </div>`;
     }).join('');
@@ -393,35 +449,41 @@ function changeInputPage(delta) {
 // Hàm chọn cuộn để nhập liệu
 function selectInputCoil(id) {
     CURRENT_INPUT_COIL = id;
+    
+    // 1. Lấy dữ liệu ngay lập tức từ biến toàn cục (RAM) -> KHÔNG CÓ ĐỘ TRỄ
     const coilData = RADAR_DATA[id] || {};
 
-    // Lấy Gốc
+    // 2. Thiết lập dữ liệu Gốc (Tham chiếu - Nét đứt)
+    // Backend đã gửi sẵn trong auto_scores ở Bước 1
     ORIGINAL_SNAPSHOT = coilData['auto_scores'] ? JSON.parse(JSON.stringify(coilData['auto_scores'])) : {};
     
+    // 3. Thiết lập dữ liệu Hiện tại (Đang sửa - Nét liền)
     INPUT_TEMP_DATA = {};
-    
     const allDefectKeys = [
         ...UNIFIED_KEYS.SURFACE, ...UNIFIED_KEYS.GEO, 
         ...UNIFIED_KEYS.PROP, ...UNIFIED_KEYS.APP
     ];
 
     allDefectKeys.forEach(key => {
-        // Ưu tiên lấy từ RADAR_DATA (Dữ liệu hiện tại/đã sửa)
+        // Ưu tiên lấy điểm đã lưu trong DB (nằm ngay level ngoài của coilData)
         if (coilData.hasOwnProperty(key)) {
             INPUT_TEMP_DATA[key] = coilData[key];
         } else {
-            // Fallback về gốc
+            // Nếu chưa có điểm lưu, lấy điểm gốc làm mặc định
             INPUT_TEMP_DATA[key] = ORIGINAL_SNAPSHOT[key] || 0;
         }
     });
 
-    // ... (Phần update UI giữ nguyên) ...
+    // 4. Update UI ngay lập tức
     document.querySelectorAll('.coil-item').forEach(e => e.classList.remove('active'));
     document.getElementById(`in_${id}`)?.classList.add('active');
+    
     document.getElementById('inputEmpty').style.display = 'none';
     document.getElementById('radarInputArea').style.display = 'grid'; 
+    document.getElementById('radarInputArea').style.opacity = '1'; // Bỏ hiệu ứng mờ loading
     document.getElementById('lblInputCoil').innerText = id;
     
+    // 5. Vẽ biểu đồ
     drawInteractiveRadars();
 }
 // Hàm reset dữ liệu nhập về gốc (Máy đo)
@@ -445,7 +507,7 @@ function resetCurrentInput() {
                 RADAR_DATA[CURRENT_INPUT_COIL][key] = val;
             });
             
-            RADAR_DATA[CURRENT_INPUT_COIL]['IS_CHECKED'] = true;
+            RADAR_DATA[CURRENT_INPUT_COIL]['IS_CHECKED'] = false;
         }
 
         // 4. Gửi dữ liệu xuống Backend (Cập nhật Database)
@@ -464,7 +526,8 @@ function resetCurrentInput() {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ 
                 coil_id: CURRENT_INPUT_COIL, 
-                scores: cleanScores // Gửi object chứa đầy đủ các điểm 0
+                scores: cleanScores,
+                is_reset: true
             })
         }).then(r=>r.json()).then(d => {
             hideLoading();
@@ -914,12 +977,42 @@ function drawCoilRadar(id){
 
 function showLoading(){document.getElementById('loadingOverlay').style.display='flex'}
 function hideLoading(){document.getElementById('loadingOverlay').style.display='none'}
-function resetFilters() { document.getElementById('f_surf').value='ALL'; document.getElementById('f_geo').value='ALL'; document.getElementById('f_prop').value='ALL'; if(document.getElementById('f_app')) document.getElementById('f_app').value='ALL'; document.getElementById('s_full').value=''; applyFilters(); }
+function resetFilters() { 
+    document.getElementById('f_surf').value='ALL'; 
+    document.getElementById('f_geo').value='ALL'; 
+    
+    // [SỬA]: Reset 2 ô lọc mới
+    if(document.getElementById('f_mech')) document.getElementById('f_mech').value='ALL'; 
+    if(document.getElementById('f_chem')) document.getElementById('f_chem').value='ALL'; 
+    
+    if(document.getElementById('f_app')) document.getElementById('f_app').value='ALL'; 
+    document.getElementById('s_full').value=''; 
+    applyFilters(); 
+}
 function filterSummaryTable(type) {
     resetFilters();
-    const setF = (s,g,p) => { document.getElementById('f_surf').value=s; document.getElementById('f_geo').value=g; document.getElementById('f_prop').value=p; };
-    if(type==='FULL') setF('YES','YES','YES'); else if(type==='GEO_PROP') setF('NO','YES','YES');
-    else if(type==='SURF_GEO') setF('YES','YES','NO'); else if(type==='SURF_PROP') setF('YES','NO','YES');
+    
+    // [SỬA]: Hàm helper setF nhận 4 tham số: Surf, Geo, Mech, Chem
+    const setF = (s, g, m, c) => { 
+        document.getElementById('f_surf').value = s; 
+        document.getElementById('f_geo').value = g; 
+        if(document.getElementById('f_mech')) document.getElementById('f_mech').value = m; 
+        if(document.getElementById('f_chem')) document.getElementById('f_chem').value = c; 
+    };
+
+    if (type === 'FULL') {
+        setF('YES', 'YES', 'YES', 'YES');
+    } 
+    else if (type === 'GEO_PROP') {
+        setF('NO', 'YES', 'ALL', 'YES'); 
+    }
+    else if (type === 'SURF_GEO') {
+        setF('YES', 'YES', 'ALL', 'ALL');
+    }
+    else if (type === 'SURF_PROP') {
+        setF('YES', 'NO', 'ALL', 'YES');
+    }
+    
     applyFilters();
 }
 
@@ -947,7 +1040,7 @@ async function loadGradeList() {
         const select = document.getElementById('globalGradeSelect');
         if(!select) return;
 
-        const currentVal = select.getAttribute('data-current') || 'SAE1006'; 
+        const currentVal = select.getAttribute('data-current') || 'ALL'; 
         
         select.innerHTML = '';
         const optAll = document.createElement('option');
@@ -1015,10 +1108,10 @@ window.addEventListener('load', () => {
 
     // 2. Set Grade Dropdown
     const gradeParam = urlParams.get('grade'); 
+    
     if(gradeParam) {
         const select = document.getElementById('globalGradeSelect');
         if(select) {
-            // Sửa gradeFromUrl thành gradeParam
             select.setAttribute('data-current', gradeParam); 
             select.value = gradeParam;
         }

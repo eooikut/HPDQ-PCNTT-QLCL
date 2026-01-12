@@ -10,37 +10,35 @@ import requests
 from utils.common import sanitize_data, standardize_id
 from utils.scoring import process_coil_scores,get_all_grade_configs,calculate_metric_surface,calculate_metric_value
 from utils.sync_worker import sync_surface_defects, sync_properties_mysql,process_and_save_geometry,API_GEO_SINGLE_URL,process_coil_scores,LAST_DATA_UPDATE, FACTORY_CONFIGS
-
+import time
 dashboard_bp = Blueprint('dashboard_bp', __name__)
 upload_lock = threading.Lock()
-# Thêm vào dashboard.py
-from utils.scoring import process_coil_scores
-# --- Thêm vào dashboard.py ---
 @dashboard_bp.route('/api/smart_resync_surface', methods=['GET', 'POST'])
 def smart_resync_surface():
     try:
         # 1. Lấy thêm cột 'factory' từ DB
         conn = db.get_connection()
-        query = "SELECT coil_id, raw_data, factory FROM coil_data WITH (NOLOCK)" # <--- THÊM factory
-        rows = conn.execute(query).fetchall()
+        cursor = conn.cursor()
+        query = "SELECT coil_id, raw_data, factory FROM coil_data WITH (NOLOCK)"
+        cursor.execute(query)
+        rows = db.fetchall_as_dict(cursor) 
         conn.close()
-
         # 2. Phân loại cuộn theo nhà máy
-        # Cấu trúc: {'HRC1': ['ID1', 'ID2'], 'HRC2': ['ID3', ...]}
         missing_map = {fid: [] for fid in FACTORY_CONFIGS}
         
-        SURFACE_KEYS = ['MI', 'HPrScale', 'PRScale', 'HOLE', 'RIP', 'BRUS', 'LC', 'SCRT', 'EL']
+        SURFACE_KEYS = ['MI', 'HPrScale', 'HOLE', 'RIP', 'BRUS', 'LC', 'SCRT', 'EL']
 
         for r in rows:
-            # Parse raw data
-            raw_json = json.loads(r.raw_data) if r.raw_data else {}
+            raw_val = r['raw_data'] 
+            factory_val = r['factory']
+            coil_id = r['coil_id']
+            raw_json = json.loads(raw_val) if raw_val else {}
             has_surface = any(k in raw_json for k in SURFACE_KEYS)
             
             if not has_surface:
-                # Lấy factory của cuộn, nếu null thì mặc định HRC1
-                fid = r.factory if r.factory else 'HRC1'
+                fid = factory_val if factory_val else 'HRC1'
                 if fid in missing_map:
-                    missing_map[fid].append(r.coil_id)
+                    missing_map[fid].append(coil_id)
 
         # 3. Chạy vòng lặp quét bù cho từng nhà máy
         msg_details = []
@@ -182,266 +180,7 @@ def check_new_data():
 @dashboard_bp.route('/qlcl', methods=['GET'])
 def qlcl_page():
     return render_dashboard_logic()
-@dashboard_bp.route('/upload_geometry', methods=['POST'])
-def upload_geometry():
-    with upload_lock:
-        file = request.files.get('file')
-        if not file: return jsonify({'msg': 'No file'})
-        try:
-            # 1. Đọc file (Hỗ trợ cả CSV và Excel)
-            try:
-                df = pd.read_csv(file) 
-            except:
-                file.seek(0)
-                df = pd.read_excel(file, engine='calamine')
 
-            # Chuẩn hóa tên cột (Viết hoa, xóa khoảng trắng)
-            df.columns = (df.columns.astype(str)
-                          .str.replace(r'[\n\r]+', ' ', regex=True) # Biến xuống dòng thành dấu cách
-                          .str.replace(r'\s+', ' ', regex=True)     # Gộp nhiều dấu cách thành 1
-                          .str.strip()
-                          .str.upper())
-            
-            # 2. MAP CỘT THEO YÊU CẦU MỚI (Đã chuẩn hóa thành 1 dòng, viết hoa)
-            rename_map = {
-                'COIL_ID': 'CustomerID', 'L3 PIECE ID': 'CustomerID',
-                'STEEL GRADE': 'Grade_Geo', 'MÃ MÁC THÉP': 'Grade_Geo',
-                
-                # Cột đo trực tiếp (Giữ nguyên logic cũ)
-                'CROWN': 'Crown', 
-                'WEDGE': 'Wedge', 
-                'FLATNESS': 'Flatness', 'I-UNIT': 'Flatness',
-
-                # --- [MAPPING MỚI CHO CÁC CỘT XUỐNG DÒNG] ---
-                # MeasThk\n(mm) -> Sau khi chuẩn hóa sẽ thành "MEASTHK (MM)"
-                'MEASTHK (MM)': 'Act_Thick', 
-                
-                # Targ Thk\n(mm) -> "TARG THK (MM)"
-                'TARG THK (MM)': 'Tgt_Thick',
-                
-                # Meas Width\n(mm) -> "MEAS WIDTH (MM)"
-                'MEAS WIDTH (MM)': 'Act_Width',
-                
-                # Targ Width\n(mm) -> "TARG WIDTH (MM)"
-                'TARG WIDTH (MM)': 'Tgt_Width'
-            }
-
-            df.rename(columns=rename_map, inplace=True)
-            df = standardize_id(df)
-
-            batch_data = []
-            conn = db.get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT coil_id, raw_data, grade, scores, is_checked FROM coil_data WITH (NOLOCK)")
-            existing_rows = db.fetchall_as_dict(cursor) # <--- SỬA
-            conn.close()
-            existing_map = {r['coil_id']: {
-                'raw': json.loads(r['raw_data']) if r['raw_data'] else {}, 
-                'grade': r['grade'],
-                'scores': json.loads(r['scores']) if r['scores'] else {},
-                'is_checked': r['is_checked']
-            } for r in existing_rows}
-
-            count = 0
-            for _, row in df.iterrows():
-                if 'CustomerID' not in row or pd.isna(row['CustomerID']): continue
-                coil_id = str(row['CustomerID']).strip()
-                
-                # 3. TÍNH TOÁN SAI LỆCH (DIFF)
-                
-                # ThickDiff = ABS(ACTUAL_THICK_F5 - TARGET_THICK)
-                act_thick = pd.to_numeric(row.get('Act_Thick'), errors='coerce')
-                tgt_thick = pd.to_numeric(row.get('Tgt_Thick'), errors='coerce')
-                thick_diff = 0
-                if pd.notnull(act_thick) and pd.notnull(tgt_thick):
-                    thick_diff = abs(act_thick - tgt_thick)
-                
-                # WidthDiff = ABS(MEAS_WIDTH - TARGET_WIDTH)
-                act_width = pd.to_numeric(row.get('Act_Width'), errors='coerce')
-                tgt_width = pd.to_numeric(row.get('Tgt_Width'), errors='coerce')
-                width_diff = 0
-                if pd.notnull(act_width) and pd.notnull(tgt_width):
-                    width_diff = abs(act_width - tgt_width)
-
-                # 4. TẠO RAW DATA
-                raw_map = {}
-                
-                # Lấy các cột đo trực tiếp nếu có trong file
-                for k in ['Flatness', 'Crown', 'Wedge']:
-                    if k in row: 
-                        val = pd.to_numeric(row[k], errors='coerce')
-                        if pd.notnull(val): raw_map[k] = val
-
-                # Lưu thêm giá trị thực (nếu cần hiển thị chi tiết sau này)
-                if pd.notnull(act_thick): raw_map['Thickness'] = act_thick
-                if pd.notnull(act_width): raw_map['Width'] = act_width
-
-                # Lưu kết quả tính toán vào đúng key Config
-                raw_map['ThickDiff'] = thick_diff
-                raw_map['WidthDiff'] = width_diff
-                val_weight = pd.to_numeric(row.get('KhoiLuongPDI'), errors='coerce') # Cần đảm bảo file Excel có cột WEIGHT
-                val_tgt_thick = tgt_thick # Đã lấy ở trên
-                val_tgt_width = tgt_width
-                clean_raw = sanitize_data(raw_map)
-
-                # 5. Xử lý Mác thép (Ưu tiên giữ nguyên nếu DB đã có, nếu chưa thì lấy từ file này)
-                current_info = existing_map.get(coil_id, {'raw': {}, 'grade': 'SAE1006'})
-                final_grade = current_info['grade']
-                
-                excel_grade = str(row.get('Grade_Geo', '')).strip().upper()
-                # Nếu trong DB đang là mặc định (SAE1006) mà file này có Grade xịn -> Cập nhật
-                if final_grade == 'SAE1006' and excel_grade and excel_grade != 'NAN' and excel_grade != '':
-                    final_grade = excel_grade
-
-                # 6. Merge & Tính điểm
-                full_raw = current_info['raw'].copy()
-                full_raw.update(clean_raw)
-                
-                new_auto_scores = process_coil_scores(coil_id, full_raw, final_grade)
-                
-                # --- [SỬA 3]: LOGIC BẢO VỆ ĐIỂM SỐ ---
-                final_scores = new_auto_scores
-                if current_info.get('is_checked') == 1:
-                    final_scores = current_info['scores'] # Giữ nguyên điểm cũ
-
-                batch_data.append({
-                    'id': coil_id,
-                    'grade': final_grade, 
-                    'raw': full_raw, # Lưu full raw đã merge
-                    'scores': final_scores,
-                    'is_checked': current_info.get('is_checked', 0),
-                    'weight': float(val_weight) if pd.notnull(val_weight) else 0,
-                    'target_thick': float(val_tgt_thick) if pd.notnull(val_tgt_thick) else 0,
-                    'target_width': float(val_tgt_width) if pd.notnull(val_tgt_width) else 0
-                })
-                count += 1
-
-            if batch_data: db.save_batch_coils_v2(batch_data)
-            return jsonify({'msg': f'Upload Hình học OK! Đã cập nhật {count} cuộn.'})
-            
-        except Exception as e: return jsonify({'msg': str(e)})
-@dashboard_bp.route('/upload_properties', methods=['POST'])
-def upload_properties():
-    with upload_lock:
-        file = request.files.get('file')
-        if not file: return jsonify({'msg': 'No file'})
-        try:
-            df = None
-            # 1. CHIẾN THUẬT ĐỌC FILE MẠNH MẼ
-            # Thử đọc là CSV trước
-            try:
-                df = pd.read_csv(file)
-            except:
-                file.seek(0)
-                try:
-                    # Thử đọc CSV với encoding utf-16 (Excel hay lưu dạng này)
-                    df = pd.read_csv(file, encoding='utf-16', sep='\t')
-                except:
-                    file.seek(0)
-                    # Cuối cùng thử đọc Excel (Dùng openpyxl cho phổ biến, header=None để tự dò)
-                    df = pd.read_excel(file, header=None, engine='openpyxl')
-
-            if df is None: return jsonify({'msg': 'Không thể đọc file. Hãy đảm bảo là file Excel hoặc CSV đúng chuẩn.'})
-
-            # 2. TỰ ĐỘNG TÌM DÒNG TIÊU ĐỀ (HEADER)
-            # Quét 10 dòng đầu để tìm dòng chứa chữ "ID" hoặc "Sản phẩm" hoặc "Mã mác thép"
-            header_idx = -1
-            for i, row in df.head(10).iterrows():
-                # Chuyển cả dòng thành chuỗi in hoa để tìm
-                row_str = " ".join([str(x).upper() for x in row.values])
-                if 'ID' in row_str or 'SAN PHAM' in row_str or 'MA MAC THEP' in row_str:
-                    header_idx = i
-                    break
-            
-            # Nếu tìm thấy header thì set lại columns
-            if header_idx != -1:
-                df.columns = df.iloc[header_idx] # Lấy dòng đó làm tên cột
-                df = df.iloc[header_idx+1:].reset_index(drop=True) # Lấy dữ liệu từ dòng sau đó
-            
-            # Chuẩn hóa tên cột
-            df.columns = df.columns.astype(str).str.upper().str.replace('\n', ' ').str.strip()
-
-            # 3. MAPPING CỘT (Bao gồm cả tên trong file CSV mới và Excel cũ)
-            rename_map = {
-                # Định danh
-                'SẢN PHẨM': 'CustomerID', 'SAN PHAM': 'CustomerID', 'ID': 'CustomerID',
-                'MÃ MÁC THÉP': 'Grade', 'MA MAC THEP': 'Grade', 'MÁC THÉP': 'Grade',
-                
-                # Cơ tính
-                'G.H CHẢY': 'YieldPoint', 'G.H CHAY': 'YieldPoint', 'GIỚI HẠN CHẢY': 'YieldPoint',
-                'G.H BỀN': 'Tensile', 'G.H BEN': 'Tensile', 'GIỚI HẠN BỀN': 'Tensile',
-                'ĐỘ GIÃN DÀI': 'Elongation', 'DO GIAN DAI': 'Elongation',
-                'ĐỘ CỨNG': 'Hardness', 'DO CUNG': 'Hardness',
-                
-                # Hóa học
-                'C': 'C', 'MN': 'Mn', 'SI': 'Si', 'P': 'P', 'S': 'S'
-            }
-            df.rename(columns=rename_map, inplace=True)
-            df = standardize_id(df)
-            
-            # --- XỬ LÝ DỮ LIỆU VÀO DB ---
-            batch_data = []
-            conn = db.get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT coil_id, raw_data, grade, scores, is_checked FROM coil_data WITH (NOLOCK)")
-            existing_rows = db.fetchall_as_dict(cursor) # <--- SỬA
-            conn.close()
-            existing_map = {r['coil_id']: {
-                'raw': json.loads(r['raw_data']) if r['raw_data'] else {}, 
-                'grade': r['grade'],
-                'scores': json.loads(r['scores']) if r['scores'] else {},
-                'is_checked': r['is_checked']
-            } for r in existing_rows}
-
-            count = 0
-            # Các cột cần lấy số liệu
-            valid_keys = ['YieldPoint', 'Tensile', 'Elongation', 'Hardness', 'C', 'Mn', 'Si', 'P', 'S']
-
-            for _, row in df.iterrows():
-                if 'CustomerID' not in row: continue
-                coil_id = str(row['CustomerID']).strip()
-                if not coil_id or coil_id.upper() == 'NAN': continue
-                
-                new_grade = str(row.get('Grade', 'SAE1006')).strip().upper()
-                if new_grade in ['NAN', '']: new_grade = 'SAE1006'
-                
-                raw_map = {}
-                for k, v in row.to_dict().items():
-                    if k in valid_keys:
-                        val_str = str(v).strip().replace(',', '.')
-                        try: raw_map[k] = float(val_str)
-                        except: raw_map[k] = None
-                
-                clean_raw = sanitize_data(raw_map)
-                
-                # Lấy info cũ
-                curr = existing_map.get(coil_id, {'raw': {}, 'grade': 'SAE1006', 'scores': {}, 'is_checked': 0})
-                
-                # Merge Raw Data
-                final_raw = curr['raw'].copy()
-                final_raw.update(clean_raw)
-                
-                # Tính điểm tự động
-                new_auto_scores = process_coil_scores(coil_id, final_raw, new_grade)
-                
-                # --- [SỬA 3]: LOGIC BẢO VỆ ĐIỂM SỐ ---
-                final_scores = new_auto_scores
-                if curr.get('is_checked') == 1:
-                    final_scores = curr['scores']
-                
-                batch_data.append({
-                    'id': coil_id,
-                    'grade': new_grade,
-                    'raw': final_raw, # Lưu Full Raw
-                    'scores': final_scores,
-                    'is_checked': curr.get('is_checked', 0)
-                })
-                count += 1
-
-            if batch_data: db.save_batch_coils(batch_data)
-            return jsonify({'msg': f'Upload TPHH thành công! Đã cập nhật {count} cuộn.'})
-            
-        except Exception as e: return jsonify({'msg': f'Lỗi: {str(e)}'})
 @dashboard_bp.route('/api/sync_single_coil', methods=['POST'])
 # Manual scan single coil endpoint
 def sync_single_coil_endpoint():
@@ -502,8 +241,6 @@ def sync_single_coil_endpoint():
     except Exception as e:
         return jsonify({'status': 'error', 'msg': str(e)})
 
-import time
-
 @dashboard_bp.route('/api/sync_batch_coils', methods=['POST'])
 def sync_batch_coils_endpoint():
     try:
@@ -524,7 +261,6 @@ def sync_batch_coils_endpoint():
             print(f"🚀 [Batch Scan] Bắt đầu quét {len(target_ids)} cuộn...")
             
             # 1. Quét Cơ Lý (MySQL) - Nhanh nhất chạy trước
-            # Hàm này đã hỗ trợ list ID, chạy 1 lệnh SQL IN (...)
             try:
                 sync_properties_mysql(target_ids)
             except Exception as e:
@@ -580,7 +316,7 @@ def get_menu_structure_for_grade(grade_config):
 
 def render_dashboard_logic(msg=None):
     current_factory = request.args.get('factory', 'HRC1') # <--- MỚI
-    selected_grade = request.args.get('grade', 'SAE1006')
+    selected_grade = request.args.get('grade', 'ALL')
 
     start_date = request.args.get('start_date', '')
     end_date = request.args.get('end_date', '')
@@ -595,6 +331,9 @@ def render_dashboard_logic(msg=None):
     """
     params = [current_factory]
 
+    if selected_grade != 'ALL':
+        sql += " AND grade = ?"
+        params.append(selected_grade)
     # 2. Nếu có lọc Ngày bắt đầu
     if start_date:
         sql += " AND production_date >= ?"
@@ -623,7 +362,7 @@ def render_dashboard_logic(msg=None):
         } 
         for r in rows
     }
-    selected_grade = request.args.get('grade', 'SAE1006')
+    # selected_grade = request.args.get('grade', 'SAE1006')
     dashboard_data = regenerate_dashboard_data(all_data, selected_grade)
     
     data_wrapper = {
@@ -644,10 +383,9 @@ def render_dashboard_logic(msg=None):
         )
 def regenerate_dashboard_data(all_data, selected_grade):
     all_configs = get_all_grade_configs()
-    if selected_grade == 'ALL':
+    current_config = all_configs.get(selected_grade)
+    if not current_config:
         current_config = all_configs.get('SAE1006')
-    else:
-        current_config = all_configs.get(selected_grade, all_configs.get('SAE1006'))
     final_radar_data = {} # Dữ liệu gửi xuống Frontend (Chứa TOÀN BỘ cuộn)
     target_coils = []     # Dữ liệu để tính toán Tabs thống kê (Chỉ Mác đang chọn)
 
@@ -655,42 +393,33 @@ def regenerate_dashboard_data(all_data, selected_grade):
     for cid, d in all_data.items():
         raw = d.get('raw_data', {})
         current_scores = d.get('scores', {})
-        # Lấy grade của cuộn, nếu không có thì mặc định
         db_grade = d.get('GRADE') if d.get('GRADE') else 'SAE1006'
-
-        # --- A. TÍNH ĐIỂM AUTO (Reference Line) ---
-        # Tính điểm máy cho TẤT CẢ các cuộn để hiển thị đúng khi xem chi tiết
         db_grade_clean = str(db_grade).strip().upper()
 
-        if not current_scores and raw:
-             auto_scores = process_coil_scores(cid, raw, db_grade_clean)
+        if raw:
+             auto_scores = process_coil_scores(cid, raw, db_grade_clean, cached_config=all_configs)
         else:
-             auto_scores = current_scores # Dùng luôn cái đã lưu
-        # --- B. TẠO CẤU TRÚC PHẲNG (FLAT STRUCTURE) ---
-        # [QUAN TRỌNG]: Copy điểm số ra lớp ngoài cùng để JS cũ không bị lỗi
+             auto_scores = {}
         frontend_obj = current_scores.copy() 
         
         frontend_obj['auto_scores'] = auto_scores
         optimized_raw = {}
-        
         if raw:
             for k, v in raw.items():
-                # 1. Nếu là List (Dữ liệu bề mặt từ máy) -> Tóm tắt lại
                 if isinstance(v, list):
-                    count = len(v)
-                    if count == 0:
-                        optimized_raw[k] = "Sạch (0 lỗi)"
-                    else:
+                    cnt = len(v)
+                    if cnt > 0:
                         try:
-                            max_val = max(v)
-                            optimized_raw[k] = f"SL: {count} | Max: {max_val}"
+                            mx = max([float(x) for x in v if x is not None and x != ''])
+                            optimized_raw[k] = f"SL: {cnt} (Max: {mx:.2f})"
                         except:
-                            optimized_raw[k] = f"SL: {count}"
-                            
-                # 2. Nếu là Số/Chuỗi (Dữ liệu Hình học/Cơ tính hoặc Nhập tay) -> Giữ nguyên
+                            optimized_raw[k] = f"SL: {cnt}"
+                    else:
+                        # Giữ cho nhẹ JSON
+                        pass 
                 else:
                     optimized_raw[k] = v
-
+        
         frontend_obj['raw_data'] = optimized_raw
         frontend_obj['GRADE'] = db_grade_clean
         frontend_obj['IS_CHECKED'] = d.get('IS_CHECKED', False)
@@ -759,7 +488,6 @@ def regenerate_dashboard_data(all_data, selected_grade):
             tabs_data[name] = calculate_metric_value(df_main, name, cfg, total_rolls, score_lookup)
 
     return {'tabs': tabs_data, 'radar_data': final_radar_data, 'menu': get_menu_structure_for_grade(current_config)}
-# [FILE: dashboard.py]
 
 @dashboard_bp.route('/api/recalc_scores_by_grade', methods=['POST'])
 def recalc_scores_by_grade():
@@ -771,11 +499,17 @@ def recalc_scores_by_grade():
 
         print(f"🔄 Đang tính lại điểm cho toàn bộ cuộn thuộc mác {target_grade}...")
 
-        # 1. Lấy tất cả cuộn thuộc Mác thép này
         conn = db.get_connection()
         cursor = conn.cursor()
-        # Lưu ý: Lấy cả raw_data để tính lại
-        cursor.execute("SELECT coil_id, raw_data, grade, scores, is_checked, factory FROM coil_data WITH (NOLOCK) WHERE grade = ?", (target_grade,))
+        
+        # [SỬA 1]: Thêm các cột production_date, slab_grade, weight... vào câu SELECT
+        query = """
+            SELECT coil_id, raw_data, grade, scores, is_checked, factory,
+                   production_date, slab_grade, weight, target_thick, target_width
+            FROM coil_data WITH (NOLOCK) 
+            WHERE grade = ?
+        """
+        cursor.execute(query, (target_grade,))
         rows = db.fetchall_as_dict(cursor)
         conn.close()
 
@@ -785,161 +519,151 @@ def recalc_scores_by_grade():
         batch_update = []
         count = 0
 
-        # 2. Chạy vòng lặp tính lại
         for r in rows:
             coil_id = r['coil_id']
             raw = json.loads(r['raw_data']) if r['raw_data'] else {}
             old_scores = json.loads(r['scores']) if r['scores'] else {}
             
-            # GỌI HÀM TÍNH ĐIỂM (Lúc này nó sẽ lấy config MỚI NHẤT của target_grade)
             new_scores = process_coil_scores(coil_id, raw, target_grade)
             
-            # 3. Logic Bảo vệ dữ liệu nhập tay (Quan trọng)
             final_scores = new_scores
             if r['is_checked'] == 1:
                 final_scores = old_scores.copy()
-                # Chỉ cập nhật những cái máy tính, giữ nguyên cái người sửa
                 for k, v in new_scores.items():
-                    # Nếu điểm cũ = 0 (chưa chấm) thì cập nhật
-                    # Nếu key này KHÔNG nằm trong danh sách nhập tay (manual keys) thì cập nhật
-                    # Cách đơn giản nhất: Nếu old_scores[k] khác 0 thì giữ nguyên
                     if old_scores.get(k, 0) == 0:
                         final_scores[k] = v
-            
             batch_update.append({
                 'id': coil_id,
                 'grade': target_grade,
                 'raw': raw,
-                'scores': final_scores,
+                'scores': final_scores, 
                 'is_checked': r['is_checked'],
-                'factory': r.get('factory', 'HRC1')
+                'factory': r.get('factory', 'HRC1'),
+                'production_date': r.get('production_date'),
+                'slab_grade': r.get('slab_grade'),
+                'weight': r.get('weight', 0),
+                'target_thick': r.get('target_thick', 0),
+                'target_width': r.get('target_width', 0)
             })
             count += 1
 
-        # 4. Lưu lại vào DB
         if batch_update:
             db.save_batch_coils_v2(batch_update)
 
-        return jsonify({'status': 'success', 'msg': f'Đã tính lại điểm cho {count} cuộn {target_grade} theo cấu hình mới!'})
+        return jsonify({'status': 'success', 'msg': f'Đã tính lại điểm cho {count} cuộn {target_grade} (Dữ liệu gốc được bảo toàn)!'})
 
     except Exception as e:
+        print(f"Recalc Error: {e}")
         return jsonify({'status': 'error', 'msg': str(e)})
-@dashboard_bp.route('/api/get_coil_detail/<coil_id>', methods=['GET'])
-def get_coil_detail(coil_id):
-    conn = db.get_connection()
-    # Chỉ lấy raw_data của 1 cuộn -> Cực nhanh
-    row = conn.execute("SELECT raw_data FROM coil_data WITH (NOLOCK) WHERE coil_id = ?", (coil_id,)).fetchone()
-    conn.close()
-    
-    if row and row[0]:
-        return jsonify(json.loads(row[0]))
-    return jsonify({})
-@dashboard_bp.route('/qlcl', methods=['POST'])
-def upload_surface():
-    """Upload Bề Mặt -> Render Dashboard"""
-    with upload_lock:
-        file = request.files.get('file')
-        if not file: return render_dashboard_logic(msg='Chưa chọn file')
-        try:
-            df = pd.read_excel(file,sheet_name=0, engine='calamine')
-            df.rename(columns={'Cuộn': 'CustomerID', 'Kích thước': 'Size', 'Lỗi': 'DefectClass'}, inplace=True)
-            df = standardize_id(df)
-            df['Size'] = pd.to_numeric(df['Size'], errors='coerce').fillna(0)
+@dashboard_bp.route('/api/get_input_detail/<coil_id>', methods=['GET'])
+def get_input_detail(coil_id):
+    try:
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        
+        # 1. Lấy dữ liệu từ DB
+        cursor.execute("SELECT raw_data, scores, grade, is_checked FROM coil_data WITH (NOLOCK) WHERE coil_id = ?", (coil_id,))
+        row = cursor.fetchone()
+        conn.close()
 
-            batch_data = []
-            conn = db.get_connection()
-            existing_rows = conn.execute("SELECT coil_id, raw_data, grade, scores, is_checked FROM coil_data WITH (NOLOCK)").fetchall()
-            conn.close()
-            existing_map = {r['coil_id']: {'raw': json.loads(r['raw_data']) if r['raw_data'] else {}, 'grade': r['grade']} for r in existing_rows}
+        if not row:
+            return jsonify({'status': 'error', 'msg': 'Không tìm thấy cuộn'})
 
-            grouped = df.groupby('CustomerID')
-            for coil_id, group in grouped:
-                raw_map = {}
-                for defect_type, defect_group in group.groupby('DefectClass'):
-                    sizes = defect_group['Size'].tolist()
-                    raw_map[defect_type] = sizes 
-                
-                clean_raw = sanitize_data(raw_map)
-                
-                current_info = existing_map.get(coil_id, {'raw': {}, 'grade': 'SAE1006'})
-                full_raw = current_info['raw'].copy()
-                full_raw.update(clean_raw)
-                new_auto_scores = process_coil_scores(coil_id, full_raw, current_info['grade'])
-                final_scores = new_auto_scores
-                if current_info.get('is_checked') == 1:
-                    final_scores = current_info['scores'] # Giữ điểm cũ
+        # 2. Parse dữ liệu
+        # row[0]: raw_data, row[1]: scores, row[2]: grade
+        current_raw = json.loads(row[0]) if row[0] else {}
+        current_scores = json.loads(row[1]) if row[1] else {}
+        grade = row[2] if row[2] else 'SAE1006'
+        
+        # 3. TÍNH TOÁN DỮ LIỆU GỐC (REFERENCE) TẠI CHỖ
+        # Thay vì lưu vào DB làm nặng, ta tính "tươi" ở đây vì chỉ tính cho 1 cuộn -> Cực nhanh
+        all_configs = get_all_grade_configs() # Hàm này đã tối ưu cache ở câu trả lời trước
+        auto_scores = process_coil_scores(coil_id, current_raw, grade, cached_config=all_configs)
 
-                batch_data.append({
-                    'id': coil_id, 
-                    'grade': None, 
-                    'raw': clean_raw, 
-                    'scores': final_scores,
-                    'is_checked': current_info.get('is_checked', 0)
-                })
-
-            if batch_data: db.save_batch_coils(batch_data)
-
-            return render_dashboard_logic(msg=f'Upload Bề mặt thành công! Đã xử lý {len(batch_data)} cuộn.')
-        except Exception as e: return render_dashboard_logic(msg=f'Lỗi: {str(e)}')
-     
-
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'coil_id': coil_id,
+                'grade': grade,
+                'current_scores': current_scores, # Điểm hiện tại (có thể đã sửa)
+                'original_scores': auto_scores,   # Điểm gốc máy chấm (tham chiếu)
+                'raw_data': current_raw,
+                'is_checked': row[3]
+            }
+        })
+    except Exception as e:
+        print(f"Err detail: {e}")
+        return jsonify({'status': 'error', 'msg': str(e)})
 ## Nhập tay
 @dashboard_bp.route('/get_manual_config', methods=['GET'])
 def get_manual_config():
     return jsonify({
-        'SURFACE_MANUAL': [{'id': 'oil', 'label': 'Gấp nếp'}, {'id': 'rust', 'label': 'Nếp Nhăn'}, {'id': 'scratch_m', 'label': 'Vết Hằn'}, {'id': 'dirt', 'label': 'Gãy mặt'}, {'id': 'mark', 'label': 'Xỉ thứ cấp'}, {'id': 'scale', 'label': 'Xỉ cán'}, {'id': 'other_s', 'label': 'Xỉ muối tiêu'}],
+        'SURFACE_MANUAL': [{'id': 'oil', 'label': 'Gấp nếp'}, {'id': 'rust', 'label': 'Nếp Nhăn'}, {'id': 'scratch_m', 'label': 'Vết Hằn'}, {'id': 'dirt', 'label': 'Gãy mặt'}, {'id': 'mark', 'label': 'Xỉ thứ cấp'}, {'id': 'scale', 'label': 'Xỉ cán'}, {'id': 'other_s', 'label': 'Xỉ muối tiêu'},{'id': 'gianbien', 'label': 'Giãn biên'}],
         'GEO_MANUAL': [{'id': 'telescope', 'label': 'Cong cạnh'}],
         'APPEARANCE': [{'id': 'strap', 'label': 'Khuyết biên'}, {'id': 'label_tag', 'label': 'Bava biên'}, {'id': 'packaging', 'label': 'Vỡ biên'}, {'id': 'edge_cond', 'label': 'Sổ vòng'}, {'id': 'coil_shape', 'label': 'Loa cuộn'}]
     })
-# API LƯU ĐIỂM ĐÁNH GIÁ THỦ CÔNG VÀ GHI LOG
 @dashboard_bp.route('/save_manual_data', methods=['POST'])
 def save_manual_data():
+    conn = None
     try:
         req = request.json
         coil_id = req.get('coil_id')
         new_scores = req.get('scores')
         user_name = req.get('user', 'User')
 
+        # [LOGIC MỚI]: Kiểm tra xem đây là hành động RESET hay LƯU
+        # Nếu Frontend gửi lên cờ 'is_reset': True thì ta sẽ trả về chế độ Auto (is_checked = 0)
+        is_reset = req.get('is_reset', False)
+
         if not coil_id: return jsonify({'status':'error', 'msg': 'Thiếu ID cuộn'})
 
-        conn = db.get_connection() # <--- Kết nối 1 mở tại đây
+        conn = db.get_connection()
+        cursor = conn.cursor() # [FIX 1]: Tạo Cursor
         
-        try: 
-            curr_row = conn.execute("SELECT scores FROM coil_data WITH (NOLOCK) WHERE coil_id=?", (coil_id,)).fetchone()
-            old_scores = json.loads(curr_row['scores']) if curr_row and curr_row['scores'] else {}
+        # 1. Lấy dữ liệu cũ để so sánh
+        cursor.execute("SELECT scores FROM coil_data WITH (NOLOCK) WHERE coil_id=?", (coil_id,))
+        curr_row = cursor.fetchone()
+        
+        # [FIX 2]: Lấy index 0 thay vì string key
+        old_scores = json.loads(curr_row[0]) if curr_row and curr_row[0] else {}
 
-            # 2. So sánh và chuẩn bị Log
-            logs = []
-            import datetime
-            now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # 2. Ghi Log thay đổi (Audit)
+        logs = []
+        import datetime
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            for key, new_val in new_scores.items():
-                old_val = old_scores.get(key, 0)
-                if float(new_val) != float(old_val):
-                    logs.append((coil_id, user_name, key, float(old_val), float(new_val), now))
+        for key, new_val in new_scores.items():
+            old_val = old_scores.get(key, 0)
+            if float(new_val) != float(old_val):
+                logs.append((coil_id, user_name, key, float(old_val), float(new_val), now))
 
-            if logs:
-                conn.executemany("INSERT INTO audit_log_qlcl (coil_id, user_name, defect_key, old_value, new_value, changed_at) VALUES (?, ?, ?, ?, ?, ?)", logs)
-            # 3. Cập nhật điểm mới (Ghi đè hoàn toàn)
-            final_scores = old_scores.copy()
-            final_scores.update(new_scores)
+        if logs:
+            # [FIX 3]: Dùng cursor.executemany thay vì conn.executemany
+            cursor.executemany("INSERT INTO audit_log_qlcl (coil_id, user_name, defect_key, old_value, new_value, changed_at) VALUES (?, ?, ?, ?, ?, ?)", logs)
 
-            conn.execute(
-                "UPDATE coil_data SET scores = ?, is_checked = 1 WHERE coil_id = ?", 
-                (json.dumps(final_scores), coil_id)
-            )
-            
-            conn.commit() 
-            return jsonify({'status': 'success', 'msg': f'Đã lưu và ghi nhận {len(logs)} thay đổi!'})
+        # 3. Cập nhật dữ liệu
+        final_scores = old_scores.copy()
+        final_scores.update(new_scores)
+        
+        # [LOGIC MỚI]: Nếu là reset thì is_checked = 0, ngược lại là 1
+        new_is_checked = 0 if is_reset else 1
 
-        except Exception as e:
-            conn.rollback() 
-            raise e
-        finally:
-            conn.close() 
+        # [FIX 4]: Dùng cursor.execute để update
+        cursor.execute(
+            "UPDATE coil_data SET scores = ?, is_checked = ? WHERE coil_id = ?", 
+            (json.dumps(final_scores), new_is_checked, coil_id)
+        )
+        
+        conn.commit() 
+        return jsonify({'status': 'success', 'msg': 'Đã lưu thành công!'})
 
-    except Exception as e: 
+    except Exception as e:
+        if conn: conn.rollback() 
+        print(f"ERROR save_manual_data: {e}")
         return jsonify({'status':'error', 'msg':str(e)})
+    finally:
+        if conn: conn.close()
+# 1. API KHỞI TẠO BẢNG LOG VÀ CÁC CHỨC NĂNG LIÊN QUAN
 @dashboard_bp.route('/api/init_log_table', methods=['GET'])
 def init_log_table():
     try:
@@ -965,25 +689,33 @@ def init_log_table():
         return jsonify({'status': 'error', 'msg': str(e)})
 @dashboard_bp.route('/api/mark_all_read', methods=['POST'])
 def mark_all_read():
+    conn = None
     try:
         conn = db.get_connection()
-        check = conn.execute("SELECT 1 FROM system_logs WHERE is_read = 0 LIMIT 1").fetchone()
+        cursor = conn.cursor() # [SỬA 1]: Tạo cursor
+        
+        cursor.execute("SELECT TOP 1 1 FROM system_logs WITH (NOLOCK) WHERE is_read = 0")
+        check = cursor.fetchone()
+        
         if check:
-            conn.execute("UPDATE system_logs SET is_read = 1 WHERE is_read = 0")
+            cursor.execute("UPDATE system_logs SET is_read = 1 WHERE is_read = 0")
             conn.commit()
             
-        conn.close()
         return jsonify({'status': 'success'})
-    except:
-        return jsonify({'status': 'error'})
+    except Exception as e:
+        print(f"Error mark_all_read: {e}") # In lỗi ra để dễ debug
+        return jsonify({'status': 'error', 'msg': str(e)})
+    finally:
+        if conn: conn.close() # Đảm bảo đóng kết nối
 @dashboard_bp.route('/api/get_unread_count', methods=['GET'])
 def get_unread_count():
-    """Đếm số thông báo chưa đọc"""
     try:
         conn = db.get_connection()
-        row = conn.execute("SELECT COUNT(*) as cnt FROM system_logs WITH (NOLOCK) WHERE is_read = 0").fetchone()
+        cursor = conn.cursor() 
+        cursor.execute("SELECT COUNT(*) as cnt FROM system_logs WITH (NOLOCK) WHERE is_read = 0")
+        row = cursor.fetchone()
         conn.close()
-        return jsonify({'count': row['cnt']})
+        return jsonify({'count': row[0]}) 
     except:
         return jsonify({'count': 0})
 # 2. API LẤY LỊCH SỬ THÔNG BÁO

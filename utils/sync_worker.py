@@ -36,21 +36,18 @@ def debug_check_data(source_name, data_row):
     Hàm soi dữ liệu: In ra độ dài của tất cả các trường.
     Báo động đỏ nếu trường nào dài quá 50 ký tự.
     """
-    print(f"\n🔍 [DEBUG - {source_name}] Kiểm tra dữ liệu chuẩn bị lưu:")
     has_error = False
     for key, value in data_row.items():
         # Chuyển về chuỗi để đếm độ dài
         val_str = str(value) if value is not None else ""
         val_len = len(val_str)
         if val_len > 45 and key not in ['raw', 'scores', 'raw_data']:
-            print(f"   ⚠️ CẢNH BÁO TRÀN: Cột '{key}' dài {val_len} ký tự! (Giá trị: '{val_str}')")
             has_error = True
     
     if not has_error:
-        print("   ✅ Dữ liệu an toàn (Các cột text < 45 ký tự).")
+        print("   ✅ Dữ liệu an toàn.")
     else:
         print("   ❌ PHÁT HIỆN NGUY CƠ LỖI!")
-    print("-" * 30)
 COIL_COOLDOWN_CACHE = {}
 API_GEO_SINGLE_URL = "http://10.192.49.39:5026/hsm?piece_id=" 
 API_SURFACE_URL = "http://10.192.49.39:5025/defects" 
@@ -58,7 +55,7 @@ FACTORY_CONFIGS = {
     'HRC1': {
         'name': 'Nhà máy HRC 1',
         'api_geo': 'http://10.192.49.39:5026/hsm?piece_id=', 
-        'api_surf': 'http://10.192.49.39:5025/defects',
+        'api_surf': 'http://10.192.49.39:5025/defects?customer_id=',
         'ws_url': 'ws://10.192.49.39:8001/ws',
         'db_prop_view': 'view_dq1_nmhrc1_cotinh',
         'db_tphh_view': 'view_dq1_nmlt_nuocthep',
@@ -73,7 +70,7 @@ FACTORY_CONFIGS = {
     'HRC2': {
         'name': 'Nhà máy HRC 2',
         'api_geo': 'http://10.192.50.24:5205/api/hsm?coilId=', # IP khác
-        'api_surf': 'http://10.192.50.39:5025/defects',
+        'api_surf': 'http://10.192.50.24:5205/api/defects?coilId=',
         'ws_url': 'ws://10.192.50.24:5205/ws',
         'db_prop_view': 'view_dq2_nmhrc2_cotinh',
         'db_tphh_view': 'view_dq2_nmlt_nuocthep',
@@ -117,7 +114,6 @@ def notify_frontend(msg, title="Cập nhật dữ liệu"):
         # Check trùng nội dung trong vòng 60s
         if full_msg == LAST_NOTIFY_CACHE['message']:
             if (current_time - LAST_NOTIFY_CACHE['time']) < 60:
-                print(f"🔇 [Anti-Spam RAM] Bỏ qua tin trùng: {msg}")
                 return 
 
         # Cập nhật Cache ngay trong Lock
@@ -132,8 +128,6 @@ def notify_frontend(msg, title="Cập nhật dữ liệu"):
         log_system_event(title, msg, 'success')
     except:
         pass 
-    
-    print(f"📢 [NOTIFY] {title}: {msg}")
 # =======================================================
 # PHẦN 2: WEBSOCKET CLIENT (REALTIME)
 # =======================================================
@@ -184,7 +178,6 @@ def on_ws_close(ws, status, msg):
 
 def start_websocket_listener():
     """Khởi động lắng nghe cho TẤT CẢ nhà máy trong Config"""
-    print("🚀 Khởi động Multi-Factory WebSocket Listeners...")
     
     headers = {"User-Agent": "Mozilla/5.0 ..."} # Giữ nguyên header của bạn
 
@@ -216,8 +209,127 @@ def start_websocket_listener():
         # Chạy thread riêng cho từng nhà máy
         t = threading.Thread(target=run_single_listener, args=(fid,), daemon=True)
         t.start()
-        print(f"   -> Đã bật lắng nghe {fid} ({cfg['name']})")
 # =======================================================
+# [MỚI] Hàm đồng bộ TPHH dựa trên Mác phôi (Lấy từ Geometry)
+def sync_tphh_from_slabs(coil_slab_map, factory_id="HRC1"):
+    """
+    coil_slab_map: Dict { 'COIL_ID': 'SLAB_ID', ... }
+    Mục tiêu: Lấy TPHH ngay khi có Geometry mà không cần chờ Cơ tính.
+    """
+    if not coil_slab_map: return
+    
+    cfg = FACTORY_CONFIGS.get(factory_id)
+    if not cfg: return
+
+    print(f"🧪 [Early TPHH] Đang tra cứu TPHH cho {len(coil_slab_map)} cuộn từ Mác phôi...")
+
+    current_db_conn = cfg['db_conn']
+    current_view_tphh = cfg['db_tphh_view']
+    
+    # 1. Lấy danh sách Slab ID unique để query
+    slab_ids = list(set(coil_slab_map.values()))
+    slabs_str = ",".join([f"'{str(x)}'" for x in slab_ids])
+    
+    final_data_map = {} # Map: CoilID -> {C, Mn, Si...}
+
+    try:
+        # Kết nối MySQL lấy TPHH
+        conn_mysql = pymysql.connect(**current_db_conn, cursorclass=pymysql.cursors.DictCursor)
+        with conn_mysql.cursor() as cursor:
+            # Query bảng TPHH
+            sql_tphh = f"SELECT * FROM {current_view_tphh} WHERE {COL_ID_PHOI_TPHH} IN ({slabs_str})"
+            cursor.execute(sql_tphh)
+            rows_tphh = cursor.fetchall()
+            
+            # Map dữ liệu về lại Coil ID
+            for r in rows_tphh:
+                slab_id = str(r.get(COL_ID_PHOI_TPHH)).strip()
+                
+                # Tìm tất cả cuộn có chung Slab ID này
+                for coil_id, s_id in coil_slab_map.items():
+                    if s_id == slab_id:
+                        if coil_id not in final_data_map: final_data_map[coil_id] = {}
+                        
+                        # Lấy các chất hóa học
+                        if r.get('C') is not None: final_data_map[coil_id]['C'] = float(r['C'])
+                        if r.get('Mn') is not None: final_data_map[coil_id]['Mn'] = float(r['Mn'])
+                        if r.get('Si') is not None: final_data_map[coil_id]['Si'] = float(r['Si'])
+                        if r.get('P') is not None: final_data_map[coil_id]['P'] = float(r['P'])
+                        if r.get('S') is not None: final_data_map[coil_id]['S'] = float(r['S'])
+        
+        conn_mysql.close()
+
+        # 2. Lưu vào Database Local (Merge với dữ liệu cũ)
+        if final_data_map:
+            batch_save = []
+            conn_local = db.get_connection()
+            
+            # Lấy dữ liệu hiện tại để merge
+            placeholders = ','.join('?' * len(final_data_map))
+            keys = list(final_data_map.keys())
+            
+            query = f"""
+                SELECT coil_id, raw_data, grade, scores, is_checked, 
+                       weight, target_thick, target_width, production_date, slab_grade,
+                       Temperature, Speed  
+                FROM coil_data WITH (NOLOCK) WHERE coil_id IN ({placeholders})
+            """
+            cursor = conn_local.cursor()
+            cursor.execute(query, keys)
+            existing_rows = db.fetchall_as_dict(cursor)
+            conn_local.close()
+            
+            existing_map = {r['coil_id']: r for r in existing_rows}
+
+            for cid, tphh_data in final_data_map.items():
+                if not tphh_data:
+                        continue
+                curr = existing_map.get(cid, {})
+                if not curr: continue # Không update nếu cuộn chưa tồn tại (lý thuyết là đã có vì vừa chạy geo xong)
+
+                old_raw = json.loads(curr['raw_data']) if curr.get('raw_data') else {}
+                
+                # Merge TPHH vào
+                final_raw = old_raw.copy()
+                final_raw.update(tphh_data)
+                clean_raw = sanitize_data(final_raw)
+
+                # Tính lại điểm
+                curr_grade = curr.get('grade', 'SAE1006')
+                new_auto_scores = process_coil_scores(cid, clean_raw, curr_grade)
+
+                # Bảo vệ điểm tay
+                final_scores = new_auto_scores
+                if curr.get('is_checked') == 1:
+                    old_scores_json = json.loads(curr['scores']) if curr.get('scores') else {}
+                    final_scores = old_scores_json.copy()
+                    for k, v in new_auto_scores.items():
+                        if old_scores_json.get(k, 0) == 0:
+                            final_scores[k] = v
+                
+                item_to_save = {
+                    'id': cid,
+                    'grade': curr_grade,
+                    'raw': clean_raw,
+                    'scores': final_scores,
+                    'is_checked': curr.get('is_checked', 0),
+                    'weight': curr.get('weight', 0),
+                    'target_thick': curr.get('target_thick', 0),
+                    'target_width': curr.get('target_width', 0),
+                    'production_date': curr.get('production_date'),
+                    'slab_grade': curr.get('slab_grade'),
+                    'factory': factory_id,
+                    'Temperature': curr.get('Temperature', 0),
+                    'Speed': curr.get('Speed', 0)
+                }
+                batch_save.append(item_to_save)
+
+            if batch_save:
+                db.save_batch_coils_v2(batch_save)
+                print(f"✅ [Early TPHH] Đã cập nhật TPHH sớm cho {len(batch_save)} cuộn.")
+
+    except Exception as e:
+        print(f"❌ [Early TPHH Error] {e}")
 def process_and_save_geometry(data_rows,factory_id="HRC1"):
     """
     Hàm core: Nhận list data từ API Geometry -> Map dữ liệu -> Lưu DB
@@ -225,7 +337,7 @@ def process_and_save_geometry(data_rows,factory_id="HRC1"):
     """
     processed_ids = []
     batch_data = []
-    
+    coil_slab_map = {}
     conn = db.get_connection()
 
     cursor = conn.cursor()
@@ -242,9 +354,6 @@ def process_and_save_geometry(data_rows,factory_id="HRC1"):
 
     for row in data_rows:
         if 'debug_printed' not in globals():
-            print("\n--- API KEYS DEBUG ---")
-            print(row.keys()) # In ra danh sách tên trường
-            print("----------------------\n")
             globals()['debug_printed'] = True
         r_id = row.get('TASK_SLAB') or row.get('piece_id') or row.get('COIL_ID') or row.get('SLAB_ID')
         if not r_id: continue
@@ -254,19 +363,41 @@ def process_and_save_geometry(data_rows,factory_id="HRC1"):
         if row.get('AVG_CROWN') is not None: raw_map['Crown'] = float(row.get('AVG_CROWN'))
         if row.get('AVG_WEDGE') is not None: raw_map['Wedge'] = float(row.get('AVG_WEDGE'))
         if row.get('FLATNEES') is not None: raw_map['Flatness'] = float(row.get('FLATNEES')) 
+
         val_prod_date = row.get('ARCHIVE_DATE') or row.get('PROD_DATE')
         clean_date = clean_date_sql(val_prod_date)
         if clean_date:
             raw_map['production_date'] = clean_date
+        
         val_slab_grade = row.get('SLAB_ID') or row.get('BILLET_GRADE')
+        cleaned_slab_id = None 
+        
         if val_slab_grade:
-            val_slab_grade = str(val_slab_grade).strip()
+            raw_slab = str(val_slab_grade).strip()
+            
+            # 🏭 LOGIC CHO NHÀ MÁY HRC 1 (Cắt đầu đuôi)
+            # Ví dụ: [72451] -> 72451
+            if factory_id == 'HRC1':
+                if len(raw_slab) >= 2:
+                    cleaned_slab_id = raw_slab[1:-1]
+                else:
+                    cleaned_slab_id = raw_slab
 
-            if len(val_slab_grade) >= 2:
-                val_slab_grade = val_slab_grade[1:-1] 
+            # 🏭 LOGIC CHO NHÀ MÁY HRC 2 (Cắt bỏ 3 ký tự cuối)
+            # Ví dụ: 72451001 -> 72451
+            elif factory_id == 'HRC2':
+                if len(raw_slab) > 3:
+                    cleaned_slab_id = raw_slab[:-3]
+                else:
+                    cleaned_slab_id = raw_slab
+            
+            # Mặc định (giữ nguyên nếu không khớp logic trên)
             else:
+                cleaned_slab_id = raw_slab
 
-                val_slab_grade = ""
+            # Thêm vào map để lát nữa query TPHH
+            if cleaned_slab_id:
+                coil_slab_map[coil_id] = cleaned_slab_id
         tgt_thick = pd.to_numeric(row.get('TARGTHK') or row.get('TARGET_THICK'), errors='coerce')
         act_thick = pd.to_numeric(row.get('THICK'), errors='coerce') 
         if pd.notnull(act_thick) and pd.notnull(tgt_thick):
@@ -312,6 +443,8 @@ def process_and_save_geometry(data_rows,factory_id="HRC1"):
             for k, v in new_auto_scores.items():
                 if old_scores.get(k, 0) == 0:
                     final_scores[k] = v
+        NhietDoSauCan = row.get('ACTUAL_EOR_TEMP') or 0
+        NhietDoTaoCuon = row.get('DC_TEMP_AVERAGE') or 0
         item_to_save={
             'id': coil_id, 
             'grade': final_grade, 
@@ -323,7 +456,9 @@ def process_and_save_geometry(data_rows,factory_id="HRC1"):
             'target_width': float(tgt_width) if pd.notnull(tgt_width) else 0,
             'production_date': clean_date,
             'factory': factory_id,
-            'slab_grade': str(val_slab_grade) if val_slab_grade else None
+            'slab_grade': cleaned_slab_id if cleaned_slab_id else None,
+            'Temperature': float(NhietDoSauCan),
+            'Speed': float(NhietDoTaoCuon)
         }
         debug_check_data("GEOMETRY", item_to_save) 
 
@@ -331,8 +466,12 @@ def process_and_save_geometry(data_rows,factory_id="HRC1"):
         processed_ids.append(coil_id)
 
     if batch_data:
+        count_updated = 0
         db.save_batch_coils_v2(batch_data)
-        
+        count_updated = len(batch_data)
+        print(f"✅ [Surface] Đã đồng bộ {count_updated} cuộn.")
+        if coil_slab_map:
+            threading.Thread(target=sync_tphh_from_slabs, args=(coil_slab_map, factory_id)).start()
     return processed_ids
 
 def sync_surface_defects(target_ids=None,factory_id="HRC1"):
@@ -342,10 +481,9 @@ def sync_surface_defects(target_ids=None,factory_id="HRC1"):
         cfg = FACTORY_CONFIGS.get(factory_id)
         if not cfg: return 0
         current_api_surf = cfg['api_surf']
-        print(f"🔄 [Surface] Bắt đầu quét {len(target_ids)} cuộn...")
         conn = db.get_connection()
         placeholders = ','.join('?' * len(target_ids))
-        query = f"SELECT coil_id, raw_data, grade, scores, is_checked FROM coil_data WITH (NOLOCK) WHERE coil_id IN ({placeholders})"
+        query = f"SELECT coil_id, raw_data, grade, scores, is_checked, Temperature, Speed FROM coil_data WITH (NOLOCK) WHERE coil_id IN ({placeholders})"
         cursor = conn.cursor()
         cursor.execute(query, target_ids)
         existing_rows = db.fetchall_as_dict(cursor) 
@@ -362,7 +500,7 @@ def sync_surface_defects(target_ids=None,factory_id="HRC1"):
 
         for coil_id in target_ids:
             try:
-                url = f"{current_api_surf}?customer_id={coil_id}"
+                url = f"{current_api_surf}{coil_id}"
                 resp = requests.get(url, timeout=5)
                 if resp.status_code != 200: continue
                 data = resp.json()
@@ -404,7 +542,9 @@ def sync_surface_defects(target_ids=None,factory_id="HRC1"):
                     'id': coil_id, 'grade': curr['grade'], 'raw': clean_raw, 
                     'scores': final_scores, 
                     'is_checked': curr.get('is_checked', 0),
-                    'factory': factory_id
+                    'factory': factory_id,
+                    'Temperature': existing_map.get(coil_id, {}).get('Temperature', 0),
+                    'Speed': existing_map.get(coil_id, {}).get('Speed', 0)
                 }
                 debug_check_data("SURFACE", item_to_save)
 
@@ -428,7 +568,7 @@ def sync_properties_mysql(target_ids=None,factory_id="HRC1"):
     current_db_conn = cfg['db_conn']      # Thông tin user/pass/host
     current_view_cotinh = cfg['db_prop_view'] # Tên view cơ tính
     current_view_tphh = cfg['db_tphh_view']
-    CHUNK_SIZE = 1000
+    CHUNK_SIZE = 100
     updated_ids_list = []
     
     for i in range(0, len(target_ids), CHUNK_SIZE):
@@ -493,7 +633,8 @@ def sync_properties_mysql(target_ids=None,factory_id="HRC1"):
                 # [QUAN TRỌNG] Lấy đầy đủ các cột cũ để không bị ghi đè NULL
                 query = f"""
                     SELECT coil_id, raw_data, grade, scores, is_checked, 
-                           weight, target_thick, target_width, production_date, slab_grade 
+                           weight, target_thick, target_width, production_date, slab_grade,
+                           Temperature, Speed -- <--- THÊM
                     FROM coil_data WITH (NOLOCK) WHERE coil_id IN ({placeholders})
                 """
                 
@@ -542,9 +683,11 @@ def sync_properties_mysql(target_ids=None,factory_id="HRC1"):
                         'weight': curr.get('weight', 0),
                         'target_thick': curr.get('target_thick', 0),
                         'target_width': curr.get('target_width', 0),
-                        'production_date': curr.get('production_date'), # Giữ nguyên ngày SX
+                        'production_date': curr.get('production_date'),
                         'slab_grade': curr.get('slab_grade'),
-                        'factory': factory_id            # Giữ nguyên Mác phôi
+                        'factory': factory_id,
+                        'Temperature': curr.get('Temperature', 0),
+                        'Speed': curr.get('Speed', 0)           
                     }
                     debug_check_data("PROPERTIES", item_to_save)
 
@@ -554,7 +697,6 @@ def sync_properties_mysql(target_ids=None,factory_id="HRC1"):
                     updated_ids_list.extend([item['id'] for item in batch_save])
                     
         except Exception as e:
-            print(f"❌ [Properties Error - Chunk] {str(e)}")
             continue 
 
     return updated_ids_list
@@ -582,7 +724,7 @@ def rescan_recent_coils_for_mechanical():
                 try:
                     # Parse dữ liệu hiện tại của cuộn
                     raw = json.loads(r['raw_data']) if r['raw_data'] else {}
-                    if not raw.get('YieldPoint') or not raw.get('Tensile'):
+                    if not raw.get('YieldPoint') or not raw.get('Hardness'):
                         target_ids.append(r['coil_id'])
                 except:
                     # Nếu lỗi parse JSON -> Coi như dữ liệu lỗi/trống -> Cho vào danh sách quét lại
@@ -639,7 +781,6 @@ def run_immediate_sync(target_id, factory_id="HRC1"):
         for attempt in range(MAX_RETRIES):
             cnt = sync_surface_defects([target_id], factory_id)
             if cnt > 0: 
-                print(f"✅ [Surface] Có dữ liệu ở lần thử {attempt + 1}")
                 break
             else:
                 if attempt < 2: time.sleep(1) 

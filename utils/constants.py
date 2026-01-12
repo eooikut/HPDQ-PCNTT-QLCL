@@ -98,21 +98,6 @@ DEFAULT_CONFIG_TEMPLATE = {
         ],
         'heatmap_cols': [(0,0,'0'),(1,10,'1-10'), (11,30,'11-30'), (31,50,'31-50'), (51,float('inf'),'>50')]
     },
-    'PRScale': {
-        'mode': 'matrix', 'group': 'surface', 'target_defect': 'PRScale',
-         'bins': [0, 1500, 3000, 4500, 6000, 9000, float('inf')],
-        'labels': ['0-1500', '1501-3000', '3001-4500', '4501-6000', '6001-9000', '>9000'],
-        'count_limits': [10, 30, 50, float('inf')], 
-        'matrix_rules': [
-            [1, 2, 3, 4], # Row: 0-1500 (Ít: C1 -> Nhiều: C4)
-            [2, 3, 4, 5], # Row: 1501-3000
-            [3, 4, 5, 6], # Row: 3001-4500
-            [4, 5, 6, 6], # Row: 4501-6000
-            [5, 6, 6, 6], # Row: 6001-9000
-            [6, 6, 6, 6]  # Row: >9000 (Luôn nặng)
-        ],
-        'heatmap_cols': [(0,0,'0'), (1,10,'1-10'), (11,30,'11-30'), (31,50,'31-50'), (51,float('inf'),'>50')]
-    },
     'RIP': {
         'mode': 'matrix', 'group': 'surface', 'target_defect': 'RIP',
         'bins': [0, 200, 400, 600, 800, 1000, float('inf')], 

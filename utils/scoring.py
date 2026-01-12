@@ -9,7 +9,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import time
 MANUAL_DEFECT_KEYS = [
     # Surface Manual
-    'oil', 'rust', 'scratch_m', 'dirt', 'mark', 'scale', 'other_s',
+    'oil', 'rust', 'scratch_m', 'dirt', 'mark', 'scale', 'other_s', 'gianbien',
     # Geo Manual
     'telescope'
 ]
@@ -152,8 +152,11 @@ def get_all_grade_configs():
     else:
         cfgs = desanitize_data(cfgs)
     return cfgs
-def process_coil_scores(coil_id, raw_data, grade):
-    all_configs = get_all_grade_configs()
+def process_coil_scores(coil_id, raw_data, grade, cached_config=None):
+    if cached_config:
+        all_configs = cached_config
+    else:
+        all_configs = get_all_grade_configs()
     grade_config = all_configs.get(grade, all_configs.get('SAE1006'))
     if not grade_config: return {}
     

@@ -27,13 +27,69 @@
         font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
     }
     /* === LAYOUT CHUNG === */
-    .run-layout { display: flex; flex-direction: column; gap: 15px; padding: 15px; height: 100vh; overflow: hidden; background: #f8fafc; }
-    .panel { background: white; border: 1px solid #cbd5e1; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .run-layout { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+            padding: 10px; 
+            height: 100vh; 
+            overflow: hidden; 
+            background: #f1f5f9; 
+        }
+    .panel { 
+            background: white; 
+            border: 1px solid #cbd5e1; 
+            border-radius: 6px; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); 
+        }    
+    /* Hàng chứa 2 Panel cài đặt (SAP + LIST) */
+    .setup-row {
+        display: flex;
+        gap: 10px;
+        height: 300px; /* Chiều cao cố định cho vùng cài đặt */
+        flex-shrink: 0; /* Không cho co lại */
+        transition: height 0.3s;
+    }
     
+    /* Khi thu gọn vùng cài đặt */
+    .setup-row.collapsed {
+        height: 40px; 
+        overflow: hidden;
+    }
+    .sap-col {
+        width: 450px; /* Chiều rộng cố định cho cột nhập liệu */
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        border-right: 1px solid #e2e8f0;
+    }
+    .list-col {
+        flex: 1; /* Chiếm phần còn lại */
+        display: flex;
+        flex-direction: column;
+        min-width: 0; /* Quan trọng để table không bị tràn flex */
+    }
+    .result-panel {
+        flex: 1; /* Tự động giãn hết chiều cao còn lại */
+        min-height: 0; /* Quan trọng để scroll hoạt động */
+        display: flex; 
+        flex-direction: column;
+    }
+
+    /* Nút Toggle thu gọn */
+    .btn-toggle-setup {
+        background: #e2e8f0; border: none; width: 100%; 
+        font-size: 0.7em; color: #64748b; cursor: pointer; padding: 2px;
+        border-bottom: 1px solid #cbd5e1;
+    }
+    .btn-toggle-setup:hover { background: #cbd5e1; color: #334155; }
     /* === SAP PANEL STYLE === */
     .sap-panel { background: #f0f9ff; border: 1px solid #bae6fd; padding: 15px; flex: 0 0 auto; }
-    .sap-label { font-size: 0.75em; font-weight: 700; color: #0369a1; text-transform: uppercase; margin-bottom: 4px; display: block; }
-    
+    .sap-label { font-size: 0.7em; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 2px; }    
+    .sap-group { padding: 10px; display: flex; flex-direction: column; gap: 8px; flex: 1; overflow: hidden; }
     /* === INPUT SECTION === */
     .input-table { width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; }
     .input-table th { background: #f8fafc; padding: 8px; font-size: 0.8em; color: #64748b; border: 1px solid #e2e8f0; text-align: left; }
@@ -117,93 +173,98 @@
 {% block content %}
 <div class="run-layout">
     
-    <div class="panel sap-panel">
-        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-            <h3 style="margin:0; color:#0369a1; font-size:1.1em;">📥 NHẬP TỪ SAP </h3>
-            <span style="font-size:0.85em; color:#0c4a6e;">Tự động lấy dữ liệu Đơn hàng, Mác thép và Kích thước</span>
-        </div>
+    <div class="setup-row" id="setupRow">
         
-        <div style="display:flex; gap: 15px; align-items: flex-end;">
-            <div style="flex: 1;">
-                <label class="sap-label">1. Tìm Đơn Hàng (SO) / Khách Hàng</label>
-                <div style="display:flex; gap:5px;">
-                    <input list="sapSoList" id="sapSoInput" class="inp-cell" 
-                        placeholder="🔍 Nhập số SO hoặc tên khách..." 
-                        onchange="onSapSoChange()"
-                        style="width:100%; border:1px solid #38bdf8; border-radius:4px; padding:8px;">
-                    
-                    <datalist id="sapSoList"></datalist>
+        <div class="panel sap-col">
+            <div style="padding:8px 12px; background:#f0f9ff; border-bottom:1px solid #bae6fd; display:flex; align-items:center; gap:8px;">
+                <h3 style="margin:0; color:#0369a1; font-size:0.95em;">📥 NHẬP TỪ SAP</h3>
+                <button onclick="toggleSetup()" title="Thu gọn vùng này" style="margin-left:auto; border:none; background:none; cursor:pointer;">🔼</button>
+            </div>
 
-                    <button onclick="loadSapSoList()" class="btn-reset" title="Tải lại danh sách" style="border:1px solid #7dd3fc; color:#0369a1;">↻</button>
+            <div class="sap-group">
+                <div>
+                    <label class="sap-label">1. Tìm Đơn Hàng (SO)</label>
+                    <div style="display:flex; gap:4px;">
+                        <input list="sapSoList" id="sapSoInput" class="inp-cell" 
+                            placeholder="🔍 Số SO / Khách..." 
+                            onchange="onSapSoChange()"
+                            style="border:1px solid #94a3b8; border-radius:4px;">
+                        <datalist id="sapSoList"></datalist>
+                        <button onclick="loadSapSoList()" class="btn-reset" title="Tải lại" style="border:1px solid #cbd5e1;">↻</button>
+                    </div>
                 </div>
-            </div>
 
-            <div style="flex: 1;">
-                <label class="sap-label">2. Chọn Mã Material (Quy cách)</label>
-                <select id="sapItemSelect" class="inp-select" style="width:100%; border:1px solid #38bdf8; border-radius:4px;" disabled>
-                    <option value="">-- Vui lòng chọn SO trước --</option>
-                </select>
-                <div id="itemStatusMsg" style="margin-top:5px; font-size:0.85em; min-height:20px;"></div>
-            </div>
-            <div>
-                <button onclick="addFromSap()" class="btn-upload" style="background:#0ea5e9; border:none; color:white; height:34px; padding:0 20px;">
+                <div style="flex:1; display:flex; flex-direction:column; min-height:0;">
+                    <label class="sap-label">2. Chọn Material (Giữ Ctrl chọn nhiều)</label>
+                    <select id="sapItemSelect" class="inp-select" multiple 
+                        style="flex:1; border:1px solid #94a3b8; border-radius:4px; font-family:monospace; font-size:0.85em;" disabled>
+                        <option value="">(Chọn SO trước)</option>
+                    </select>
+                </div>
+
+                <button onclick="addFromSap()" class="btn-upload" style="background:#0ea5e9; color:white; border:none; padding:8px; border-radius:4px; font-weight:600;">
                     ⬇ THÊM VÀO LIST
                 </button>
             </div>
         </div>
-    </div>
 
-    <div class="panel" style="flex: 0 0 auto; max-height: 40vh;">
-        <div style="padding:10px 15px; background:#f1f5f9; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
-            <h3 style="margin:0; color:#1e293b; font-size:1.1em;">DANH SÁCH CẦN PHÂN BỔ </h3>
-            <div>
-                <button onclick="runBatchSearch()" class="btn-upload btn-geo" style="margin-left:10px;">CHẠY PHÂN BỔ</button>
+        <div class="panel list-col">
+            <div style="padding:8px 12px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; color:#334155; font-size:0.95em;">DANH SÁCH CẦN PHÂN BỔ</h3>
+                <button onclick="openManualModal()" class="btn-upload" style="padding:4px 15px; font-size:0.85em; background:#10b981; color:white; border:none;">
+                    ➕ Thêm ngoài
+                </button>
+                <button onclick="runBatchSearch()" class="btn-upload btn-geo" style="padding:4px 15px; font-size:0.85em;">CHẠY PHÂN BỔ</button>
+            </div>
+            
+            <div style="flex:1; overflow:auto;">
+                <table class="input-table">
+                    <thead style="position:sticky; top:0; z-index:5;">
+                        <tr>
+                            <th width="12%">Số SO</th>
+                            <th width="15%">Khách</th>
+                            <th width="8%">Mác</th>
+                            <th width="10%">TDC</th>
+                            <th width="7%">Dày</th>
+                            <th width="7%">Rộng</th>
+                            <th width="8%">Min</th>
+                            <th width="8%">Max</th>
+                            <th width="10%">Tổng (Kg)</th>
+                            <th width="10%">Đã gán</th> 
+                            <th width="5%" style="text-align:center">X</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inputBody"></tbody>
+                </table>
             </div>
         </div>
-        
-        <div style="overflow-y:auto;">
-            <table class="input-table">
-                <thead>
-                    <tr>
-                        <th width="10%">Số SO</th>
-                        <th width="15%">Khách Hàng</th>
-                        <th width="8%">Mác Thép</th>
-                        <th width="12%">TDC Code</th>
-                        <th width="8%">Dày</th>
-                        <th width="8%">Rộng</th>
-                        <th width="8%">Min Kg</th>
-                        <th width="8%">Max Kg</th>
-                        <th width="10%">Tổng Cần (Kg)</th>
-                        <th width="10%">Đang dự kiến</th> <th width="5%" style="text-align:center">X</th>
-                    </tr>
-                </thead>
-                <tbody id="inputBody"></tbody>
-            </table>
-        </div>
     </div>
 
-    <div class="panel" style="flex: 1; display:flex; flex-direction:column; min-height:0;">
-        <div style="padding:10px 15px; background:#fff; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
-            <h3 style="margin:0; color:#1e293b; font-size:1.1em;">✅ KẾT QUẢ PHÂN BỔ (Vui lòng kiểm tra  và chọn)</h3>
-            <div style="font-size:0.9em; color:#64748b;">
-                <i>Hệ thống gợi ý dựa trên Tồn kho & Tiêu chuẩn</i>
+    <div class="panel result-panel">
+        <div style="padding:8px 12px; background:#fff; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <button onclick="toggleSetup()" id="btnExpandSetup" style="display:none; border:1px solid #cbd5e1; background:#f1f5f9; cursor:pointer; padding:2px 8px; border-radius:4px;">🔽 Hiện Cài đặt</button>
+                <h3 style="margin:0; color:#1e293b; font-size:1.1em;">✅ KẾT QUẢ PHÂN BỔ</h3>
             </div>
+            <div style="font-size:0.85em; color:#64748b;"><i>Tick chọn và bấm 'Chốt' ở dưới đáy</i></div>
         </div>
         
-        <div class="table-container" style="flex:1; overflow:auto;">
+        <div class="table-container">
             <table class="result-table">
                 <thead>
                     <tr>
                         <th width="30"><input type="checkbox" id="chkAll" onclick="toggleAll(this)" checked></th> 
                         <th width="40">#</th>
                         <th width="100">SO Đích</th> 
-                        <th width="200">Thông tin Cuộn (ID - Mác - Size)</th>
+                        <th width="200">Cuộn (ID - Mác - Size)</th>
                         <th width="100">Khối lượng</th>
-                        <th width="240">Biểu đồ chất lượng</th> <th width="100">Trạng thái</th>
-                        <th width="60" style="text-align: center;">Điểm</th>
+                        <th width="220">Biểu đồ</th> 
+                        <th width="90">Trạng thái</th>
+                        <th width="70">Tỉ lệ</th>
+                        <th width="50" style="text-align: center;">Điểm</th>
                         <th>Chi tiết Lỗi</th>
                         <th width="150">Ghi chú</th>
-                        <th width="50">Bỏ</th>
+                        <th width="40">Bỏ</th>
                     </tr>
                 </thead>
                 <tbody id="resBody"></tbody>
@@ -211,10 +272,9 @@
         </div>
 
         <div id="selectionBar" class="selection-bar" style="display:none;">
-            <div class="sel-info" id="summaryContainer">
-                </div>
-            <button onclick="confirmSelected()" class="btn-upload" style="background:#ea580c; color:white; border:none; padding:8px 25px; font-size:1em;">
-                💾 CHỐT CÁC CUỘN ĐANG CHỌN
+            <div class="sel-info" id="summaryContainer"></div>
+            <button onclick="confirmSelected()" class="btn-upload" style="background:#ea580c; color:white; border:none; padding:8px 25px; font-weight:bold;">
+                💾 CHỐT ĐƠN
             </button>
         </div>
     </div>
@@ -238,7 +298,62 @@
         </div>
     </div>
 </div>
+<div id="manualModal" class="chart-modal" onclick="closeManualModal(event)">
+    <div class="chart-box" onclick="event.stopPropagation()" style="width:500px; height:auto; max-height:90vh;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
+            <h3 style="margin:0; color:#1e293b;">📝 Thêm Đơn Hàng Thủ Công</h3>
+            <button onclick="closeManualModal()" class="btn-reset" style="font-size:1.5em; cursor:pointer;">✕</button>
+        </div>
 
+        <div style="display:flex; flex-direction:column; gap:15px; overflow-y:auto; padding:5px;">
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1;">
+                    <label style="font-size:0.8em; font-weight:bold; color:#64748b;">Số SO (*)</label>
+                    <input type="text" id="mSO" class="inp-cell" style="border:1px solid #cbd5e1; width:100%;" placeholder="VD: 20001234">
+                </div>
+                <div style="flex:1.5;">
+                    <label style="font-size:0.8em; font-weight:bold; color:#64748b;">Tên Khách Hàng (*)</label>
+                    <input type="text" id="mCust" class="inp-cell" style="border:1px solid #cbd5e1; width:100%;" placeholder="VD: HOA SEN">
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1.5;">
+                    <label style="font-size:0.8em; font-weight:bold; color:#64748b;">Mã Nguyên Liệu (Material)</label>
+                    <input type="text" id="mMat" class="inp-cell" style="border:1px solid #cbd5e1; width:100%;" placeholder="VD: 1251...">
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size:0.8em; font-weight:bold; color:#64748b;">Mác Thép</label>
+                    <input type="text" id="mGrade" class="inp-cell" style="border:1px solid #cbd5e1; width:100%;" placeholder="VD: SAE1006">
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1;">
+                    <label style="font-size:0.8em; font-weight:bold; color:#64748b;">Dày (mm)</label>
+                    <input type="number" id="mThick" class="inp-cell" step="0.01" style="border:1px solid #cbd5e1; width:100%;">
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size:0.8em; font-weight:bold; color:#64748b;">Rộng (mm)</label>
+                    <input type="number" id="mWidth" class="inp-cell" step="1" style="border:1px solid #cbd5e1; width:100%;">
+                </div>
+            </div>
+
+            <div>
+                <label style="font-size:0.8em; font-weight:bold; color:#64748b;">Khối lượng cần (Kg) (*)</label>
+                <input type="number" id="mWeight" class="inp-cell" style="border:1px solid #cbd5e1; width:100%; font-weight:bold; color:#2563eb;">
+            </div>
+            
+            <div style="font-size:0.8em; color:#ef4444; font-style:italic;">
+                * Lưu ý: TDC (Tiêu chuẩn) sẽ chọn sau khi thêm vào danh sách.
+            </div>
+        </div>
+
+        <div style="margin-top:20px; text-align:right;">
+            <button onclick="saveManualItem()" class="btn-upload" style="background:#10b981; color:white; border:none; padding:10px 30px;">LƯU LẠI</button>
+        </div>
+    </div>
+</div>
 <script>
     let MASTER_TDCS = [];     
     let CANDIDATES = [];      
@@ -327,31 +442,40 @@ async function loadBacklogFromDB() {
     } catch(e) { console.error(e); input.placeholder = "Lỗi kết nối"; }
 }
 
-    async function onSapSoChange() {
-    const rawValue = document.getElementById('sapSoInput').value; // VD: "200003087 | TÔN HÒA PHÁT"
+// --- HÀM XỬ LÝ KHI CHỌN SỐ SO (HIỂN THỊ DANH SÁCH MATERIAL) ---
+async function onSapSoChange() {
+    const rawValue = document.getElementById('sapSoInput').value; 
     const itemSel = document.getElementById('sapItemSelect');
     
-    // Reset dropdown item
-    itemSel.innerHTML = '<option>Đang lấy dữ liệu...</option>';
+    // Reset danh sách trước khi tải
+    itemSel.innerHTML = ''; 
     itemSel.disabled = true;
-    SAP_ITEMS_CACHE = [];
+    SAP_ITEMS_CACHE = []; // Xóa cache cũ
 
     if(!rawValue) { 
-        itemSel.innerHTML = '<option value="">-- Vui lòng chọn SO trước --</option>'; 
+        // Nếu xóa trống ô input SO
         return; 
     }
+
     let soNum = rawValue.split('|')[0].trim();
     
-    const isValid = SAP_SO_DATA.some(x => x.so_number.toString() === soNum);
+    // Kiểm tra tính hợp lệ của SO (Logic cũ giữ nguyên)
+    const isValid = (typeof SAP_SO_DATA !== 'undefined') ? SAP_SO_DATA.some(x => x.so_number.toString() === soNum) : true;
+    
     if (!isValid) {
-        // Cố gắng tìm số trong chuỗi (Fallback)
-        const match = rawValue.match(/\d{8,10}/); // Tìm chuỗi số 8-10 ký tự
+        // Fallback: Cố gắng tìm chuỗi số trong input nếu người dùng paste cả đoạn text
+        const match = rawValue.match(/\d{8,10}/); 
         if(match) soNum = match[0];
         else {
-            itemSel.innerHTML = '<option value="">❌ Không tìm thấy mã SO hợp lệ</option>';
+            // Nếu không tìm thấy SO hợp lệ, dừng lại
             return;
         }
     }
+
+    // Hiển thị trạng thái đang tải vào trong box chọn
+    const loadingOpt = document.createElement('option');
+    loadingOpt.text = "⏳ Đang tải dữ liệu từ SAP...";
+    itemSel.add(loadingOpt);
 
     try {
         const res = await fetch('/api/sap/get_so_items', { 
@@ -361,70 +485,135 @@ async function loadBacklogFromDB() {
         });
         const json = await res.json();
         
+        // Xóa dòng "Đang tải..."
+        itemSel.innerHTML = '';
+
         if(json.status === 'success') {
             SAP_ITEMS_CACHE = json.data;
+            
             if(SAP_ITEMS_CACHE.length === 0) { 
-                itemSel.innerHTML = '<option>SO đã hoàn thành hoặc không có item</option>'; 
+                const opt = document.createElement('option');
+                opt.text = "⚠️ SO này không có Material hoặc đã xuất hết.";
+                itemSel.add(opt);
                 return; 
             }
             
-            itemSel.innerHTML = '<option value="">-- Chọn Material --</option>' + 
-                SAP_ITEMS_CACHE.map((item, index) => {
-                    return `<option value="${index}">[${item.material_code}] ${item.description} (Cần: ${item.req_weight.toLocaleString()} kg)</option>`;
-                }).join('');
-            itemSel.disabled = false;
+            // --- [QUAN TRỌNG] RENDER DANH SÁCH MATERIAL CHO MULTI-SELECT ---
+            // Không cần dòng "-- Chọn Material --" vì đây là list box
+            
+            const htmlOptions = SAP_ITEMS_CACHE.map((item, index) => {
+                // Tạo label chi tiết: [Mã] Tên (Khối lượng cần)
+                return `<option value="${index}" style="padding: 4px 8px; border-bottom: 1px solid #f1f5f9;">
+                            📦 [${item.material_code}] ${item.description} — Cần: ${item.req_weight.toLocaleString()} kg
+                        </option>`;
+            }).join('');
+
+            itemSel.innerHTML = htmlOptions;
+            itemSel.disabled = false; // Mở khóa cho phép chọn
+        } else {
+            alert("Lỗi từ SAP: " + json.msg);
         }
-    } catch(e) { alert("Lỗi lấy chi tiết SO: " + e); }
+    } catch(e) { 
+        console.error(e);
+        itemSel.innerHTML = '<option>❌ Lỗi kết nối server</option>';
+    }
 }
 
 async function addFromSap() {
-        const idx = document.getElementById('sapItemSelect').value;
-        if(idx === "") return alert("Vui lòng chọn Material!");
-        const item = SAP_ITEMS_CACHE[parseInt(idx)];
-        
+        const select = document.getElementById('sapItemSelect');
         const rawValue = document.getElementById('sapSoInput').value;
+        
+        // 1. Lấy danh sách các option đang được chọn (selectedOptions trả về HTMLCollection)
+        const selectedOpts = Array.from(select.selectedOptions);
+
+        if(selectedOpts.length === 0 || select.value === "") {
+            return alert("Vui lòng chọn ít nhất một Material!");
+        }
+
         let soNum = rawValue.split('|')[0].trim();
         if(!soNum) soNum = "N/A";
 
-        // Chuẩn bị data
-        const rowData = {
-            so: soNum,
-            cust: item.customer_name,
-            grade: item.grade,
-            thick: item.thick,
-            width: item.width,
-            weight: item.req_weight,
-            material: item.material_code,
-            min_weight: 0,
-            max_weight: 0,
-            tdc_id: null
-        };
+        // Hiệu ứng Loading cho nút bấm
+        const btnAdd = document.querySelector('button[onclick="addFromSap()"]');
+        const oldText = btnAdd.innerText;
+        btnAdd.innerText = `⏳ Đang thêm ${selectedOpts.length} dòng...`;
+        btnAdd.disabled = true;
 
-        // GỌI API SAVE LUÔN ĐỂ LẤY ID
         try {
-            const res = await fetch('/api/save_backlog_item', {
-                method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({
-                    so_number: rowData.so,
-                    material_code: rowData.material,
-                    description: item.description,
-                    customer_name: rowData.cust,
-                    grade: rowData.grade,
-                    thick: rowData.thick,
-                    width: rowData.width,
-                    req_weight: rowData.weight
-                })
-            });
-            const json = await res.json();
-            if(json.status === 'success') {
-                rowData.id = json.id; // Gán ID vừa tạo
-                addRowWithData(rowData); // Vẽ lên giao diện
-            } else {
-                alert("Lỗi lưu DB: " + json.msg);
-            }
-        } catch(e) { alert("Lỗi mạng: " + e); }
-    }
+            // 2. Tạo danh sách các Promises (Gửi request song song để nhanh hơn)
+            const requests = selectedOpts.map(async (option) => {
+                const idx = parseInt(option.value);
+                // Kiểm tra an toàn
+                if (isNaN(idx) || !SAP_ITEMS_CACHE[idx]) return null;
 
+                const item = SAP_ITEMS_CACHE[idx];
+
+                // Gọi API Save cho từng dòng
+                const res = await fetch('/api/save_backlog_item', {
+                    method: 'POST', 
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({
+                        so_number: soNum,
+                        material_code: item.material_code,
+                        description: item.description,
+                        customer_name: item.customer_name,
+                        grade: item.grade,
+                        thick: item.thick,
+                        width: item.width,
+                        req_weight: item.req_weight
+                    })
+                });
+                
+                const json = await res.json();
+                
+                if(json.status === 'success') {
+                    // Trả về dữ liệu đã format để vẽ lên bảng
+                    return {
+                        id: json.id, // ID từ DB trả về
+                        so: soNum,
+                        cust: item.customer_name,
+                        grade: item.grade,
+                        thick: item.thick,
+                        width: item.width,
+                        weight: item.req_weight,
+                        material: item.material_code,
+                        min_w: 0,
+                        max_w: 0,
+                        tdc_id: null
+                    };
+                } else {
+                    console.error("Lỗi thêm dòng " + item.material_code + ": " + json.msg);
+                    return null;
+                }
+            });
+
+            // 3. Chờ tất cả request hoàn thành (Promise.all)
+            const results = await Promise.all(requests);
+
+            // 4. Vẽ các dòng thành công lên bảng
+            let successCount = 0;
+            results.forEach(rowData => {
+                if (rowData) {
+                    addRowWithData(rowData);
+                    successCount++;
+                }
+            });
+
+            // 5. Reset lựa chọn sau khi xong
+            select.selectedIndex = -1;
+            
+            if (successCount < selectedOpts.length) {
+                alert(`Đã thêm ${successCount}/${selectedOpts.length} dòng. (Xem console nếu có lỗi)`);
+            }
+
+        } catch(e) { 
+            alert("Lỗi xử lý: " + e); 
+        } finally {
+            // Trả lại trạng thái nút
+            btnAdd.innerText = oldText;
+            btnAdd.disabled = false;
+        }
+    }
 function addRowWithData(data) {
         if (!data) return; // Bỏ qua nếu null
         const tr = document.createElement('tr');
@@ -465,9 +654,18 @@ function addRowWithData(data) {
                 <option value="">-- Chọn --</option>
             </select></td>
             
-            <td><input type="number" class="inp-cell inp-thick" value="${data.thick}" readonly style="${lockStyle}"></td>
-            <td><input type="number" class="inp-cell inp-width" value="${data.width}" readonly style="${lockStyle}"></td>
-            
+            <td>
+                <input type="number" class="inp-cell inp-thick" 
+                    value="${data.thick}" step="0.01" 
+                    onchange="autoSave(this)" 
+                    style="font-weight:bold; color:#0f172a;">
+            </td>
+            <td>
+                <input type="number" class="inp-cell inp-width" 
+                    value="${data.width}" step="1" 
+                    onchange="autoSave(this)" 
+                    style="font-weight:bold; color:#0f172a;">
+            </td>
             <td><input type="number" class="inp-cell inp-min-w" value="${data.min_w || ''}" placeholder="0" onchange="autoSave(this)"></td>
             <td><input type="number" class="inp-cell inp-max-w" value="${data.max_w || ''}" placeholder="0" onchange="autoSave(this)"></td>
             
@@ -541,21 +739,26 @@ async function autoSave(el) {
     }
 function loadTdcOptionsForLockedRow(tr, custName, grade) {
     const tdcSel = tr.querySelector('.sel-tdc');
-    
-    // Lọc trong thư viện Master TDC
-    // (So sánh không phân biệt hoa thường để chắc ăn)
-    const codes = MASTER_TDCS.filter(x => 
-        x.customer_name.toLowerCase() === custName.toLowerCase() && 
-        x.grade.toLowerCase() === grade.toLowerCase()
-    );
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-    if (codes.length > 0) {
-        tdcSel.innerHTML = codes.map(c => `<option value="${c.id}">${c.tdc_code} (${c.usage_purpose})</option>`).join('');
-        // Nếu chỉ có 1 TDC thì chọn luôn
-        if(codes.length === 1) tdcSel.selectedIndex = 0;
+    const activeAndValidCodes = MASTER_TDCS.filter(x => {
+        // Chuyển đổi ngày từ DB sang Timestamp để so sánh
+        const start = new Date(x.valid_from).getTime();
+        const end = x.valid_to ? new Date(x.valid_to).getTime() : Infinity;
+
+        return x.customer_name.toLowerCase() === custName.toLowerCase() && 
+               x.grade.toLowerCase() === grade.toLowerCase() &&
+               today >= start && today <= end; // RÀNG BUỘC THỜI GIAN
+    });
+
+    if (activeAndValidCodes.length > 0) {
+        tdcSel.innerHTML = activeAndValidCodes.map(c => 
+            `<option value="${c.id}">${c.tdc_code} (v${c.version_no})</option>`
+        ).join('');
     } else {
-        tdcSel.innerHTML = '<option value="">⚠️ Không có TDC khớp</option>';
-        tdcSel.style.color = 'red';
+        tdcSel.innerHTML = '<option value="">⚠️ TDC chưa đến hạn/hết hạn</option>';
+        tdcSel.style.color = "red";
     }
 }
     function onCustChange(el) {
@@ -737,7 +940,6 @@ function loadTdcOptionsForLockedRow(tr, custName, grade) {
                     </td>
 
                     <td style="text-align: center; color: #64748b;">${i+1}</td>
-                    
                     <td style="font-weight:bold; color:#2563eb; font-family:Consolas, monospace;">${item.so_number}</td>
 
                     <td>
@@ -746,10 +948,15 @@ function loadTdcOptionsForLockedRow(tr, custName, grade) {
                     </td>
 
                     <td style="font-weight:bold;">${item.weight.toLocaleString()} kg</td>
-
                     <td>${radarHtml}</td>
-
                     <td>${statusBadge}</td>
+
+                    <td style="text-align: center;">
+                        <div style="font-weight:bold; color: ${item.match_pct >= 90 ? '#16a34a' : '#d97706'}">
+                            ${item.match_ratio}
+                        </div>
+                        <div style="font-size: 0.75em; color: #64748b;">(${item.match_pct}%)</div>
+                    </td>
 
                     <td style="text-align: center; font-weight:bold; color:${item.penalty>0?'#d97706':'#16a34a'}">${item.penalty}</td>
                     
@@ -845,33 +1052,65 @@ function loadTdcOptionsForLockedRow(tr, custName, grade) {
         }).join('');
     }
 
-    // --- 4. HÀM CONFIRM MỚI ---
+// --- 4. HÀM CONFIRM MỚI (CÓ RÀNG BUỘC GHI CHÚ) ---
     async function confirmSelected() {
         if(typeof SELECTED_INDICES !== 'undefined' && SELECTED_INDICES.size === 0) 
             return alert("Vui lòng chọn ít nhất 1 cuộn!");
         
-        const listToConfirm = (typeof SELECTED_INDICES !== 'undefined') 
-            ? Array.from(SELECTED_INDICES).map(idx => {
-                // [MỚI] Lấy giá trị ghi chú từ ô input trước khi gửi
-                const item = CANDIDATES[idx];
-                const noteInput = document.getElementById(`note-${idx}`);
-                return {
-                    ...item,
-                    note: noteInput ? noteInput.value : '' // Gắn thêm note vào object
-                };
-            }) 
-            : CANDIDATES;
+        let missingNotes = []; // Danh sách các cuộn vi phạm
 
-        // --- 1. THU THẬP THÔNG TIN ĐƠN HÀNG (SO META) ---
+        // 1. DUYỆT VÀ THU THẬP DATA (ĐỒNG THỜI CHECK VALIDATION)
+        const listToConfirm = Array.from(SELECTED_INDICES).map(idx => {
+            const item = CANDIDATES[idx];
+            const noteInput = document.getElementById(`note-${idx}`);
+            const noteVal = noteInput ? noteInput.value.trim() : '';
+
+            // --- [LOGIC MỚI] KIỂM TRA RÀNG BUỘC ---
+            // Điều kiện: Nếu có điểm phạt (Penalty > 0) VÀ Ghi chú để trống
+            if (item.penalty > 0 && noteVal === '') {
+                missingNotes.push(item.coil_id);
+                // Hiệu ứng: Tô viền đỏ ô nhập liệu để user dễ thấy
+                if(noteInput) {
+                    noteInput.style.border = "2px solid #ef4444";
+                    noteInput.style.background = "#fef2f2";
+                    // Reset lại khi user bắt đầu gõ
+                    noteInput.oninput = function() { 
+                        this.style.border = "1px solid #cbd5e1"; 
+                        this.style.background = "white"; 
+                    };
+                }
+            } else {
+                // Nếu hợp lệ thì reset style (phòng trường hợp bị đỏ trước đó)
+                if(noteInput) {
+                    noteInput.style.border = "1px solid #cbd5e1";
+                    noteInput.style.background = "white";
+                }
+            }
+
+            return {
+                ...item,
+                note: noteVal, // Lấy giá trị ghi chú
+                penalty: item.penalty || 0,
+                match_pct: item.match_pct || 0,
+                match_ratio: item.match_ratio || '',
+                failed_msg: item.failed_msg || ''
+            };
+        });
+
+        // 2. CHẶN NẾU CÓ LỖI
+        if (missingNotes.length > 0) {
+            alert(`⛔ KHÔNG THỂ CHỐT!\n\nHệ thống phát hiện ${missingNotes.length} cuộn không đạt chuẩn (Penalty > 0) nhưng chưa có Ghi chú.\n\nVui lòng nhập lý do duyệt (VD: "Khách đồng ý", "Duyệt ngoại lệ"...) vào các ô được tô đỏ trước khi Chốt.`);
+            return; // Dừng hàm ngay lập tức
+        }
+
+        // --- 3. THU THẬP THÔNG TIN ĐƠN HÀNG (SO META) ---
+        // (Phần này giữ nguyên như code cũ của bạn)
         const soMetaList = [];
         const rows = document.querySelectorAll('#inputBody tr');
         rows.forEach(tr => {
             const so = tr.querySelector('.inp-so').value.trim();
-            // Lấy input ẩn material code
             const inpMat = tr.querySelector('.inp-mat');
             const matCode = inpMat ? inpMat.value : '';
-            
-            // Xử lý parse số an toàn hơn (bỏ dấu phẩy nếu có)
             const rawWeight = tr.querySelector('.inp-weight').value;
             const reqWeight = parseFloat(rawWeight.replace(/,/g, '') || 0);
             
@@ -884,6 +1123,7 @@ function loadTdcOptionsForLockedRow(tr, custName, grade) {
             const width = parseFloat(tr.querySelector('.inp-width').value || 0);
             const tdcSelect = tr.querySelector('.sel-tdc');
             const tdcId = tdcSelect ? tdcSelect.value : null;
+
             if(so && reqWeight > 0) {
                 soMetaList.push({
                     so_number: so,
@@ -898,23 +1138,25 @@ function loadTdcOptionsForLockedRow(tr, custName, grade) {
             }
         });
 
-        // --- 2. KIỂM TRA AN TOÀN (CHẶN LỖI HISTORY TRỐNG) ---
-        // Lấy danh sách các SO có trong các cuộn được chọn
+        // --- 4. KIỂM TRA DATA TOÀN VẸN ---
         const distinctSOs = [...new Set(listToConfirm.map(c => c.so_number))];
-        
-        // Kiểm tra xem các SO này có thông tin Meta chưa
         const missingInfo = distinctSOs.filter(so => !soMetaList.find(m => m.so_number === so));
         
         if (missingInfo.length > 0) {
-            return alert(`⛔ LỖI DỮ LIỆU: Không tìm thấy thông tin chi tiết cho đơn hàng: ${missingInfo.join(', ')}.\n\nNguyên nhân: Có thể bạn đã xóa dòng nhập liệu hoặc chưa nhập khối lượng.\nVui lòng kiểm tra lại bảng danh sách bên trên.`);
+            return alert(`⛔ LỖI DỮ LIỆU: Không tìm thấy thông tin chi tiết cho đơn hàng: ${missingInfo.join(', ')}.\n\nNguyên nhân: Có thể bạn đã xóa dòng nhập liệu hoặc chưa nhập khối lượng.`);
         }
 
         if(!confirm(`Xác nhận chốt ${listToConfirm.length} cuộn vào hệ thống?`)) return;
 
-        // 3. Gửi Payload
+        // 5. Gửi Payload
         const finalAllocation = listToConfirm.map(c => ({
             coil_id: c.coil_id,
-            so_number: c.so_number
+            so_number: c.so_number,
+            penalty: c.penalty,
+            match_pct: c.match_pct,
+            match_ratio: c.match_ratio,
+            failed_msg: c.failed_msg,
+            note: c.note
         }));
 
         const payload = { 
@@ -924,7 +1166,6 @@ function loadTdcOptionsForLockedRow(tr, custName, grade) {
         };
 
         try { 
-            // Hiệu ứng Loading
             const btn = document.querySelector('button[onclick="confirmSelected()"]');
             const oldText = btn.innerText;
             btn.innerText = "⏳ Đang lưu..."; btn.disabled = true;
@@ -945,7 +1186,9 @@ function loadTdcOptionsForLockedRow(tr, custName, grade) {
             } 
         } catch(e) { 
             alert("Lỗi kết nối: " + e); 
-            if(btn) { btn.innerText = oldText; btn.disabled = false; }
+            // Nếu có lỗi thì reset nút
+            const btn = document.querySelector('button[onclick="confirmSelected()"]');
+            if(btn) { btn.innerText = "💾 CHỐT ĐƠN"; btn.disabled = false; }
         }
     }
     // --- CHART & UTILS (GIỮ NGUYÊN) ---
@@ -1053,67 +1296,104 @@ function loadTdcOptionsForLockedRow(tr, custName, grade) {
         updateChart(COMPARE_CHARTS.prop, 'prop', 'rgba(22, 163, 74, 1)'); 
         updateChart(COMPARE_CHARTS.app, 'app', 'rgba(147, 51, 234, 1)');
     }
-async function checkSapItemStatus() {
-        const idx = document.getElementById('sapItemSelect').value;
-        const statusDiv = document.getElementById('itemStatusMsg');
-        statusDiv.innerHTML = ''; // Reset
+    function closeModal(e) { if(e) e.stopPropagation(); document.getElementById('compareModal').style.display = 'none'; }
+    function toggleSetup() {
+    const row = document.getElementById('setupRow');
+    const btnExpand = document.getElementById('btnExpandSetup');
+    
+    if (row.classList.contains('collapsed')) {
+        row.classList.remove('collapsed');
+        btnExpand.style.display = 'none';
+    } else {
+        row.classList.add('collapsed');
+        btnExpand.style.display = 'block';
+    }
+}
+// --- LOGIC THÊM THỦ CÔNG ---
+    function openManualModal() {
+        // Reset form
+        document.getElementById('mSO').value = '';
+        document.getElementById('mCust').value = '';
+        document.getElementById('mMat').value = '';
+        document.getElementById('mGrade').value = '';
+        document.getElementById('mThick').value = '';
+        document.getElementById('mWidth').value = '';
+        document.getElementById('mWeight').value = '';
+        
+        document.getElementById('manualModal').style.display = 'flex';
+        document.getElementById('mSO').focus();
+    }
 
-        if(idx === "") return;
+    function closeManualModal(e) {
+        if(e) e.stopPropagation();
+        document.getElementById('manualModal').style.display = 'none';
+    }
 
-        const item = SAP_ITEMS_CACHE[parseInt(idx)];
-        if(!item) return;
+    async function saveManualItem() {
+        // 1. Lấy dữ liệu
+        const so = document.getElementById('mSO').value.trim();
+        const cust = document.getElementById('mCust').value.trim();
+        const mat = document.getElementById('mMat').value.trim() || ("MANUAL_" + Date.now()); // Tự sinh mã nếu trống
+        const grade = document.getElementById('mGrade').value.trim();
+        const thick = parseFloat(document.getElementById('mThick').value || 0);
+        const width = parseFloat(document.getElementById('mWidth').value || 0);
+        const weight = parseFloat(document.getElementById('mWeight').value || 0);
 
-        const rawValue = document.getElementById('sapSoInput').value;
-        let soNum = rawValue.split('|')[0].trim();
-        if(!soNum) soNum = "N/A";
+        // 2. Validate cơ bản
+        if(!so || !cust || weight <= 0) {
+            alert("Vui lòng nhập: Số SO, Khách hàng và Khối lượng > 0");
+            return;
+        }
 
-        // Hiện loading
-        statusDiv.innerHTML = '<span style="color:#64748b;">⏳ Đang kiểm tra dữ liệu hệ thống...</span>';
-
+        // 3. Gửi API Save (Tận dụng API save_backlog_item cũ)
         try {
-            const res = await fetch('/api/check_item_status', {
+            const btn = document.querySelector('button[onclick="saveManualItem()"]');
+            btn.innerText = "⏳ Đang lưu..."; btn.disabled = true;
+
+            const res = await fetch('/api/save_backlog_item', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    so_number: soNum,
-                    material_code: item.material_code
+                    so_number: so,
+                    material_code: mat,
+                    description: `[Manual] ${grade} ${thick}x${width}`,
+                    customer_name: cust,
+                    grade: grade,
+                    thick: thick,
+                    width: width,
+                    req_weight: weight
                 })
             });
-            const data = await res.json();
 
-            if(data.status === 'success') {
-                const backlog = data.backlog_weight;
-                const alloc = data.allocated_weight;
+            const json = await res.json();
+            
+            btn.innerText = "LƯU LẠI"; btn.disabled = false;
 
-                // Logic hiển thị màu sắc thông minh
-                let html = '';
+            if(json.status === 'success') {
+                // Thêm dòng mới vào bảng giao diện ngay lập tức
+                addRowWithData({
+                    id: json.id,
+                    so: so,
+                    cust: cust,
+                    grade: grade,
+                    thick: thick,
+                    width: width,
+                    weight: weight,
+                    material: mat,
+                    min_w: 0, 
+                    max_w: 0,
+                    tdc_id: null,
+                    actual: 0
+                });
                 
-                // Nếu đã có trong backlog
-                if(backlog > 0) {
-                    html += `<span style="color:#d97706; font-weight:bold; margin-right:10px;">
-                        ⚠️ Đã có trong Backlog: ${(backlog/1000).toLocaleString()} Tấn
-                    </span>`;
-                }
-
-                // Nếu đã phân bổ được một ít
-                if(alloc > 0) {
-                    html += `<span style="color:#16a34a; font-weight:bold;">
-                        ✅ Đã gán xong: ${(alloc/1000).toLocaleString()} Tấn
-                    </span>`;
-                }
-
-                // Nếu chưa có gì
-                if(backlog === 0 && alloc === 0) {
-                    html = `<span style="color:#64748b;">⚪ Chưa có trong hệ thống (Mới)</span>`;
-                }
-
-                statusDiv.innerHTML = html;
+                closeManualModal();
+            } else {
+                alert("Lỗi: " + json.msg);
             }
         } catch(e) {
-            console.error(e);
-            statusDiv.innerHTML = '';
+            alert("Lỗi hệ thống: " + e);
+            btn.innerText = "LƯU LẠI"; btn.disabled = false;
         }
     }
-    function closeModal(e) { if(e) e.stopPropagation(); document.getElementById('compareModal').style.display = 'none'; }
 </script>
 {% endblock %}

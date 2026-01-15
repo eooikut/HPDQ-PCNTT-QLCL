@@ -11,6 +11,7 @@ from utils.common import sanitize_data, standardize_id
 from utils.scoring import process_coil_scores,get_all_grade_configs,calculate_metric_surface,calculate_metric_value
 from utils.sync_worker import sync_surface_defects, sync_properties_mysql,process_and_save_geometry,API_GEO_SINGLE_URL,process_coil_scores,LAST_DATA_UPDATE, FACTORY_CONFIGS
 import time
+import datetime
 dashboard_bp = Blueprint('dashboard_bp', __name__)
 upload_lock = threading.Lock()
 @dashboard_bp.route('/api/smart_resync_surface', methods=['GET', 'POST'])
@@ -320,7 +321,11 @@ def render_dashboard_logic(msg=None):
 
     start_date = request.args.get('start_date', '')
     end_date = request.args.get('end_date', '')
-
+    if not start_date and not end_date:
+        today_dt = datetime.datetime.now()
+        # Lấy từ ngày hôm qua đến hết ngày hôm nay (2 ngày)
+        start_date = (today_dt - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+        end_date = today_dt.strftime('%Y-%m-%d')
     conn = db.get_connection()
     cursor = conn.cursor()
     sql = """

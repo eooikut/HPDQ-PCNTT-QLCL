@@ -7,19 +7,15 @@ alloc_hist_bp = Blueprint('alloc_hist_bp', __name__)
 @alloc_hist_bp.route('/allocation_history', methods=['GET'])
 def allocation_history_page():
     return render_template('allocation_history.html')
-
-# [Trong file alloc_hist.py]
-
 @alloc_hist_bp.route('/api/get_history_summary', methods=['GET'])
 def get_history_summary():
     try:
         conn = db.get_connection()
         cursor = conn.cursor()
 
-        # BƯỚC 1: Lấy thông tin TDC Master để chấm điểm
+        # 1. LẤY THƯ VIỆN TDC & MAP (Giữ nguyên)
         cursor.execute("SELECT id, criteria_json FROM tdc_master")
         tdc_rows = db.fetchall_as_dict(cursor)
-        # Tạo từ điển map ID -> Criteria để tra cứu cho nhanh
         tdc_library = {}
         for row in tdc_rows:
             try:
@@ -27,18 +23,12 @@ def get_history_summary():
             except:
                 tdc_library[row['id']] = []
 
-        # BƯỚC 2: Lấy HEADER + Chi tiết Đơn hàng (Thêm cột tdc_id)
+        # 2. LẤY DANH SÁCH SALES ORDERS (Giữ nguyên)
         query_orders = """
             SELECT 
-                so.so_number, 
-                so.customer_name, 
-                so.order_date,
-                d.material_code, 
-                d.description, 
-                d.total_weight as req_weight, 
-                d.thickness, 
-                d.width,
-                d.tdc_id  -- [MỚI] Lấy thêm TDC ID để biết đường chấm điểm
+                so.so_number, so.customer_name, so.order_date,
+                d.material_code, d.description, d.total_weight as line_req_weight, 
+                d.thickness, d.width, d.tdc_id
             FROM sales_orders so
             LEFT JOIN so_details d ON so.so_number = d.so_number
             ORDER BY so.created_at DESC
@@ -47,6 +37,8 @@ def get_history_summary():
         raw_rows = db.fetchall_as_dict(cursor)
 
         orders_map = {}
+        so_mat_to_tdc = {} 
+
         for r in raw_rows:
             so = r['so_number']
             if so not in orders_map:
@@ -54,37 +46,33 @@ def get_history_summary():
                     'so_number': so,
                     'customer_name': r['customer_name'],
                     'date': r['order_date'],
-                    'total_target': 0,
-                    'total_actual': 0,
+                    'total_target': 0, 
+                    'total_actual': 0, 
                     'items': []
                 }
             
-            if r['req_weight'] is not None:
-                w = float(r['req_weight'])
+            if r['line_req_weight']:
+                w = float(r['line_req_weight'])
                 orders_map[so]['total_target'] += w
                 orders_map[so]['items'].append({
                     'material': r['material_code'], 
                     'desc': r['description'],
                     'thick': float(r['thickness']) if r['thickness'] else 0,
                     'width': float(r['width']) if r['width'] else 0,
-                    'tdc_id': r['tdc_id'], # Lưu TDC ID vào item
-                    'req': w,
-                    'actual': 0
+                    'tdc_id': r['tdc_id'],
+                    'req': w
                 })
+                if r['material_code']:
+                    so_mat_to_tdc[(so, r['material_code'])] = r['tdc_id']
 
-        # BƯỚC 3: Lấy THỰC TẾ (Actual) từ kho cuộn
+        # 3. LẤY DANH SÁCH CUỘN ĐÃ PHÂN BỔ
+        # Đảm bảo query lấy đủ alloc_penalty
         query_coils = """
             SELECT 
-                coil_id, 
-                allocated_order, 
-                allocated_material, 
-                weight, 
-                target_thick AS thick,
-                target_width AS width,
-                grade, 
-                scores, 
-                allocated_to,
-                alloc_note -- Lấy thêm ghi chú nếu cần
+                coil_id, allocated_order, allocated_material, weight, grade, scores, 
+                allocated_to, alloc_note,
+                target_thick, target_width, 
+                alloc_penalty, alloc_match_pct, alloc_match_ratio, alloc_failed_msg
             FROM coil_data WITH (NOLOCK) 
             WHERE allocated_order IS NOT NULL AND allocated_order != ''
         """
@@ -92,65 +80,65 @@ def get_history_summary():
         coils_rows = db.fetchall_as_dict(cursor)
         conn.close()
 
-        # BƯỚC 4: Logic Mapping & TÍNH ĐIỂM (Re-scoring)
+        # 4. XỬ LÝ DỮ LIỆU
         allocated_coils = []
         for c in coils_rows:
-            so = c['allocated_order']
-            # Parse scores từ JSON
-            coil_scores = json.loads(c['scores']) if c['scores'] else {}
-            c['scores'] = coil_scores # Gán ngược lại để trả về frontend
+            c['thick'] = float(c['target_thick']) if c['target_thick'] else 0
+            c['width'] = float(c['target_width']) if c['target_width'] else 0
+            c['weight'] = float(c['weight']) if c['weight'] else 0
             
-            # Mặc định penalty = 0 (Chuẩn)
-            c['penalty'] = 0 
+            # --- [QUAN TRỌNG] LẤY TRỰC TIẾP TỪ DB, KHÔNG TÍNH LẠI ---
+            c['penalty'] = c['alloc_penalty'] if c['alloc_penalty'] is not None else 0
+            c['match_pct'] = c['alloc_match_pct'] if c['alloc_match_pct'] is not None else 0
+            
+            scores = {}
+            if c['scores']:
+                try: scores = json.loads(c['scores'])
+                except: pass
+            
+            # --- TÍNH SORT TUPLE (Chỉ dùng để sort, ko gán lại penalty) ---
+            key = (c['allocated_order'], c['allocated_material'])
+            tdc_id = so_mat_to_tdc.get(key)
+            sort_diffs = [] 
+            
+            if tdc_id and tdc_id in tdc_library:
+                criteria_list = tdc_library[tdc_id]
+                for crit in criteria_list:
+                    defect = crit['defect']
+                    val = scores.get(defect, 0)
+                    target = crit.get('target', 1)
+                    allowed_range = crit.get('range', [])
+                    
+                    if val == 0:
+                        sort_diffs.append(99) # Missing -> Đẩy xuống
+                    elif val in allowed_range:
+                        sort_diffs.append(0)  # Pass
+                    else:
+                        sort_diffs.append(abs(val - target)) # Fail
+            
+            c['_sort_priority'] = tuple(sort_diffs)
 
-            if so in orders_map:
-                w = float(c['weight']) if c['weight'] else 0
-                orders_map[so]['total_actual'] += w
-                
-                coil_mat = c.get('allocated_material', '')
-                matched_item = None
-                
-                # Tìm xem cuộn này thuộc dòng (Item) nào của đơn hàng
-                # Ưu tiên 1: Map theo Material
-                if coil_mat:
-                    for item in orders_map[so]['items']:
-                        if item['material'] == coil_mat:
-                            item['actual'] += w
-                            matched_item = item
-                            break
-                
-                # Ưu tiên 2: Fallback theo Kích thước (nếu không map được theo material)
-                if not matched_item:
-                    for item in orders_map[so]['items']:
-                        if abs(item['thick'] - c['thick']) < 0.05 and abs(item['width'] - c['width']) < 10:
-                            item['actual'] += w
-                            matched_item = item
-                            break
-                
-                # [QUAN TRỌNG] TÍNH LẠI ĐIỂM PHẠT (RE-CALCULATE PENALTY)
-                if matched_item and matched_item.get('tdc_id'):
-                    tdc_id = matched_item['tdc_id']
-                    criteria = tdc_library.get(tdc_id, [])
-                    
-                    # Logic chấm điểm (Copy logic từ alloc_run.py)
-                    total_penalty = 0
-                    for crit in criteria:
-                        defect = crit['defect']
-                        target = crit.get('target', 1)
-                        val = coil_scores.get(defect, 1) # Nếu thiếu data coi như 1
-                        allowed_range = crit.get('range', [])
-                        
-                        if val == 0: # Thiếu data
-                            total_penalty += 20
-                        elif val not in allowed_range:
-                            dist = abs(val - target)
-                            if dist == 1: total_penalty += 20
-                            elif dist == 2: total_penalty += 50
-                            else: total_penalty += 999
-                    
-                    c['penalty'] = total_penalty
+            # Xử lý hiển thị Ratio
+            if c['alloc_match_ratio']: c['match_ratio'] = c['alloc_match_ratio']
+            else: c['match_ratio'] = "Old"
+            
+            # Đảm bảo failed_msg không bị None
+            c['alloc_failed_msg'] = c['alloc_failed_msg'] if c['alloc_failed_msg'] else ''
 
             allocated_coils.append(c)
+            
+            # Cộng tổng
+            so_num = c['allocated_order']
+            if so_num in orders_map:
+                orders_map[so_num]['total_actual'] += c['weight']
+
+        # 5. SORT GIỮ NGUYÊN
+        allocated_coils.sort(key=lambda x: (
+            0 if x['penalty'] == 0 else 1,   
+            x['penalty'],                    
+            x['_sort_priority'],             
+            -x['match_pct']                  
+        ))
 
         return jsonify({
             'orders': list(orders_map.values()), 

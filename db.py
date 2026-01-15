@@ -1,7 +1,7 @@
 import pyodbc
 import orjson
 import os
-from datetime import datetime
+from datetime import datetime , timedelta
 
 # CẤU HÌNH KẾT NỐI (Nên để trong biến môi trường hoặc file .env riêng)
 SQL_CONFIG = {
@@ -128,40 +128,219 @@ def save_batch_coils_v2(batch_data):
 
 # --- CÁC HÀM GET DỮ LIỆU CŨ CẦN SỬA ĐỂ TRẢ VỀ DICT ---
 
-def get_tdc_master_list():
+def get_active_tdc_list():
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM tdc_master ORDER BY customer_name, usage_purpose")
-        # Convert tuple sang dict thủ công
+        query = """
+        SELECT m.id, m.tdc_code, m.customer_name, m.usage_purpose, m.grade, 
+               v.version_no, v.criteria_json, v.pdf_path, v.valid_from, v.valid_to, v.status, v.id as version_id
+        FROM tdc_master m
+        JOIN tdc_versions v ON m.id = v.master_id
+        WHERE v.status = 'Active' -- CHỈ LẤY BẢN ACTIVE Ở ĐÂY
+        ORDER BY m.customer_name, v.version_no DESC
+        """
+        cursor.execute(query)
         columns = [column[0] for column in cursor.description]
-        results = []
-        for row in cursor.fetchall():
-            results.append(dict(zip(columns, row)))
-        return results
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
     finally:
         conn.close()
 
-def save_tdc_master(data):
+def get_tdc_pending_list():
+    """Lấy danh sách TDC đang chờ duyệt (Pending)"""
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        if data.get('id'):
+        query = """
+        SELECT m.id as master_id, m.tdc_code, m.customer_name, m.usage_purpose, m.grade, 
+               v.version_no, v.criteria_json, v.pdf_path, v.valid_from, v.valid_to, v.status, v.created_at, v.id as version_id
+        FROM tdc_versions v
+        JOIN tdc_master m ON v.master_id = m.id
+        WHERE v.status = 'Pending'
+        ORDER BY v.created_at DESC
+        """
+        cursor.execute(query)
+        columns = [column[0] for column in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+def get_tdc_history(master_id):
+    """Lấy lịch sử version của một Master ID"""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        query = """
+        SELECT v.*, m.tdc_code 
+        FROM tdc_versions v
+        JOIN tdc_master m ON v.master_id = m.id
+        WHERE v.master_id = ?
+        ORDER BY v.version_no DESC
+        """
+        cursor.execute(query, (master_id,))
+        columns = [column[0] for column in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+def save_tdc_version(data):
+    """
+    Lưu TDC (Draft/Pending).
+    - Nếu có master_id: Tạo version mới cho master đó.
+    - Nếu chưa có master_id: Tạo master mới + version 1.
+    """
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        
+        master_id = data.get('master_id')
+        
+        # 1. Nếu chưa có Master ID -> Insert Master
+        if not master_id:
+            # Check trùng code
+            cursor.execute("SELECT id FROM tdc_master WHERE tdc_code = ?", (data['code'],))
+            existing = cursor.fetchone()
+            if existing:
+                return False, f"Mã TDC {data['code']} đã tồn tại!"
+
             cursor.execute("""
-                UPDATE tdc_master 
-                SET tdc_code=?, customer_name=?, usage_purpose=?, grade=?, criteria_json=?, pdf_path=?
-                WHERE id=?
-            """, (data['code'], data['cust'], data['purpose'], data['grade'], orjson.dumps(data['criteria']).decode('utf-8'), data['pdf'], data['id']))
+                INSERT INTO tdc_master (tdc_code, customer_name, usage_purpose, grade)
+                VALUES (?, ?, ?, ?)
+            """, (data['code'], data['cust'], data['purpose'], data['grade']))
+            cursor.execute("SELECT @@IDENTITY")
+            master_id = cursor.fetchone()[0]
         else:
-            cursor.execute("""
-                INSERT INTO tdc_master (tdc_code, customer_name, usage_purpose, grade, criteria_json, pdf_path)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (data['code'], data['cust'], data['purpose'], data['grade'], orjson.dumps(data['criteria']).decode('utf-8'), data['pdf']))
+            # Nếu đã có Master, update Master Infor nếu cần (Optional, thường master ít đổi)
+            # Ở đây ta giả định Master Infor (Customer, Purpose, Code) không đổi khi ra version mới
+            pass
+            
+        # 2. Determine Version No
+        # Lấy max version hiện tại
+        cursor.execute("SELECT MAX(version_no) FROM tdc_versions WHERE master_id = ?", (master_id,))
+        row = cursor.fetchone()
+        next_ver = (row[0] or 0) + 1
+        
+        # 3. Insert Version
+        valid_from = data.get('valid_from') or None
+        valid_to = data.get('valid_to') or None
+        status = data.get('status', 'Pending') # Pending or Draft
+
+        sql_ver = """
+            INSERT INTO tdc_versions (master_id, version_no, criteria_json, pdf_path, valid_from, valid_to, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, GETDATE())
+        """
+        cursor.execute(sql_ver, (master_id, next_ver, orjson.dumps(data['criteria']).decode('utf-8'), data['pdf'], valid_from, valid_to, status))
+        
         conn.commit()
-        return True
+        return True, "Lưu thành công!"
     except Exception as e:
-        print(f"Error saving TDC: {e}")
-        return False
+        print(f"Error save_tdc_version: {e}")
+        conn.rollback()
+        return False, str(e)
+    finally:
+        conn.close()
+def check_tdc_overlap(master_id, start_date, end_date, exclude_version_id=None):
+    """
+    Kiểm tra xem khoảng thời gian (start_date, end_date) có bị trùng với 
+    bản ghi Active hoặc Pending nào khác của cùng một Master ID không.
+    """
+    if not start_date:
+        return False, "Thiếu ngày bắt đầu"
+    
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        
+        # Nếu end_date là None (vô thời hạn), dùng một ngày rất xa để so sánh
+        check_end = end_date if end_date else '9999-12-31'
+        
+        query = """
+            SELECT v.version_no, v.status, v.valid_from, v.valid_to
+            FROM tdc_versions v
+            WHERE v.master_id = ? 
+              AND v.status IN ('Active', 'Pending')
+              AND v.id != ISNULL(?, -1)
+              AND v.valid_from <= ?  -- S1 <= E2
+              AND (v.valid_to >= ? OR v.valid_to IS NULL) -- E1 >= S2
+        """
+        # Logic: Một bản ghi v trùng với bản ghi mới nếu:
+        # v.valid_from <= new_end AND (v.valid_to >= new_start)
+        
+        cursor.execute(query, (master_id, exclude_version_id, check_end, start_date))
+        conflict = cursor.fetchone()
+        
+        if conflict:
+            msg = f"Trùng lịch với bản v{conflict[0]} ({conflict[1]}: {conflict[2]} đến {conflict[3] or 'vô thời hạn'})"
+            return True, msg
+            
+        return False, ""
+    finally:
+        conn.close()
+def confirm_tdc_version(data): # Đổi tham số thành 'data' để nhận dictionary
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        
+        # Trích xuất version_id từ dictionary
+        version_id = data.get('version_id')
+        if not version_id: return False, "Thiếu Version ID"
+
+        # [BỔ SUNG] Cập nhật lại thông tin nếu có thay đổi từ tab Approval
+        update_sql = """
+            UPDATE tdc_versions 
+            SET criteria_json = ?, valid_from = ?, valid_to = ?
+            WHERE id = ?
+        """
+        cursor.execute(update_sql, (
+            orjson.dumps(data['criteria']).decode('utf-8'),
+            data.get('valid_from'),
+            data.get('valid_to'),
+            version_id
+        ))
+
+        # 1. Lấy thông tin bản mới để xử lý các bản cũ
+        cursor.execute("SELECT master_id, valid_from FROM tdc_versions WHERE id = ?", (version_id,))
+        row = cursor.fetchone()
+        if not row: return False, "Không tìm thấy bản ghi"
+        
+        master_id, new_valid_from = row
+        new_valid_from_dt = datetime.strptime(data['valid_from'], '%Y-%m-%d')
+        old_valid_to = (new_valid_from_dt - timedelta(days=1)).strftime('%Y-%m-%d')
+        # 2. Update bản cũ (Active -> Expired)
+        cursor.execute("""
+            UPDATE tdc_versions 
+            SET status = 'Expired', valid_to = ?
+            WHERE master_id = ? AND status = 'Active' AND id != ?
+        """, (old_valid_to or datetime.now(), master_id, version_id))
+            
+        # 3. Chuyển bản hiện tại sang Active
+        cursor.execute("""
+            UPDATE tdc_versions 
+            SET status = 'Active', confirmed_at = GETDATE()
+            WHERE id = ?
+        """, (version_id,))
+        
+        conn.commit()
+        return True, "Đã phê duyệt và cập nhật dữ liệu!"
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"Confirm Error: {e}")
+        return False, str(e)
+    finally:
+        if conn: conn.close()
+def reject_tdc_version(version_id, reason=""):
+    """
+    Từ chối Version:
+    - Set status = 'Rejected'
+    """
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE tdc_versions SET status = 'Rejected' WHERE id = ?", (version_id,))
+        conn.commit()
+        return True, "Đã từ chối!"
+    except Exception as e:
+        return False, str(e)
     finally:
         conn.close()
 

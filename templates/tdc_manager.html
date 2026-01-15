@@ -1,1185 +1,785 @@
 {% extends "base.html" %}
 
-{% block title %}Quản lý Tiêu Chuẩn (TDC){% endblock %}
+{% block title %}Quản lý Tiêu Chuẩn (TDC) - Restored Layout{% endblock %}
 
 {% block head %}
     <style>
-    /* === RESET & LAYOUT CHUNG === */
-    body { background: #f1f5f9; height: 100vh; display: flex; flex-direction: column; margin: 0; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
-    .app-header { flex-shrink: 0; }
-    
-    /* [SỬA 1] Mở rộng cột bên phải từ 500px -> 700px, thu hẹp cột trái 1 chút */
-    .main-layout { 
-        display: grid; 
-        grid-template-columns: 280px 1fr 600px; /* <--- ĐÃ SỬA: Cột phải rộng 700px */
-        gap: 15px; 
-        flex: 1; 
-        overflow: hidden; 
-        padding: 15px; 
-    }
+    /* === RESET & CONFIG === */
+    body { background: #f8fafc; height: 100vh; display: flex; flex-direction: column; margin: 0; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+    .app-header { flex-shrink: 0; background:white; border-bottom:1px solid #e2e8f0; }
 
-    .panel { background: white; border: 1px solid #e2e8f0; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    .panel-head { padding: 10px 15px; background: #fff; border-bottom: 1px solid #e2e8f0; font-weight: bold; color: #334155; display: flex; justify-content: space-between; align-items: center; height: 45px; flex-shrink: 0;}
+    /* TABS */
+    .tab-header { display: flex; gap: 5px; padding: 5px 15px 0 15px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+    .tab-btn { padding: 8px 16px; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; background: #f1f5f9; color: #64748b; font-weight: 600; cursor: pointer; }
+    .tab-btn.active { background: #fff; color: #2563eb; border-color: #e2e8f0; border-top: 3px solid #2563eb; }
+    .tab-content { display: none; flex: 1; overflow: hidden; padding: 10px; }
+    .tab-content.active { display: flex; gap: 10px; }
 
-    /* CỘT 1: CÂY KHÁCH HÀNG */
-    .tree-cust { 
-        padding: 10px 15px; 
-        background: #1e293b; 
-        color: #f8fafc; 
-        font-weight: 700; 
-        border-bottom: 1px solid #334155;
-        display: flex; justify-content: space-between; align-items: center; 
-        cursor: pointer;
-        transition: 0.2s;
-    }
-    .tree-cust:hover { background: #334155; }
-    .tree-grade { 
-        padding: 8px 15px 8px 30px; 
-        background: #f1f5f9; 
-        color: #475569;
-        font-weight: 700;
-        border-bottom: 1px solid #e2e8f0; 
-        display: flex; justify-content: space-between; align-items: center; 
-        cursor: pointer;
-        font-size: 0.95em;
-    }
-    .tree-grade:hover { background: #e2e8f0; color: #0f172a; }
-    .tree-item { 
-        padding: 8px 15px 8px 45px;
-        border-bottom: 1px solid #f8fafc; 
-        border-left: 4px solid transparent;
-        cursor: pointer; 
-        font-size: 0.9em;
-        background: #fff;
-    }
-    .tree-item:hover { background: #eff6ff; color: #0284c7; }
-    .tree-item.active { background: #dbeafe; border-left-color: #2563eb; color: #1e40af; font-weight: 700; }
-    .item-sub { font-size: 0.85em; color: #94a3b8; margin-top: 2px; }
-    .btn-mini-add {
-        width: 24px; height: 24px; 
-        border-radius: 4px; border: none; 
-        background: rgba(255,255,255,0.2); color: #fff;
-        cursor: pointer; display: flex; align-items: center; justify-content: center;
-        font-weight: bold; font-size: 16px; margin-right: 8px;
-        transition: 0.2s;
-    }
-    .btn-mini-add:hover { background: #22c55e; color: white; transform: scale(1.1); }
-    .badge-count { font-size: 0.8em; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; }
+    /* LAYOUT: 3 COLUMNS FIXED (320px | 1fr | 450px) - RESTORED */
+    .main-layout { display: grid; grid-template-columns: 320px 550px 1fr; gap: 10px; width: 100%; height: 100%; }
+    /* APPROVAL LAYOUT: 2 COLUMNS (List | Detail) - Inside Detail is 3 Cols */
+    .approval-layout { display: grid; grid-template-columns: 280px 1fr; gap: 10px; width: 100%; height: 100%; }
+    .approval-detail-grid { display: grid; grid-template-columns: 250px 1fr 550px; gap: 10px; height: 100%; }
+    /* LIBRARY LAYOUT: 2 COLUMNS (Tree | Detail) */
+    .library-layout { display: grid; grid-template-columns: 320px 1fr; gap: 10px; width: 100%; height: 100%; }
+    .library-detail-grid { display: grid; grid-template-columns: 280px 1fr 450px; gap: 10px; height: 100%; }
 
-    /* FORM & MIDDLE */
-    .mid-content { display: flex; flex-direction: column; height: 100%; overflow-y: auto; padding: 20px; gap: 20px; }
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .panel { background: white; border: 1px solid #e2e8f0; border-radius: 6px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 100%; }
+    .panel-head { padding: 8px 12px; background: #fff; border-bottom: 1px solid #e2e8f0; font-weight: bold; color: #334155; display: flex; justify-content: space-between; align-items: center; min-height: 40px; }
+    .panel-body { padding: 10px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+
+    /* COMMON UI ELEMENTS */
+    .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
     .form-label { font-size: 0.75em; font-weight: 700; color: #64748b; text-transform: uppercase; }
-    .form-input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: 600; color: #0f172a; }
-    .pdf-area { flex: 1; border: 2px dashed #e2e8f0; border-radius: 6px; background: #f8fafc; display: flex; align-items: center; justify-content: center; overflow: hidden; min-height: 300px; position: relative; }
+    .form-input { padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: 600; color: #0f172a; width: 100%; box-sizing:border-box; }
+    
+    .btn-primary, .btn-success, .btn-danger, .btn-reset { border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.85em; white-space: nowrap; }
+    .btn-primary { background: #2563eb; color: white; }
+    .btn-success { background: #22c55e; color: white; }
+    .btn-danger { background: #ef4444; color: white; }
+    .btn-reset { border:1px solid #cbd5e1; background:#f8fafc; color:#334155; }
+
+    /* LISTS & TREE */
+    .list-item { padding: 8px; border-bottom: 1px solid #f1f5f9; cursor: pointer; }
+    .list-item:hover { background: #f8fafc; }
+    .tree-folder { font-weight:bold; padding:6px 10px; background:#f1f5f9; cursor:pointer; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; }
+    .tree-folder:hover { background:#e2e8f0; }
+    .tree-content { display:none; padding-left:10px; background:white; }
+    .tree-content.open { display:block; }
+
+    /* BADGES */
+    .badge { padding: 2px 6px; border-radius: 8px; font-size: 0.7em; font-weight: bold; }
+    .badge-pending { background: #fef9c3; color: #854d0e; }
+    .badge-active { background: #dcfce7; color: #166534; }
+    .badge-draft { background: #e0f2fe; color: #075985; }
+    .badge-rejected { background: #fee2e2; color: #991b1b; }
+    .badge-expired { background: #f1f5f9; color: #94a3b8; }
+
+    /* PDF AREA */
+    .pdf-area { flex: 1; background: #334155; display: flex; align-items: center; justify-content: center; position: relative; border-radius: 4px; overflow:hidden; }
     .pdf-iframe { width: 100%; height: 100%; border: none; }
-    
-    /* RIGHT PANEL */
-    .right-content { display: flex; flex-direction: column; height: 100%; overflow: hidden; background: #fff; }
-    .add-crit-box { padding: 10px 15px; border-bottom: 1px solid #eee; background: #fff; display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
-    .crit-list-container { flex: 1; overflow-y: auto; padding: 0 15px 15px 15px; background: #fff; }
-    .crit-row { display: flex; justify-content: space-between; align-items: center; background: white; padding: 8px 10px; margin-bottom: 6px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.9em; cursor: grab; }
-    .mini-select { padding: 4px 2px; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: 600; font-size: 0.9em; color: #334155; cursor: pointer; background: #fff; min-width: 45px; }
-    .btn-x { color: #94a3b8; background: none; border: none; cursor: pointer; font-size: 1.2em; margin-left: 8px; }
-    
-    /* [SỬA 2] RADAR SECTION: Chuyển sang Grid 2x2 thay vì Flex ngang */
-    .radar-section { 
-        height: 360px; /* Tăng chiều cao lên để chứa 2 hàng */
-        border-top: 4px solid #f1f5f9; 
-        padding: 10px 15px; 
-        background: #fff; 
-        flex-shrink: 0;
-        
-        display: grid; /* Dùng Grid */
-        grid-template-columns: 1fr 1fr; /* 2 cột */
-        grid-template-rows: 1fr 1fr;    /* 2 hàng */
-        gap: 10px;
-    }
-    
-    .mini-radar-item { 
-        background: white; 
-        border: 1px solid #e2e8f0; 
-        border-radius: 8px; 
-        position: relative; 
-        display: flex; 
-        flex-direction: column; 
-        overflow: hidden; 
-        /* Không cần flex: 1 nữa vì đã dùng grid */
-    }
-    /* === CỘT 1: CÂY KHÁCH HÀNG (MODERN STYLE) === */
-    
-    /* Container danh sách: Tùy chỉnh thanh cuộn cho đẹp */
-    #tdcListContainer::-webkit-scrollbar { width: 6px; }
-    #tdcListContainer::-webkit-scrollbar-track { background: transparent; }
-    #tdcListContainer::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-    #tdcListContainer::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-    /* Nhóm Khách hàng: Dạng thẻ nổi (Card) */
-    .cust-group {
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px; /* Bo tròn mềm mại */
-        margin-bottom: 10px; /* Khoảng cách giữa các khách */
-        overflow: hidden;
-        transition: box-shadow 0.2s ease, transform 0.2s ease;
-    }
-    .cust-group:hover {
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); /* Hiệu ứng nổi khi di chuột */
-        border-color: #cbd5e1;
-    }
+    /* CRITERIA TABLE UI - RESTORED */
+    .crit-table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+    .crit-table th { text-align: left; color: #64748b; font-weight: 600; padding: 4px; border-bottom: 1px solid #e2e8f0; }
+    .crit-table td { padding: 4px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    .crit-row { background: white; }
+    .crit-row:hover { background: #f8fafc; }
+    .drag-handle { color: #94a3b8; cursor: grab; margin-right: 8px; font-size: 1.2em; line-height: 1; }
+    .inline-sel { border: 1px solid #cbd5e1; border-radius: 3px; font-size: 0.9em; padding: 1px; font-weight: bold; width: 35px; text-align: center; }
 
-    /* Header Khách hàng */
-    .tree-cust { 
-        padding: 12px 15px; 
-        background: #fff; /* Chuyển sang nền trắng cho sạch sẽ */
-        color: #1e293b; 
-        font-weight: 700; 
-        border-bottom: 1px solid transparent;
-        display: flex; justify-content: space-between; align-items: center; 
-        cursor: pointer;
-        transition: all 0.2s;
-        font-size: 0.95em;
-    }
-    .tree-cust:hover { background: #f8fafc; }
-    /* Khi mở ra thì header đậm hơn chút để phân biệt */
-    .cust-group.open .tree-cust {
-        background: #f1f5f9;
-        border-bottom: 1px solid #e2e8f0;
-        color: #0f172a;
-    }
+    /* RADAR GRID FIXED */
+    .radar-container { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: auto; padding-top: 10px; border-top: 1px solid #eee; height: 380px; flex-shrink: 0; }
+    .radar-box { border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px; position: relative; background: white; display:flex; flex-direction:column; overflow: hidden;}
+    .radar-title { position: absolute; top: 4px; left: 4px; font-size: 11px; font-weight: bold; background: white; padding: 1px 4px; border: 1px solid #e2e8f0; border-radius: 3px; color:#ef4444; z-index:5; }
+    .radar-canvas-wrap { flex:1; position:relative; width:100%; height:100%; }
 
-    /* Icon Tên Khách hàng */
-    .cust-icon {
-        display: inline-flex; align-items: center; justify-content: center;
-        width: 32px; height: 32px;
-        background: #e0f2fe; color: #0284c7;
-        border-radius: 6px; margin-right: 10px;
-        font-size: 1.1em;
-    }
-
-    /* Nút cộng (+) mới */
-    .btn-quick-add {
-        width: 28px; height: 28px;
-        background: white; border: 1px solid #e2e8f0; color: #64748b;
-        border-radius: 50%; /* Tròn */
-        cursor: pointer; display: flex; align-items: center; justify-content: center;
-        font-size: 16px; margin-right: 8px;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-    .btn-quick-add:hover { 
-        background: #2563eb; border-color: #2563eb; color: white; 
-        transform: rotate(90deg); /* Xoay nhẹ khi hover tạo cảm giác mượt */
-    }
-
-    /* Badge số lượng */
-    .badge-count { 
-        font-size: 0.75em; font-weight: 700;
-        background: #f1f5f9; color: #64748b; 
-        padding: 4px 8px; border-radius: 12px; 
-        min-width: 24px; text-align: center;
-        transition: 0.2s;
-    }
-    .badge-active { background: #dcfce7; color: #15803d; } /* Xanh lá nếu có dữ liệu */
-
-    /* Phần Body (Chứa Mác thép & Item) */
-    .tree-body { 
-        display: none; 
-        background: #fff;
-        animation: slideDown 0.3s ease-out; /* Hiệu ứng trượt xuống */
-    }
-    @keyframes slideDown {
-        from { opacity: 0; transform: translateY(-5px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Header Mác thép */
-    .tree-grade { 
-        padding: 8px 15px 8px 58px; /* Thụt vào thẳng hàng với tên khách */
-        background: #fff;
-        color: #64748b;
-        font-weight: 600;
-        font-size: 0.85em;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        border-top: 1px solid #f1f5f9;
-        display: flex; align-items: center; gap: 8px;
-    }
-    .tree-grade::before { content: "•"; color: #cbd5e1; font-size: 1.5em; line-height: 0; }
-
-    /* TDC Item (Con cuối cùng) */
-    .tree-item { 
-        padding: 10px 15px 10px 58px;
-        cursor: pointer; 
-        font-size: 0.9em;
-        background: #fff;
-        border-left: 3px solid transparent; /* Chuẩn bị cho hover */
-        transition: all 0.2s;
-    }
-    .tree-item:hover { 
-        background: #f8fafc; 
-        border-left-color: #3b82f6; /* Viền xanh bên trái khi hover */
-        padding-left: 62px; /* Dịch nhẹ sang phải */
-    }
-    .tree-item.active { 
-        background: #eff6ff; 
-        border-left-color: #2563eb; 
-        color: #1e40af; 
-        font-weight: 600; 
-    }
-    
-    .code-pill {
-        display: inline-block; 
-        background: #e0e7ff; color: #4338ca; 
-        padding: 2px 6px; border-radius: 4px; 
-        font-size: 0.8em; font-family: monospace; font-weight: 700;
-        margin-top: 4px;
-    }
-    /* === CỘT 1: DANH SÁCH KHÁCH HÀNG (ENTERPRISE FLAT STYLE) === */
-    
-    /* Container: Bỏ padding thừa để list sát cạnh */
-    #tdcListContainer { padding: 0; }
-
-    /* Nhóm Khách hàng: Dạng danh sách liền mạch, không tách card */
-    .cust-group {
-        background: #fff;
-        border-bottom: 1px solid #e2e8f0; /* Chỉ có gạch chân mờ */
-        margin: 0; /* Bỏ khoảng cách giữa các dòng */
-    }
-    .cust-group:last-child { border-bottom: none; }
-
-    /* Header Khách hàng */
-    .tree-cust { 
-        padding: 10px 15px; /* Giảm padding cho gọn */
-        background: #fff;
-        color: #334155; 
-        font-weight: 600; 
-        font-size: 0.9em;
-        display: flex; justify-content: space-between; align-items: center; 
-        cursor: pointer;
-        transition: background 0.1s;
-    }
-    .tree-cust:hover { background: #f8fafc; color: #0f172a; }
-    
-    /* Khi đang mở */
-    .cust-group.open .tree-cust {
-        background: #f1f5f9;
-        font-weight: 700;
-        color: #0369a1;
-        border-left: 3px solid #0369a1; /* Điểm nhấn bên trái */
-        padding-left: 12px; /* Bù lại 3px border */
-    }
-
-    /* Nút (+) nhỏ gọn tinh tế hơn */
-    .btn-quick-add {
-        width: 24px; height: 24px;
-        background: transparent;
-        border: 1px solid #cbd5e1; color: #64748b;
+    /* HEADER TOOLBAR FOR CRITERIA */
+    .range-select-row { display: flex; gap: 5px; align-items: center; background: #f1f5f9; padding: 6px; border-radius: 6px; margin-bottom: 10px; }
+    .ver-input-group { display: flex; align-items: center; gap: 4px; background: white; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 4px; }
+    .ver-select { border: none; font-weight: bold; width: 30px; outline: none; text-align: center; cursor: pointer; }
+    /* Style riêng cho nút Copy/Paste */
+    .btn-clipboard {
+        background: #eff6ff;
+        color: #2563eb;
+        border: 1px solid #bfdbfe;
+        padding: 6px 12px;
         border-radius: 4px;
-        cursor: pointer; display: flex; align-items: center; justify-content: center;
-        font-size: 14px; margin-right: 6px;
+        font-weight: bold;
+        cursor: pointer;
+        font-size: 0.85em;
+        display: flex;
+        align-items: center;
+        gap: 5px;
         transition: all 0.2s;
     }
-    .btn-quick-add:hover { 
-        background: #0ea5e9; border-color: #0ea5e9; color: white; 
+
+    .btn-clipboard:hover {
+        background: #dbeafe;
+        border-color: #3b82f6;
+        box-shadow: 0 2px 4px rgba(37, 99, 235, 0.1);
     }
 
-    /* Badge số lượng: Nhỏ gọn */
-    .badge-count { 
-        font-size: 0.75em; font-weight: 600;
-        color: #94a3b8; background: #f1f5f9;
-        padding: 2px 6px; border-radius: 4px;
-        min-width: 20px; text-align: center;
-    }
-    .badge-active { background: #dbeafe; color: #1d4ed8; } /* Xanh đậm nếu có dữ liệu */
-
-    /* Body (Danh sách con) */
-    .tree-body { 
-        display: none; 
-        background: #fff;
-        box-shadow: inset 0 4px 6px -4px rgba(0,0,0,0.1); /* Bóng đổ nhẹ bên trong */
+    .btn-clipboard:active {
+        transform: translateY(1px);
     }
 
-    /* Mác thép header */
-    .tree-grade { 
-        padding: 6px 15px 6px 35px; /* Thụt đầu dòng */
-        background: #f8fafc;
-        color: #64748b;
-        font-weight: 700;
-        font-size: 0.8em;
-        border-top: 1px solid #f1f5f9;
-        display: flex; align-items: center;
+    /* Biến đổi nút Dán khi có dữ liệu trong bộ nhớ */
+    .btn-paste-active {
+        animation: pulse-blue 2s infinite;
     }
-    .tree-grade::before { content: "⚙"; margin-right: 6px; opacity: 0.5; font-size:0.9em; }
 
-    /* Item TDC cuối cùng */
-    .tree-item { 
-        padding: 8px 15px 8px 35px;
-        cursor: pointer; 
-        font-size: 0.9em;
-        border-left: 3px solid transparent;
-        border-bottom: 1px solid #f8fafc;
+    @keyframes pulse-blue {
+        0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
+        70% { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
     }
-    .tree-item:hover { 
-        background: #eff6ff; 
-        color: #0284c7; 
-    }
-    .code-pill {
-        display: inline-block; 
-        background: #e2e8f0; color: #475569; 
-        padding: 1px 5px; border-radius: 3px; 
-        font-size: 0.75em; font-family: monospace;
-        margin-left: 5px;
-    }
-    .chart-label { position: absolute; top: 5px; left: 5px; font-size: 11px; font-weight: bold; color: #64748b; background: rgba(255,255,255,0.95); padding: 2px 6px; z-index: 10; border-radius: 4px; border: 1px solid #eee; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-    .canvas-wrapper { flex: 1; position: relative; width: 100%; min-height: 0; }
-</style>
+    </style>
 {% endblock %}
 
 {% block content %}
-<div class="app-header" style="margin:0; border-radius:0;">
-    <div class="app-title-row" style="border:none; margin:0; padding:0;">
-        <h1>📚 THƯ VIỆN TIÊU CHUẨN TDC MASTER</h1>
+<div class="app-header">
+    <div style="padding: 10px 15px;">
+        <h1 style="margin:0; font-size:1.1em; color:#0f172a;">📚 TDC MASTER SYSTEM</h1>
     </div>
 </div>
 
-<div class="main-layout">
-    <div class="panel">
-        <div class="panel-head" style="flex-direction:column; align-items:stretch; height:auto; gap:10px; padding-bottom:10px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span>Danh sách Tiêu chuẩn</span>
-                <button onclick="loadTDCList()" class="btn-reset" title="Tải lại">↻</button>
-            </div>
-            <input type="text" id="searchCust" onkeyup="filterCustList()" 
-                placeholder="🔍 Lọc tên khách, mác thép..." 
-                style="width:100%; padding:6px; border:1px solid #cbd5e1; border-radius:4px; font-size:0.9em;">
-        </div>
-        <div style="flex:1; overflow-y:auto;" id="tdcListContainer"></div>
-    </div>
+<div class="tab-header">
+    <div class="tab-btn active" onclick="switchTab('tabDraft')" id="btnDraft">Editor</div>
+    <div class="tab-btn" onclick="switchTab('tabApproval')" id="btnApproval">Approval</div>
+    <div class="tab-btn" onclick="switchTab('tabLibrary')" id="btnLibrary">Library</div>
+</div>
 
-    <div class="panel">
-        <div class="panel-head">
-            <span id="detailTitle" style="color:#2563eb;">Chi tiết Tiêu chuẩn</span>
-            <button onclick="saveTDC()" class="btn-upload btn-prop" style="padding:4px 15px; font-size: 0.9em;">💾 LƯU MASTER</button>
-        </div>
-        <div class="mid-content">
-            <input type="hidden" id="tdcId"> 
-            <div class="form-grid">
+<!-- TAB 1: DRAFT (EDITOR) -->
+<div class="tab-content active" id="tabDraft">
+    <div class="main-layout">
+        <!-- COL 1: INFO (320px) -->
+        <div class="panel">
+            <div class="panel-head">Thông tin chung <span class="badge badge-draft" id="draftBadge">NEW</span></div>
+            <div class="panel-body">
+                <input type="hidden" id="draftId">
                 <div class="form-group">
-                    <label class="form-label">1. KHÁCH HÀNG (SAP)</label>
-                    <div style="display:flex; gap:5px;">
-                        <input list="sapCustList" id="custName" class="form-input" placeholder="🔍 Chọn hoặc gõ tên..." onchange="onSapCustChange()" style="flex:1;">
-                        <datalist id="sapCustList"></datalist>
-                        <button onclick="loadSapCustomers()" title="Tải lại danh sách" class="btn-reset" style="border:1px solid #cbd5e1;">↻</button>
+                    <label class="form-label">Khách hàng</label>
+                    <div style="display:flex; gap:3px;">
+                        <input list="dlCust" id="draftCust" class="form-input" placeholder="Chọn khách..." onchange="onSapCustInput()">
+                        <datalist id="dlCust"></datalist>
+                        <button onclick="loadSapCust()" class="btn-reset">↺</button>
                     </div>
                 </div>
-                
                 <div class="form-group">
-                    <label class="form-label">2. MÁC THÉP (SAP)</label>
-                    <select id="gradeSelect" class="form-input" onchange="onGradeChange()">
-                        <option value="">-- Vui lòng chọn Khách trước --</option>
-                    </select>
+                    <label class="form-label">Mác thép</label>
+                    <input list="dlGrade" id="draftGrade" class="form-input" placeholder="Chọn mác...">
+                    <datalist id="dlGrade"></datalist>
+                </div>
+                <div class="form-group"><label class="form-label">Mục đích</label><input id="draftPurpose" class="form-input"></div>
+                <div class="form-group"><label class="form-label">Mã TDC</label><input id="draftCode" class="form-input" style="color:#2563eb;"></div>
+                <div class="form-group">
+                    <label class="form-label">Hiệu lực</label>
+                    <div style="display:flex; gap:5px;"><input type="date" id="draftFrom" class="form-input"><input type="date" id="draftTo" class="form-input"></div>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label">3. MỤC ĐÍCH SỬ DỤNG</label>
-                    <input type="text" id="usagePurpose" class="form-input" placeholder="VD: Ống thép, Mạ, Cán nguội...">
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">4. MÃ TDC (TỰ ĐẶT)</label>
-                    <input type="text" id="tdcCode" class="form-input" placeholder="VD: HP-ONG-01" style="color:#2563eb; font-weight:bold;">
+                <div style="margin-top:auto; display:flex; flex-direction:column; gap:8px;">
+                    <button onclick="saveDraft('Pending')" class="btn-success">GỬI PHÊ DUYỆT</button>
+                    <button onclick="saveDraft('Draft')" class="btn-reset">Lưu Nháp</button>
+                    <button onclick="resetDraft()" class="btn-reset" style="color:red;">Xóa Form</button>
                 </div>
             </div>
+        </div>
 
-            <hr style="border:0; border-top:1px solid #eee; width:100%;">
+        <!-- COL 2: PDF (1fr) -->
+        <div class="panel">
+            <div class="panel-head">File PDF <div><input type="file" id="pdfUp" hidden accept="application/pdf" onchange="uploadPdf()"><button onclick="document.getElementById('pdfUp').click()" class="btn-primary">Upload</button></div></div>
+            <div class="panel-body" style="padding:0;">
+                <input type="hidden" id="draftPdfPath">
+                <div class="pdf-area" id="draftPdfView"><span style="color:white;">(Trống)</span></div>
+            </div>
+        </div>
 
-            <div style="display:flex; flex-direction:column; gap:10px; flex:1;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <label class="form-label">📄 TÀI LIỆU GỐC (PDF)</label>
-                    <div style="display:flex; gap:5px;">
-                        <input type="file" id="pdfInput" accept="application/pdf" style="display:none;" onchange="handlePdfSelect()">
-                        <button onclick="document.getElementById('pdfInput').click()" class="btn-reset" style="font-size:0.85em;">⬆️ Upload PDF</button>
-                        <button onclick="clearPDF()" class="btn-reset" style="color:#ef4444; font-size:0.85em;">✕ Xóa</button>
+        <!-- COL 3: CRITERIA & RADAR (450px) -->
+        <div class="panel">
+            <div class="panel-head">Tiêu chuẩn & Radar 
+                <button id="btnPaste" onclick="pasteCriteria()" class="btn-clipboard" title="Dán tiêu chuẩn từ bộ nhớ">
+                    📋 DÁN TIÊU CHUẨN
+                </button>
+                <button onclick="clearCrit()" class="btn-reset" style="font-size:0.8em; color:red;">Xóa hết</button>
+            </div>
+            <div class="panel-body">
+                <!-- TOOLBAR RESTORED -->
+                <div class="range-select-row">
+                    <select id="selDefect" style="flex:1; padding:4px;" class="form-input"></select>
+                    <div class="ver-input-group">
+                        <select id="selFrom" class="ver-select"><option>6</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select>
+                        <span>➝</span>
+                        <select id="selTo" class="ver-select"><option>6</option><option>5</option><option>4</option><option>3</option><option>2</option><option selected>1</option></select>
                     </div>
-                </div>
-                <div class="pdf-area" id="pdfPreview">
-                    <span style="color:#94a3b8;">(Chưa có file PDF)</span>
-                </div>
-                <input type="hidden" id="pdfPathVal">
-            </div>
-        </div>
-    </div>
-
-    <div class="panel">
-        <div class="panel-head">
-            <span>Tiêu chuẩn Lỗi (Radar)</span>
-            <button onclick="addAllDefects()" style="font-size:0.8em; color:#2563eb; border:none; background:none; cursor:pointer; font-weight:bold;">⚡ Thêm Hết</button>
-        </div>
-        <div class="right-content">
-    
-            <div class="add-crit-box" style="background:#f1f5f9; border-bottom:1px solid #e2e8f0;">
-                <div style="flex:1; display:flex; flex-direction:column;">
-                    <label style="font-size:0.7em; font-weight:bold; color:#64748b;">CHỌN LỖI (AUTO & MANUAL)</label>
-                    <select id="unifiedDefectSelect" class="form-input" style="font-weight:bold; color:#0f172a;"></select>
+                    <button onclick="addSingle()" class="btn-primary" title="Thêm">+</button>
+                    <button onclick="batchAdd()" class="btn-reset" title="Thêm nhóm">++</button>
+                    <button onclick="addAllDefault()" class="btn-success" title="Thêm tất cả hạng mục" style="padding: 2px 10px;">
+                        +++ THÊM TẤT CẢ
+                    </button>
                 </div>
 
-                <div style="display:flex; align-items:center; gap:5px; margin-top:14px;">
-                    <select id="rangeStart" class="form-input" style="width: 60px">
-                        <option value="1">C1</option>
-                        <option value="2">C2</option>
-                        <option value="3">C3</option>
-                        <option value="4">C4</option>
-                        <option value="5">C5</option>
-                        <option value="6">C6</option>
-                    </select>
-                    <span style="font-size: 0.8em; color: #999">➔</span>
-                    <select id="rangeEnd" class="form-input" style="width: 60px">
-                        <option value="1">C1</option>
-                        <option value="2">C2</option>
-                        <option value="3">C3</option>
-                        <option value="4">C4</option>
-                        <option value="5">C5</option>
-                        <option value="6">C6</option>
-                    </select>
-                    <button onclick="addUnifiedCrit()" class="btn-upload btn-geo" style="width:35px; padding:0; height:32px;" title="Thêm Lỗi">+</button>
+                <div style="flex:1; overflow-y:auto;">
+                    <table class="crit-table"><tbody id="draftCritBody"></tbody></table>
                 </div>
-            </div>
-            
-            <div id="critList" class="crit-list-container"></div>
-            
-            <div class="radar-section">
-                <div class="mini-radar-item">
-                    <span class="chart-label" style="color:#dc2626">BỀ MẶT</span>
-                    <div class="canvas-wrapper"><canvas id="radarSurf"></canvas></div>
-                </div>
-                <div class="mini-radar-item">
-                    <span class="chart-label" style="color:#2563eb">HÌNH HỌC</span>
-                    <div class="canvas-wrapper"><canvas id="radarGeo"></canvas></div>
-                </div>
-                <div class="mini-radar-item">
-                    <span class="chart-label" style="color:#16a34a">CƠ LÝ HÓA</span>
-                    <div class="canvas-wrapper"><canvas id="radarProp"></canvas></div>
-                </div>
-                <div class="mini-radar-item">
-                    <span class="chart-label" style="color:#9333ea">NGOẠI QUAN</span>
-                    <div class="canvas-wrapper"><canvas id="radarApp"></canvas></div>
+
+                <div class="radar-container">
+                    <div class="radar-box"><span class="radar-title">BỀ MẶT</span><div class="radar-canvas-wrap"><canvas id="cgSurf_D"></canvas></div></div>
+                    <div class="radar-box"><span class="radar-title">HÌNH HỌC</span><div class="radar-canvas-wrap"><canvas id="cgGeo_D"></canvas></div></div>
+                    <div class="radar-box"><span class="radar-title" style="color:green;">CƠ LÝ HÓA</span><div class="radar-canvas-wrap"><canvas id="cgProp_D"></canvas></div></div>
+                    <div class="radar-box"><span class="radar-title" style="color:purple;">NGOẠI QUAN</span><div class="radar-canvas-wrap"><canvas id="cgApp_D"></canvas></div></div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- TAB 2: APPROVAL -->
+<div class="tab-content" id="tabApproval">
+    <div class="approval-layout" > 
+         <!-- LIST -->
+        <div class="panel">
+            <div class="panel-head">Chờ duyệt <button onclick="loadPending()" class="btn-reset">↻</button></div>
+            <div class="panel-body" id="pendingList" style="padding:0;"></div>
+        </div>
+
+        <!-- DETAIL WITH 3 COLS RESTORED -->
+        <div class="panel">
+             <div class="panel-head">Phê duyệt & Chỉnh sửa <span id="appBadge" class="badge"></span></div>
+             <div class="panel-body">
+                <div class="approval-detail-grid">
+                    <!-- Col 1 -->
+                    <div>
+                        <div class="form-group"><label class="form-label">Khách hàng</label><input id="appCust" class="form-input"></div>
+                        <div class="form-group"><label class="form-label">Mác thép</label><input id="appGrade" class="form-input"></div>
+                        <div class="form-group"><label class="form-label">Mục đích</label><input id="appPurpose" class="form-input"></div>
+                        <div class="form-group"><label class="form-label">Mã TDC</label><input disabled id="appCode" class="form-input" style="background:#f1f5f9;"></div>
+                        <div class="form-group"><label class="form-label">Hiệu lực</label><div style="display:flex;gap:5px;"><input type="date" id="appFrom" class="form-input"><input type="date" id="appTo" class="form-input"></div></div>
+                        <div style="margin-top:auto; display:flex; gap:5px;">
+                            <button onclick="confirmApp()" class="btn-success" style="flex:1;">✅ DUYỆT</button>
+                            <button onclick="rejectApp()" class="btn-danger" style="flex:1;">⛔ TỪ CHỐI</button>
+                        </div>
+                    </div>
+                    <!-- Col 2 -->
+                    <div class="pdf-area" id="appPdf"><span>PDF</span></div>
+                    <!-- Col 3 -->
+                    <div style="display:flex; flex-direction:column; overflow:hidden;">
+                        <div class="range-select-row">
+                             <select id="selDefectA" style="flex:1;" class="form-input"></select>
+                             <button onclick="addSingleApp()" class="btn-primary" style="padding:2px 8px;">+</button>
+                        </div>
+                        <div style="flex:1; overflow-y:auto; border-bottom:1px solid #eee;">
+                            <table class="crit-table"><tbody id="appCritBody"></tbody></table>
+                        </div>
+                        <div class="radar-container" style="flex:none; height:320px; border:none; margin:0;">
+                             <div class="radar-box"><span class="radar-title">BỀ MẶT</span><div class="radar-canvas-wrap"><canvas id="cgSurf_A"></canvas></div></div>
+                            <div class="radar-box"><span class="radar-title">HÌNH HỌC</span><div class="radar-canvas-wrap"><canvas id="cgGeo_A"></canvas></div></div>
+                            <div class="radar-box"><span class="radar-title">CƠ LÝ HÓA</span><div class="radar-canvas-wrap"><canvas id="cgProp_A"></canvas></div></div>
+                            <div class="radar-box"><span class="radar-title">NGOẠI QUAN</span><div class="radar-canvas-wrap"><canvas id="cgApp_A"></canvas></div></div>
+                        </div>
+                    </div>
+                </div>
+             </div>
+        </div>
+    </div>
+</div>
+
+<!-- TAB 3: LIBRARY (RESTORED WITH SEARCH) -->
+<div class="tab-content" id="tabLibrary">
+    <div class="library-layout">
+        <!-- TREE -->
+        <div class="panel">
+            <div class="panel-head">Thư viện <input placeholder="Tìm..." style="width:120px; padding:2px;" onkeyup="filterLib(this.value)"></div>
+            <div class="panel-body" id="libTree" style="padding:0;"></div>
+        </div>
+        <!-- DETAIL 3 COLS RESTORED -->
+        <div class="panel">
+            <div class="panel-head">
+                Chi tiết 
+                <div style="display:flex; gap:5px;">
+                    <button onclick="copyLibCriteria()" class="btn-clipboard">
+                        📋 COPY CRITERIA
+                    </button>
+                    <button onclick="renewLib()" id="btnRenew" style="display:none;" class="btn-primary">
+                        Gia hạn / Edit
+                    </button>
+                </div>
+            </div>
+            <div class="panel-body">
+                 <div class="library-detail-grid">
+                    <div>
+                        <!-- RESTORED HEADER STYLE -->
+                        <div id="libInfo"></div>
+                        <div style="margin-top:15px; font-weight:bold; color:#64748b;">Lịch sử:</div>
+                        <div id="libHist" style="margin-top:5px; background:#f8fafc; border-radius:4px; padding:5px;"></div>
+                    </div>
+                    <div class="pdf-area" id="libPdf" style="border:1px solid #ddd; background:#334155;"></div>
+                    <div style="display:flex; flex-direction:column; overflow:hidden;">
+                        <div style="flex:1; overflow-y:auto; border-bottom:1px solid #eee;">
+                            <table class="crit-table"><tbody id="libCritBody"></tbody></table>
+                        </div>
+                        <div class="radar-container" style="flex:none; height:320px; border:none; margin:0;">
+                             <div class="radar-box"><span class="radar-title">BỀ MẶT</span><div class="radar-canvas-wrap"><canvas id="cgSurf_L"></canvas></div></div>
+                            <div class="radar-box"><span class="radar-title">HÌNH HỌC</span><div class="radar-canvas-wrap"><canvas id="cgGeo_L"></canvas></div></div>
+                            <div class="radar-box"><span class="radar-title">CƠ LÝ HÓA</span><div class="radar-canvas-wrap"><canvas id="cgProp_L"></canvas></div></div>
+                            <div class="radar-box"><span class="radar-title">NGOẠI QUAN</span><div class="radar-canvas-wrap"><canvas id="cgApp_L"></canvas></div></div>
+                        </div>
+                    </div>
+                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
-{% block scripts %} 
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script>
-const MANUAL_LIB = [
-    // Bề mặt
-    { code: 'oil', name: 'Gấp nếp', group: 'surface' },
-    { code: 'rust', name: 'Nếp Nhăn', group: 'surface' },
-    { code: 'scratch_m', name: 'Vết hằn Pinch Roll', group: 'surface' },
-    { code: 'dirt', name: 'Gãy mặt', group: 'surface' },
-    { code: 'mark', name: 'Xỉ thứ cấp', group: 'surface' },
-    { code: 'scale', name: 'Xỉ cán', group: 'surface' },
-    { code: 'other_s', name: 'Xỉ muối tiêu', group: 'surface' },
-    { code: 'gianbien', name: 'Giãn biên', group: 'surface' },
-    // Hình học
-    { code: 'telescope', name: 'Cong cạnh', group: 'geometry' },
-    // Ngoại quan (App)
-    { code: 'strap', name: 'Khuyết biên', group: 'app' },
-    { code: 'label_tag', name: 'Bava biên', group: 'app' },
-    { code: 'packaging', name: 'Vỡ biên', group: 'app' },
-    { code: 'edge_cond', name: 'Sổ vòng', group: 'app' },
-    { code: 'coil_shape', name: 'Loa cuộn', group: 'app' }
-];
-let GRADE_CONFIGS = {};
-let TDC_LIBRARY = {}; // Dữ liệu thư viện TDC tải từ server
-let CURRENT_CRITERIA = []; // Lưu danh sách lỗi đang cấu hình
-let CHARTS = { surf: null, geo: null, prop: null };
-let CURRENT_PDF_PATH = "";
-
-// 1. KHỞI TẠO
-window.onload = async () => {
-    // A. Load Config lỗi (Để dùng cho việc map lỗi tự động sau này)
-    const res = await fetch('/api/grade_configs');
-    GRADE_CONFIGS = await res.json();
-
-    // B. Load Danh sách Khách hàng từ SAP (Mới)
-    await loadSapCustomers();
-
-    // C. Load Danh sách TDC đã lưu
-    loadTDCList(); 
-    
-    // D. Init Radar
-    setTimeout(initRadars, 200); 
+var LIB_HISTORY_DATA = []; // Lưu trữ dữ liệu các phiên bản cũ để truy xuất nhanh
+/* === CONFIG & DATA (PRESERVED) === */
+var RADAR_LABELS = {
+    surf: ['MI', 'HPrScale', 'EL', 'HOLE', 'RIP', 'BRUS', 'LC', 'SCRT', 'oil', 'rust', 'scratch_m', 'dirt', 'mark', 'scale', 'other_s', 'gianbien'],
+    geo: ['Flatness', 'Crown', 'Wedge', 'ThickDiff', 'WidthDiff', 'telescope'],
+    prop: ['YieldPoint', 'Tensile', 'Elongation', 'Hardness', 'C', 'Mn', 'Si', 'P', 'S'],
+    app: ['strap', 'label_tag', 'packaging', 'edge_cond', 'coil_shape']
 };
-async function loadSapCustomers() {
-    const list = document.getElementById('sapCustList');
-    try {
-        const res = await fetch('/api/sap/get_customers');
-        const json = await res.json();
-        if(json.status === 'success') {
-            list.innerHTML = json.data.map(c => `<option value="${c}">`).join('');
-        }
-    } catch(e) { console.error(e); }
+var DEFECT_OPTS = [
+    // --- BỀ MẶT (surf) ---
+    {code:'MI', name:'Ngậm xỉ đúc', grp:'surf'},
+    {code:'HPrScale', name:'Xỉ sơ cấp HP', grp:'surf'},
+    {code:'EL', name:'Lỗi xếp lớp', grp:'surf'},
+    {code:'HOLE', name:'Lỗ thủng', grp:'surf'},
+    {code:'RIP', name:'Rách bề mặt', grp:'surf'},
+    {code:'BRUS', name:'Vết Hằn trục', grp:'surf'},
+    {code:'LC', name:'Nứt dọc', grp:'surf'},
+    {code:'SCRT', name:'Xước bề mặt', grp:'surf'},
+    {code:'oil', name:'Gấp nếp', grp:'surf'},
+    {code:'rust', name:'Nếp Nhăn', grp:'surf'},
+    {code:'scratch_m', name:'Vết hằn Pinch Roll', grp:'surf'},
+    {code:'dirt', name:'Gãy mặt', grp:'surf'},
+    {code:'mark', name:'Xỉ thứ cấp', grp:'surf'},
+    {code:'scale', name:'Xỉ cán', grp:'surf'},
+    {code:'other_s', name:'Xỉ muối tiêu', grp:'surf'},
+    {code:'gianbien', name:'Giãn biên', grp:'surf'},
+
+    // --- HÌNH HỌC (geo) ---
+    {code:'Flatness', name:'Độ phẳng', grp:'geo'},
+    {code:'Crown', name:'Độ vồng', grp:'geo'},
+    {code:'Wedge', name:'Độ nêm', grp:'geo'},
+    {code:'ThickDiff', name:'Sai lệch dày', grp:'geo'},
+    {code:'WidthDiff', name:'Sai lệch rộng', grp:'geo'},
+    {code:'telescope', name:'Cong cạnh', grp:'geo'},
+
+    // --- CƠ LÝ HÓA (prop) ---
+    {code:'YieldPoint', name:'GH Chảy', grp:'prop'},
+    {code:'Tensile', name:'GH Bền', grp:'prop'},
+    {code:'Elongation', name:'Độ giãn', grp:'prop'},
+    {code:'Hardness', name:'Độ cứng', grp:'prop'},
+    {code:'C', name:'Carbon', grp:'prop'},
+    {code:'Mn', name:'Mangan', grp:'prop'},
+    {code:'Si', name:'Silic', grp:'prop'},
+    {code:'P', name:'Photpho', grp:'prop'},
+    {code:'S', name:'Lưu huỳnh', grp:'prop'},
+
+    // --- NGOẠI QUAN (app) ---
+    {code:'strap', name:'Khuyết biên', grp:'app'},
+    {code:'label_tag', name:'Bava biên', grp:'app'},
+    {code:'packaging', name:'Vỡ biên', grp:'app'},
+    {code:'edge_cond', name:'Sổ vòng', grp:'app'},
+    {code:'coil_shape', name:'Loa cuộn', grp:'app'}
+];
+const DEFECT_MAP = Object.fromEntries(DEFECT_OPTS.map(x => [x.code, x.name]));
+var COMMON_GRADES = ["SPHC","SS400","SAE1006","SAE1008","Q235","Q345","SGCC"];
+var CHARTS = { D:{}, A:{}, L:{} };
+var CURR_CRIT = []; var APP_CRIT = [];
+var GRADE_CONFIGS = {};
+var PENDING_ITEM = null; var LIB_ITEM = null;
+
+var CRIT_CLIPBOARD = null;
+/* === INIT === */
+window.onload = async () => {
+    document.getElementById('selDefect').innerHTML = genSelectHtml();
+    document.getElementById('selDefectA').innerHTML = genSelectHtml();
+    loadStaticGrades(); loadSapCust(); await loadConfigs();
+    ['D','A','L'].forEach(k => initRadars(k));
+    
+    // Sortable Restore
+    new Sortable(document.getElementById('draftCritBody'), { handle: '.drag-handle', animation: 150, onEnd: (e)=>{ arrayMove(CURR_CRIT, e.oldIndex, e.newIndex); } });
+    new Sortable(document.getElementById('appCritBody'), { handle: '.drag-handle', animation: 150, onEnd: (e)=>{ arrayMove(APP_CRIT, e.oldIndex, e.newIndex); } });
+
+    loadPending(); loadLib();
+};
+
+function genSelectHtml() {
+    let h = '';
+    ['surf','geo','prop','app'].forEach(g => {
+        h += `<optgroup label="${g.toUpperCase()}">`;
+        DEFECT_OPTS.filter(x=>x.grp===g).forEach(x => { h += `<option value="${x.code}" data-name="${x.name}" data-grp="${x.grp}">${x.name}</option>`; });
+        h += `</optgroup>`;
+    }); return h;
+}
+function arrayMove(arr, from, to) { arr.splice(to, 0, arr.splice(from, 1)[0]); }
+function switchTab(id) {
+    document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.getElementById(id.replace('tab','btn')).classList.add('active');
+    if(id==='tabApproval') loadPending();
+    if(id==='tabLibrary') loadLib();
+}
+function fmtDate(s) { if(!s) return ''; const d=new Date(s); return `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`; }
+
+
+/* === CRITERIA & INLINE EDIT (RESTORED Dropdowns) === */
+function addSingle() {
+    const s=document.getElementById('selDefect'); const opt=s.selectedOptions[0];
+    upsertCrit(CURR_CRIT, s.value, opt.getAttribute('data-name'), opt.getAttribute('data-grp'), calcRange(parseInt(document.getElementById('selFrom').value), parseInt(document.getElementById('selTo').value)));
+    renderCrit(CURR_CRIT, 'draftCritBody', 'D'); updateCharts(CURR_CRIT, 'D');
+}
+function batchAdd() {
+    const s=document.getElementById('selDefect'); const opt=s.selectedOptions[0]; const grp=opt.getAttribute('data-grp');
+    if(confirm(`Thêm cả nhóm ${grp.toUpperCase()}?`)) {
+        const r=calcRange(parseInt(document.getElementById('selFrom').value), parseInt(document.getElementById('selTo').value));
+        DEFECT_OPTS.filter(x => x.grp === grp).forEach(d => upsertCrit(CURR_CRIT, d.code, d.name, d.grp, r));
+        renderCrit(CURR_CRIT, 'draftCritBody', 'D'); updateCharts(CURR_CRIT, 'D');
+    }
+}
+function addSingleApp() {
+    const s=document.getElementById('selDefectA'); const opt=s.selectedOptions[0];
+    upsertCrit(APP_CRIT, s.value, opt.getAttribute('data-name'), opt.getAttribute('data-grp'), [3]);
+    renderCrit(APP_CRIT, 'appCritBody', 'A'); updateCharts(APP_CRIT, 'A');
 }
 
-async function onSapCustChange() {
-    const custName = document.getElementById('custName').value;
-    const gradeSel = document.getElementById('gradeSelect');
+function calcRange(f,t) { const max=Math.max(f,t); const min=Math.min(f,t); return Array.from({length: max-min+1}, (_,i) => i+min).sort((a,b)=>b-a); }
+
+function upsertCrit(list, code, name, grp, range) {
+    const idx = list.findIndex(x => x.defect === code);
+    if(idx >= 0) list[idx] = { ...list[idx], range: range };
+    else list.push({ defect: code, name_vi: name, manual_group: grp, range: range });
+}
+
+function onInlineChange(idx, type, val, mode) {
+    const list=mode==='D'?CURR_CRIT:APP_CRIT; // Select list
+    const item = list[idx];
+    let arr = Array.isArray(item.range) ? [...item.range] : [item.range];
     
-    gradeSel.innerHTML = '<option>Đang tải mác thép...</option>';
+    // Determine new Min/Max
+    let max = arr[0] || 0; // Current Max
+    let min = arr[arr.length-1] || 0; // Current Min
     
-    if(!custName) {
-        gradeSel.innerHTML = '<option value="">-- Chọn Khách trước --</option>';
+    if(type===0) max = parseInt(val); // Updating Max
+    if(type===1) min = parseInt(val); // Updating Min
+    
+    list[idx].range = calcRange(max, min);
+    updateCharts(list, mode);
+}
+
+// RESTORED UI: Drag | Name | Dropdown -> Dropdown | X
+function renderCrit(list, bodyId, mode) {
+    document.getElementById(bodyId).innerHTML = list.map((x,i) => {
+        const arr = Array.isArray(x.range) ? x.range : [x.range];
+        const max = arr[0] || 6; 
+        const min = arr[arr.length-1] || 1;
+        
+        return `<tr class="crit-row">
+            <td style="width:20px;"><span class="drag-handle">☰</span></td>
+            <td><b>${x.name_vi||x.defect}</b></td>
+            <td style="text-align:right; white-space:nowrap; width:100px;">
+                <select class="inline-sel" onchange="onInlineChange(${i}, 0, this.value, '${mode}')">
+                    ${[1,2,3,4,5,6].map(v => `<option value="${v}" ${v==max?'selected':''}>${v}</option>`).join('')}
+                </select>
+                <span style="color:#94a3b8">➝</span>
+                <select class="inline-sel" onchange="onInlineChange(${i}, 1, this.value, '${mode}')">
+                    ${[1,2,3,4,5,6].map(v => `<option value="${v}" ${v==min?'selected':''}>${v}</option>`).join('')}
+                </select>
+            </td>
+            <td style="width:25px; text-align:center; color:red; cursor:pointer;" onclick="delItem(${i}, '${mode}')">✕</td>
+        </tr>`;
+    }).join('');
+}
+function delItem(i, mode) { const list=mode==='D'?CURR_CRIT:APP_CRIT; list.splice(i,1); renderCrit(list, mode==='D'?'draftCritBody':'appCritBody', mode); updateCharts(list, mode); }
+function clearCrit(){ CURR_CRIT=[]; renderCrit(CURR_CRIT,'draftCritBody','D'); updateCharts([], 'D'); }
+
+
+/* === RADAR CHART (AREA/FILL LOGIC) === */
+function initRadars(suffix) {
+    const opts = {
+        plugins: { legend: {display:false} },
+        scales: { r: { min:0, max:6, ticks:{stepSize:1, display:false}, pointLabels:{font:{size:8, weight:'bold'}, color:'#334155'} } },
+        maintainAspectRatio: false, responsive: true
+    };
+    // Helper to create chart with 2 datasets for Area effect
+    const create = (id, lbls, col) => new Chart(document.getElementById(id), {
+        type: 'radar',
+        data: { 
+            labels: lbls.map(code => DEFECT_MAP[code] || code), 
+            datasets: [
+                {   // Min Dataset
+                    data: Array(lbls.length).fill(0),
+                    borderColor: col.replace('0.2','0.8'), // Same color tone
+                    pointRadius: 2, 
+                    borderWidth: 1
+                },
+                {   // Max Dataset
+                    data: Array(lbls.length).fill(0),
+                    backgroundColor: col, 
+                    borderColor: col.replace('0.2','0.8'), 
+                    borderWidth: 2,
+                    fill: { target: 0, above: col } // Fill to index 0 (Min)
+                }
+            ] 
+        },
+        options: opts
+    });
+    
+    CHARTS[suffix] = {
+        surf: create(`cgSurf_${suffix}`, RADAR_LABELS.surf, 'rgba(239, 68, 68, 0.2)'),
+        geo:  create(`cgGeo_${suffix}`,  RADAR_LABELS.geo,  'rgba(34, 197, 94, 0.2)'),
+        prop: create(`cgProp_${suffix}`, RADAR_LABELS.prop, 'rgba(34, 197, 94, 0.2)'),
+        app:  create(`cgApp_${suffix}`,  RADAR_LABELS.app,  'rgba(168, 85, 247, 0.2)')
+    };
+}
+
+
+function updateCharts(list, suffix) {
+    const update = (key, labels) => {
+        const mins = []; const maxs = [];
+        labels.forEach(lbl => {
+            const item = list.find(x => x.name_vi === lbl || x.defect === lbl); 
+            if(!item) { 
+                mins.push(0); maxs.push(0); 
+            } else {
+                const vals = Array.isArray(item.range) ? item.range : [item.range];
+                mins.push(Math.min(...vals));
+                maxs.push(Math.max(...vals));
+            }
+        });
+        const c = CHARTS[suffix][key];
+        c.data.datasets[0].data = mins;
+        c.data.datasets[1].data = maxs;
+        c.update();
+    };
+    update('surf', RADAR_LABELS.surf); update('geo', RADAR_LABELS.geo);
+    update('prop', RADAR_LABELS.prop); update('app', RADAR_LABELS.app);
+}
+
+/* === BACKEND ACTIONS === */
+async function loadSapCust() { try { const r=await fetch('/api/sap/get_customers'); const j=await r.json(); document.getElementById('dlCust').innerHTML=j.data.map(x=>`<option value="${x}">`).join(''); } catch(e){} }
+function loadStaticGrades(x=[]) { document.getElementById('dlGrade').innerHTML=[...new Set([...COMMON_GRADES,...x])].map(v=>`<option value="${v}">`).join(''); }
+async function onSapCustInput(){ const c=document.getElementById('draftCust').value; if(c) { const r=await fetch('/api/sap/get_grades_by_cust', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer_name:c})}); const j=await r.json(); if(j.status=='success') loadStaticGrades(j.data); } }
+async function loadConfigs(){ try{const r=await fetch('/api/grade_configs'); GRADE_CONFIGS=await r.json();}catch(e){} }
+
+async function uploadPdf(){ const f=document.getElementById('pdfUp').files[0]; if(!f)return; const fd=new FormData(); fd.append('file',f); const r=await fetch('/api/upload_tdc_pdf',{method:'POST',body:fd}); const j=await r.json(); if(j.status=='success'){ document.getElementById('draftPdfPath').value=j.path; document.getElementById('draftPdfView').innerHTML=`<iframe src="${j.path}" class="pdf-iframe"></iframe>`; } else alert(j.msg); }
+async function saveDraft(st){
+    const p = { master_id: document.getElementById('draftId').value||null, customer_name: document.getElementById('draftCust').value, grade: document.getElementById('draftGrade').value, usage_purpose: document.getElementById('draftPurpose').value, tdc_code: document.getElementById('draftCode').value, valid_from: document.getElementById('draftFrom').value, valid_to: document.getElementById('draftTo').value, pdf_path: document.getElementById('draftPdfPath').value, criteria: CURR_CRIT, status: st };
+    
+    // Strict Validation
+    if(!p.customer_name) { alert('Thiếu tên khách hàng!'); return; }
+    if(!p.grade) { alert('Thiếu mác thép!'); return; }
+    if(!p.usage_purpose) { alert('Thiếu mục đích sử dụng!'); return; }
+    if(!p.tdc_code) { alert('Thiếu mã TDC!'); return; }
+    if(!p.valid_from) { alert('Chưa chọn ngày hiệu lực!'); return; }
+    if(!p.valid_to) { alert('Chưa chọn ngày hết hạn!'); return; }
+    if(new Date(p.valid_to) <= new Date(p.valid_from)) { alert('Ngày hết hạn phải lớn hơn ngày hiệu lực!'); return; }
+    if(!p.pdf_path) { alert('Thiếu file PDF!'); return; }
+    const requiredCodes = Object.values(RADAR_LABELS).flat(); 
+    const totalRequired = requiredCodes.length;
+    const currentCount = p.criteria.length;
+    // 2. VALIDATE ĐẦY ĐỦ
+    if (currentCount < totalRequired) {
+        const currentCodes = p.criteria.map(c => c.defect);
+        const missingCodes = requiredCodes.filter(code => !currentCodes.includes(code));
+        const missingNames = missingCodes.map(code => DEFECT_MAP[code] || code);
+
+        alert(`⚠️ THIẾU TIÊU CHUẨN!\n\nHệ thống yêu cầu đầy đủ ${totalRequired} hạng mục lỗi.\nBạn mới nhập: ${currentCount}/${totalRequired}.\n\nCác hạng mục còn thiếu:\n- ${missingNames.slice(0, 10).join('\n- ')}${missingNames.length > 10 ? '\n...và các lỗi khác' : ''}`);
         return;
     }
 
-    try {
-        // Gọi API lấy Grade theo Customer
-        const res = await fetch('/api/sap/get_grades_by_cust', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ customer_name: custName })
-        });
-        const json = await res.json();
-        
-        if(json.status === 'success' && json.data.length > 0) {
-            gradeSel.innerHTML = json.data.map(g => `<option value="${g}">${g}</option>`).join('');
-            // Sau khi load xong grade, trigger logic load lỗi
-            onGradeChange(); 
-        } else {
-            gradeSel.innerHTML = '<option value="">Khách này chưa có lịch sử Mác thép</option>';
-            // Nếu không có trên SAP, cho phép nhập tay bằng cách biến thành input (Optional)
-            // Hoặc add option "Khác"
-            gradeSel.innerHTML += '<option value="OTHER">Mác khác (Nhập tay Criteria)</option>';
-        }
-    } catch(e) { 
-        alert('Lỗi lấy Mác thép: ' + e);
-        gradeSel.innerHTML = '<option value="">Lỗi kết nối</option>';
-    }
+    const r=await fetch('/api/save_tdc_master',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}); const j=await r.json();
+    if(j.status=='success'){ alert(j.msg); resetDraft(); if(st=='Pending') switchTab('tabApproval'); } else alert(j.msg);
 }
-
-function onGradeChange() {
-    // Khi Mác thép thay đổi -> Load lại danh sách lỗi gợi ý (Unified Dropdown)
-    loadUnifiedDropdown();
-}
-function loadUnifiedDropdown() {
-    const grade = document.getElementById('gradeSelect').value;
-    
-    // Tìm config trong thư viện đã định nghĩa (GRADE_CONFIGS)
-    // Lưu ý: Mác từ SAP có thể là "SPHC", trong Config có thể là "SPHC" -> Khớp thì ngon
-    // Nếu SAP trả về "SPHC-1" mà Config chỉ có "SPHC" -> Cần logic mapping gần đúng nếu muốn xịn hơn
-    
-    const config = GRADE_CONFIGS[grade] || {}; 
-    
-    const select = document.getElementById('unifiedDefectSelect');
-    let html = '';
-
-    // Nhóm 1: Tự động (Chỉ hiện nếu tìm thấy Config khớp với tên Mác SAP)
-    if(Object.keys(config).length > 0) {
-        html += `<optgroup label="GỢI Ý (THEO CONFIG ${grade})">`;
-        Object.keys(config).forEach(k => {
-            html += `<option value="${k}" data-type="auto">${k}</option>`;
-        });
-        html += `</optgroup>`;
-    } else {
-        html += `<option disabled>-- Chưa có Config mẫu cho ${grade} --</option>`;
+function pasteCriteria() {
+    if (!CRIT_CLIPBOARD) {
+        alert("Bộ nhớ tạm đang trống!");
+        return;
     }
+    
+    if (CURR_CRIT.length > 0 && !confirm("Dữ liệu hiện tại sẽ bị ghi đè. Bạn chắc chắn?")) return;
+    
+    CURR_CRIT = JSON.parse(JSON.stringify(CRIT_CLIPBOARD));
+    renderCrit(CURR_CRIT, 'draftCritBody', 'D');
+    updateCharts(CURR_CRIT, 'D');
 
-    // Nhóm 2: Thủ công (Luôn hiện)
-    html += `<optgroup label="THƯ VIỆN LỖI CHUNG">`;
-    MANUAL_LIB.forEach(m => {
-        html += `<option value="${m.code}" data-type="manual">${m.name}</option>`;
+    // Tắt hiệu ứng phát sáng sau khi dán xong
+    document.getElementById('btnPaste').classList.remove('btn-paste-active');
+}
+function resetDraft(){ document.getElementById('draftId').value=''; document.getElementById('draftCust').value=''; document.getElementById('draftGrade').value=''; document.getElementById('draftPurpose').value=''; document.getElementById('draftCode').value=''; document.getElementById('draftFrom').value=''; document.getElementById('draftTo').value=''; document.getElementById('draftPdfPath').value=''; document.getElementById('draftPdfView').innerHTML='(Trống)'; document.getElementById('draftBadge').innerText='NEW'; clearCrit(); }
+function addAllDefault() {
+    const fromVal = parseInt(document.getElementById('selFrom').value);
+    const toVal = parseInt(document.getElementById('selTo').value);
+    const dynamicRange = calcRange(fromVal, toVal);
+    DEFECT_OPTS.forEach(d => {
+        upsertCrit(CURR_CRIT, d.code, d.name, d.grp, dynamicRange);
     });
-    html += `</optgroup>`;
-
-    select.innerHTML = html;
-    updateAllCharts();
+    renderCrit(CURR_CRIT, 'draftCritBody', 'D');
+    updateCharts(CURR_CRIT, 'D');
 }
-
-function addUnifiedCrit() {
-    const select = document.getElementById('unifiedDefectSelect');
-    const selectedOption = select.options[select.selectedIndex];
-    if(!selectedOption) return; 
-
-    const defectCode = select.value;
-    const type = selectedOption.getAttribute('data-type');
+async function loadPending(){ const r=await fetch('/api/get_tdc_pending'); const d=await r.json(); document.getElementById('pendingList').innerHTML=d.length?d.map(i=>`<div class="list-item" onclick='selPending(${JSON.stringify(i)})'><b>${i.customer_name}</b> <span class="badge badge-pending">Pending</span><br><span style="font-size:0.8em;color:#64748b;">${i.grade} | ${i.tdc_code} (v${i.version_no})</span></div>`).join(''):'<div style="text-align:center;padding:20px;">Trống</div>'; }
+function selPending(i){ 
+    PENDING_ITEM=i; 
+    APP_CRIT=JSON.parse(JSON.stringify(i.criteria||[])); // Safer deep copy
+    document.getElementById('appBadge').innerText=`v${i.version_no}`; 
+    document.getElementById('appCust').value=i.customer_name; 
+    document.getElementById('appGrade').value=i.grade; 
+    document.getElementById('appPurpose').value=i.usage_purpose; 
+    document.getElementById('appCode').value=i.tdc_code; 
     
-    // 1. LẤY RANGE TỪ GIAO DIỆN (Áp dụng cho cả Auto và Manual)
-    const s = parseInt(document.getElementById('rangeStart').value);
-    const e = parseInt(document.getElementById('rangeEnd').value);
-    const range = (s <= e) ? Array.from({length: e-s+1}, (_, i) => s + i) : Array.from({length: s-e+1}, (_, i) => s - i);
+    // Fix Date Sync
+    document.getElementById('appFrom').value = i.valid_from ? new Date(i.valid_from).toISOString().split('T')[0] : '';
+    document.getElementById('appTo').value = i.valid_to ? new Date(i.valid_to).toISOString().split('T')[0] : '';
 
-    let newItem = {
-        defect: defectCode,
-        target: s,
-        range: range, // Manual bây giờ cũng lưu range đầy đủ
-        type: type
-    };
-
-    // Nếu là Manual thì bổ sung thêm tên tiếng Việt và Group để vẽ Radar
-    if (type === 'manual') {
-        const libItem = MANUAL_LIB.find(x => x.code === defectCode);
-        newItem.name_vi = libItem.name;
-        newItem.manual_group = libItem.group;
-    }
-
-    // Check trùng và thêm
-    const idx = CURRENT_CRITERIA.findIndex(c => c.defect === newItem.defect);
-    if(idx >= 0) CURRENT_CRITERIA[idx] = newItem; 
-    else CURRENT_CRITERIA.push(newItem);
+    document.getElementById('appPdf').innerHTML=i.pdf_path?`<iframe src="${i.pdf_path}" class="pdf-iframe"></iframe>`:'No PDF'; 
+    renderCrit(APP_CRIT,'appCritBody','A'); updateCharts(APP_CRIT,'A'); 
+}
+async function confirmApp(){ 
+    if(!PENDING_ITEM || !confirm('Duyệt?')) return; 
+    const p={ version_id: PENDING_ITEM.version_id, customer_name: document.getElementById('appCust').value, grade: document.getElementById('appGrade').value, usage_purpose: document.getElementById('appPurpose').value, valid_from: document.getElementById('appFrom').value, valid_to: document.getElementById('appTo').value, criteria: APP_CRIT }; 
     
-    renderCriteriaList();
+    // Strict Validation
+    if(!p.customer_name) { alert('Thiếu tên khách hàng!'); return; }
+    if(!p.grade) { alert('Thiếu mác thép!'); return; }
+    if(!p.usage_purpose) { alert('Thiếu mục đích sử dụng!'); return; }
+    if(!p.valid_from) { alert('Chưa chọn ngày hiệu lực!'); return; }
+    if(!p.valid_to) { alert('Chưa chọn ngày hết hạn!'); return; }
+    if(new Date(p.valid_to) <= new Date(p.valid_from)) { alert('Ngày hết hạn phải lớn hơn ngày hiệu lực!'); return; }
+    if(!PENDING_ITEM.pdf_path) { alert('Thiếu file PDF!'); return; }
+    if(!p.criteria || p.criteria.length === 0) { alert('Danh sách tiêu chuẩn lỗi không được trống!'); return; }
+
+    const r=await fetch('/api/confirm_tdc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}); const j=await r.json(); if(j.status=='success'){ alert('Đã duyệt!'); loadPending(); resetApp(); } else alert(j.msg); 
 }
-// --- LOGIC CỘT 1: DANH SÁCH TDC (SỬA LẠI: Group theo Khách -> Mục đích) ---
-async function loadTDCList() {
-    const container = document.getElementById('tdcListContainer');
-    container.innerHTML = '<div style="text-align:center; padding:20px;">⏳ Đang tải dữ liệu từ SAP...</div>';
+async function rejectApp(){ if(!PENDING_ITEM || !confirm('Từ chối?')) return; const r=await fetch('/api/reject_tdc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version_id:PENDING_ITEM.version_id})}); const j=await r.json(); if(j.status=='success'){ alert('Đã từ chối!'); loadPending(); resetApp(); } else alert(j.msg); }
+function resetApp(){ document.getElementById('appCust').value=''; document.getElementById('appPdf').innerHTML='PDF'; APP_CRIT=[]; renderCrit([], 'appCritBody', 'A'); updateCharts([], 'A'); }
 
-    try {
-        // 1. Gọi song song 2 API: Lấy TDC hiện có (DB) và Lấy Khách hàng (SAP)
-        const [resTdc, resSap] = await Promise.all([
-            fetch('/api/get_tdc_library'),
-            fetch('/api/sap/get_customers')
-        ]);
-
-        const dbData = await resTdc.json();
-        const sapRes = await resSap.json();
-        const sapCustomers = sapRes.data || []; // List string tên khách
-
-        // 2. Cấu trúc dữ liệu Tree
-        // Master Tree: Key là Tên khách hàng
-        const tree = {};
-
-        // BƯỚC A: Khởi tạo khung từ SAP (Để đảm bảo khách nào trên SAP cũng hiện ra)
-        sapCustomers.forEach(cust => {
-            tree[cust] = { 
-                has_data: false, // Đánh dấu chưa có TDC
-                grades: {}       // Chứa các mác thép
-            };
-        });
-
-        // BƯỚC B: Đổ dữ liệu DB vào Tree
-        dbData.forEach(item => {
-            const cust = item.customer_name || 'KHÁCH LẺ';
-            
-            // Nếu khách có trong DB mà không có trong SAP (Dữ liệu cũ), vẫn tạo mới
-            if (!tree[cust]) tree[cust] = { has_data: true, grades: {} };
-            
-            tree[cust].has_data = true; // Đánh dấu là đã có TDC
-            
-            const grade = item.grade || 'KHÁC';
-            if (!tree[cust].grades[grade]) tree[cust].grades[grade] = [];
-            tree[cust].grades[grade].push(item);
-        });
-
-        // 3. Render HTML
-        let html = '';
-        // Sắp xếp tên khách hàng A-Z
-        const sortedCusts = Object.keys(tree).sort();
-
-        sortedCusts.forEach(cust => {
-            const data = tree[cust];
-            const gradeKeys = Object.keys(data.grades);
-            
-            let totalTDC = 0;
-            gradeKeys.forEach(g => totalTDC += data.grades[g].length);
-            
-            const badgeClass = totalTDC > 0 ? 'badge-active' : '';
-            // Icon tòa nhà hoặc avatar chữ cái đầu
-            const firstLetter = cust.charAt(0).toUpperCase();
-
-            html += `
-            <div class="cust-group" id="grp_${cust}">
-                <div class="tree-cust" onclick="toggleDisplay(this)">
-                    <div style="display:flex; align-items:center;">
-                        <span class="cust-icon">${firstLetter}</span>
-                        <span style="line-height:1.2;">${cust}</span>
-                    </div>
-                    <div style="display:flex; align-items:center;">
-                        <button class="btn-quick-add" onclick="quickAddTDC('${cust}', event)" title="Thêm tiêu chuẩn cho ${cust}">+</button>
-                        <span class="badge-count ${badgeClass}">${totalTDC}</span>
-                    </div>
-                </div>
-                
-                <div class="tree-body">`;
-            
-            if (gradeKeys.length === 0) {
-                html += `<div style="padding:15px; font-style:italic; color:#94a3b8; font-size:0.85em; text-align:center;">
-                            Chưa có thiết lập nào.<br>Bấm <b style="color:#2563eb">+</b> để tạo mới.
-                         </div>`;
-            } else {
-                gradeKeys.forEach(grade => {
-                    html += `<div class="tree-grade">${grade}</div>`;
-                    data.grades[grade].forEach(it => {
-                        html += `
-                        <div class="tree-item" onclick='selectTDC(${JSON.stringify(it)})'>
-                            <div style="color:#1e293b; margin-bottom:2px;">${it.usage_purpose}</div>
-                            <div class="code-pill">${it.tdc_code}</div>
-                        </div>`;
-                    });
-                });
-            }
-            html += `</div></div>`;
-        });
-
-        container.innerHTML = html;
-
-    } catch (e) {
-        console.error(e);
-        container.innerHTML = `<div style="color:red; padding:10px;">Lỗi tải dữ liệu: ${e.message}</div>`;
-    }
-}
-async function quickAddTDC(custName, event) {
-    event.stopPropagation(); // Không đóng/mở menu
-    
-    // 1. Reset Form
-    createNewTDC();
-    
-    // 2. Điền tên khách hàng (vào ô input hoặc datalist)
-    document.getElementById('custName').value = custName;
-    
-    // 3. Trigger load Mác thép ngay lập tức
-    // Giả lập sự kiện change để gọi hàm onSapCustChange (đã viết ở bước trước)
-    await onSapCustChange(); 
-    
-    // 4. Focus vào ô tiếp theo
-    document.getElementById('gradeSelect').focus();
-    
-    // 5. Cập nhật tiêu đề để người dùng biết
-    document.getElementById('detailTitle').innerHTML = `Tạo mới cho: <span style="color:#e11d48">${custName}</span>`;
-}
-function addTdcForCust(custName, event) {
-    event.stopPropagation();
-    createNewTDC();
-    document.getElementById('custName').value = custName;
-    document.getElementById('usagePurpose').focus();
-}
-function toggleDisplay(element) {
-    const parent = element.parentElement;
-    const body = parent.querySelector('.tree-body');
-    const icon = element.querySelector('span'); // Mũi tên
-    
-    // Nếu không có body (do chưa có dữ liệu) thì thoát luôn
-    if (!body) return;
-
-    if (body.style.display === 'block') {
-        body.style.display = 'none';
-        parent.classList.remove('open');
-        if(icon) icon.style.transform = 'rotate(0deg)';
-    } else {
-        body.style.display = 'block';
-        parent.classList.add('open');
-        if(icon) icon.style.transform = 'rotate(90deg)'; // Xoay mũi tên xuống
-    }
-}
-// --- LOGIC CỘT 2: FORM & PDF ---
-function createNewTDC() {
-    document.getElementById('tdcId').value = ''; // ID rỗng = Tạo mới
-    document.getElementById('custName').value = '';
-    document.getElementById('usagePurpose').value = '';
-    document.getElementById('tdcCode').value = '';
-    
-    CURRENT_CRITERIA = [];
-    renderCriteriaList(); // Xóa sạch list lỗi
-    clearPDF(); // Xóa PDF
-    document.getElementById('detailTitle').innerText = "Tạo Tiêu Chuẩn Mới";
-}
-
-function selectTDC(item) {
-    // 1. Fill thông tin
-    document.getElementById('tdcId').value = item.id;
-    document.getElementById('custName').value = item.customer_name;
-    document.getElementById('usagePurpose').value = item.usage_purpose;
-    document.getElementById('tdcCode').value = item.tdc_code;
-
-    // 2. Xử lý Mác thép
-    const gradeSel = document.getElementById('gradeSelect');
-    gradeSel.innerHTML = `<option value="${item.grade}" selected>${item.grade}</option>`;
-
-    fetch('/api/sap/get_grades_by_cust', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ customer_name: item.customer_name })
-    }).then(r => r.json()).then(json => {
-        if(json.status === 'success') {
-            const currentGrade = item.grade;
-            let opts = json.data.map(g => `<option value="${g}" ${g===currentGrade?'selected':''}>${g}</option>`).join('');
-            // Nếu mác hiện tại không nằm trong list SAP trả về (do lịch sử cũ), append nó vào
-            if(!json.data.includes(currentGrade)) {
-                opts += `<option value="${currentGrade}" selected>${currentGrade} (Lịch sử)</option>`;
-            }
-            gradeSel.innerHTML = opts;
-        }
-    });
-
-    loadUnifiedDropdown(); 
-
-    // 3. Criteria & PDF (Giữ nguyên)
-    CURRENT_CRITERIA = item.criteria || [];
-    renderCriteriaList(); 
-    document.getElementById('detailTitle').innerText = `Sửa: ${item.tdc_code}`;
-    CURRENT_PDF_PATH = item.pdf_path || "";
-    renderPDF();
-}
-
-async function handlePdfSelect() {
-    const file = document.getElementById('pdfInput').files[0];
-    if(!file) return;
-
-    // Upload ngay khi chọn file
-    const fd = new FormData();
-    fd.append('file', file);
-    
-    // Gọi API upload
-    try {
-        const res = await fetch('/api/upload_tdc_pdf', { method:'POST', body:fd });
-        const d = await res.json();
-        if(d.status === 'success') {
-            CURRENT_PDF_PATH = d.path;
-            renderPDF();
-        } else {
-            alert('Lỗi upload PDF: ' + d.msg);
-        }
-    } catch(e) { alert('Lỗi: ' + e); }
-}
-
-function renderPDF() {
-    const div = document.getElementById('pdfPreview');
-    if(CURRENT_PDF_PATH) {
-        div.innerHTML = `<iframe src="${CURRENT_PDF_PATH}#navpanes=0&toolbar=0&view=FitH" class="pdf-iframe"></iframe>`;
-        document.getElementById('pdfPathVal').value = CURRENT_PDF_PATH;
-    } else {
-        div.innerHTML = `<span style="color:#94a3b8;">(Chưa có file PDF)</span>`;
-        document.getElementById('pdfPathVal').value = "";
-    }
-}
-
-function clearPDF() {
-    CURRENT_PDF_PATH = "";
-    renderPDF();
-    document.getElementById('pdfInput').value = "";
-}
-
-// --- LOGIC CỘT 3: RADAR & CRITERIA (GIỮ NGUYÊN CODE CŨ CỦA BẠN) ---
-function loadGradeConfig() {
-    const g = document.getElementById('gradeSelect').value;
-    const cfg = GRADE_CONFIGS[g];
-    if(!cfg) return;
-    document.getElementById('defectSelect').innerHTML = Object.keys(cfg).map(k => `<option value="${k}">${k}</option>`).join('');
-    updateAllCharts();
-}
-
-function addCrit() {
-    const d = document.getElementById('defectSelect').value;
-    const s = parseInt(document.getElementById('rangeStart').value);
-    const e = parseInt(document.getElementById('rangeEnd').value);
-    const range = (s <= e) ? Array.from({length: e-s+1}, (_, i) => s + i) : Array.from({length: s-e+1}, (_, i) => s - i);
-    
-    const idx = CURRENT_CRITERIA.findIndex(c => c.defect === d);
-    if(idx >= 0) CURRENT_CRITERIA[idx].range = range; // Update nếu đã có
-    else CURRENT_CRITERIA.push({ defect: d, target: s, range: range });
-    
-    renderCriteriaList();
-}
-
-function addAllDefects() {
-    const g = document.getElementById('gradeSelect').value;
-    const cfg = GRADE_CONFIGS[g];
-    if(!cfg) return;
-
-    // Lấy Range hiện tại đang chọn trên giao diện
-    const s = parseInt(document.getElementById('rangeStart').value);
-    const e = parseInt(document.getElementById('rangeEnd').value);
-    const range = (s <= e) ? Array.from({length: e-s+1}, (_, i) => s + i) : Array.from({length: s-e+1}, (_, i) => s - i);
-
-    // 1. Thêm Auto
-    Object.keys(cfg).forEach(k => {
-        if(!CURRENT_CRITERIA.find(c => c.defect === k)) {
-            CURRENT_CRITERIA.push({ defect: k, target: s, range: [...range], type: 'auto' });
-        }
-    });
-
-    // 2. Thêm Manual (Cũng dùng range C1-C6 y hệt)
-    MANUAL_LIB.forEach(m => {
-        if(!CURRENT_CRITERIA.find(c => c.defect === m.code)) {
-            CURRENT_CRITERIA.push({ 
-                defect: m.code, 
-                name_vi: m.name, 
-                type: 'manual', 
-                manual_group: m.group,
-                target: s,
-                range: [...range] // <--- QUAN TRỌNG: Lưu range giống hệt Auto
+/* === LIBRARY SEARCH & TREE (Search Maintained) === */
+async function loadLib(){
+    const r=await fetch('/api/get_tdc_library'); const d=await r.json();
+    const tree={}; d.forEach(x=>{ if(!tree[x.customer_name]) tree[x.customer_name]={}; if(!tree[x.customer_name][x.grade]) tree[x.customer_name][x.grade]=[]; tree[x.customer_name][x.grade].push(x); });
+    let h=''; 
+    Object.keys(tree).sort().forEach(cust=>{
+        h+=`<div class="tree-group-cust" data-cust="${cust.toLowerCase()}"><div class="tree-folder" onclick="toggleTree(this)">📂 ${cust} <span style="font-size:0.8em;opacity:0.7">(${Object.keys(tree[cust]).length})</span></div><div class="tree-content">`;
+        Object.keys(tree[cust]).sort().forEach(gr=>{
+            h+=`<div class="tree-group-grade"><div class="tree-folder" style="padding-left:20px;background:white;" onclick="toggleTree(this)">📄 ${gr}</div><div class="tree-content" style="padding-left:30px;">`;
+            tree[cust][gr].forEach(i=>{
+                const sTxt = `${i.usage_purpose} ${i.tdc_code}`.toLowerCase();
+                h+=`<div class="list-item" data-search="${sTxt}" onclick='selLib(${JSON.stringify(i)})'>
+                        ${i.usage_purpose} <span class="badge badge-active">v${i.version_no}</span>
+                        <div style="font-size:0.75em;color:gray;">${fmtDate(i.valid_from)} - ${fmtDate(i.valid_to)}</div>
+                    </div>`;
             });
-        }
+            h+=`</div></div>`;
+        });
+        h+=`</div></div>`;
     });
-
-    renderCriteriaList();
+    document.getElementById('libTree').innerHTML=h;
 }
-// Render danh sách lỗi (Có Kéo Thả)
-function renderCriteriaList() {
-    const div = document.getElementById('critList');
+function toggleTree(el){ el.nextElementSibling.classList.toggle('open'); }
+function filterLib(val){
+    val=val.toLowerCase().trim();
+    document.querySelectorAll('.tree-group-cust').forEach(cg=>{
+        const custMatch = cg.getAttribute('data-cust').includes(val);
+        let visGrade=false;
+        cg.querySelectorAll('.tree-group-grade').forEach(gg=>{
+            let visItem=false;
+            gg.querySelectorAll('.list-item').forEach(it=>{
+                const v = !val || custMatch || it.getAttribute('data-search').includes(val);
+                it.style.display=v?'block':'none';
+                if(v) visItem=true;
+            });
+            gg.style.display=visItem?'block':'none';
+            if(visItem) { visGrade=true; if(val) gg.querySelector('.tree-content').classList.add('open'); } 
+            else if(val) gg.querySelector('.tree-content').classList.remove('open');
+        });
+        cg.style.display=visGrade?'block':'none';
+        if(visGrade) { if(val) cg.querySelector('.tree-content').classList.add('open'); }
+        else if(val) cg.querySelector('.tree-content').classList.remove('open');
+    });
+}
+async function selLib(i){
+    LIB_ITEM = i; 
     
-    div.innerHTML = CURRENT_CRITERIA.map((c, i) => {
-        let style = '';
-        let labelHtml = '';
+    // 1. Kiểm tra trạng thái để ẩn/hiện nút Gia hạn
+    const btnRenew = document.getElementById('btnRenew');
+    btnRenew.style.display = (i.status === 'Active') ? 'block' : 'none';
+    
+    // 2. Hiển thị thông tin Header
+    document.getElementById('libInfo').innerHTML = `
+        <h2 style="margin:0; font-size:1.4em; color:#2563eb;">${i.customer_name}</h2>
+        <div style="font-weight:600; font-size:1.1em; color:#475569; margin:5px 0;">${i.grade} | ${i.usage_purpose}</div>
+        <div style="background:#f1f5f9; padding:4px 8px; border-radius:4px; display:inline-block; font-family:monospace; font-weight:bold;">Code: ${i.tdc_code}</div>
+    `;
 
-        // Tạo chuỗi Option cho dropdown C1-C6
-        const s = c.range[0];
-        const e = c.range[c.range.length - 1];
-        const opts = (val) => [1,2,3,4,5,6].map(v => `<option value="${v}" ${v===val?'selected':''}>C${v}</option>`).join('');
-        
-        // Dropdown chọn Range (Dùng chung cho cả 2 loại)
-        const rangeSelectHtml = `
-            <div style="margin-left:auto; display:flex; align-items:center; gap:2px;">
-                <select class="mini-select" onchange="updCrit(${i},'s',this.value)">${opts(s)}</select> ➔ 
-                <select class="mini-select" onchange="updCrit(${i},'e',this.value)">${opts(e)}</select>
-            </div>
-        `;
-
-        if (c.type === 'manual') {
-            // Manual: Màu Cam + Tên Tiếng Việt
-            style = 'border-left: 4px solid #ea580c; background: #fff7ed;';
-            labelHtml = `<b style="color:#c2410c;">👁️ ${c.name_vi || c.defect}</b>`;
-        } else {
-            // Auto: Màu Xanh + Tên Code
-            style = 'border-left: 4px solid #2563eb; background: #fff;';
-            labelHtml = `<b style="color:#0f172a;">${c.defect}</b>`;
-        }
-
-        return `
-        <div class="crit-row" draggable="true" data-index="${i}" style="${style} display:flex; align-items:center; padding:8px; margin-bottom:5px; border-radius:4px; border:1px solid #e2e8f0;">
-            <span style="color:#cbd5e1; cursor:grab; margin-right:8px;" title="Kéo để sắp xếp">☰</span>
-            <div style="flex:1;">${labelHtml}</div>
-            ${rangeSelectHtml}
-            <button onclick="CURRENT_CRITERIA.splice(${i},1); renderCriteriaList()" class="btn-x" style="color:#ef4444; margin-left:10px;" title="Xóa">✕</button>
-        </div>`;
-    }).join('');
-
-    addDragEvents();
-    updateAllCharts();
-}
-function addDragEvents() {
-    const rows = document.querySelectorAll('.crit-row');
-    rows.forEach(row => {
-        row.addEventListener('dragstart', handleDragStart);
-        row.addEventListener('dragover', handleDragOver);
-        row.addEventListener('dragleave', handleDragLeave);
-        row.addEventListener('drop', handleDrop);
-        row.addEventListener('dragend', handleDragEnd);
+    // 3. Hiển thị nội dung (PDF, Criteria, Radar)
+    document.getElementById('libPdf').innerHTML = i.pdf_path ? `<iframe src="${i.pdf_path}" class="pdf-iframe"></iframe>` : 'No PDF';
+    renderCrit(i.criteria || [], 'libCritBody', 'L'); 
+    updateCharts(i.criteria || [], 'L');
+    
+    // 4. Tải lịch sử và gắn sự kiện click
+    const r = await fetch('/api/get_tdc_history', {
+        method: 'POST', 
+        headers: {'Content-Type': 'application/json'}, 
+        body: JSON.stringify({ master_id: i.id })
     });
-}
-let dragSrcIndex = null;
-
-function handleDragStart(e) { this.classList.add('dragging'); dragSrcIndex = parseInt(this.getAttribute('data-index')); e.dataTransfer.effectAllowed = 'move'; }
-function handleDragOver(e) { if (e.preventDefault) e.preventDefault(); this.classList.add('drag-over'); e.dataTransfer.dropEffect = 'move'; return false; }
-function handleDragLeave(e) { this.classList.remove('drag-over'); }
-function handleDrop(e) {
-    if (e.stopPropagation) e.stopPropagation();
-    const targetIndex = parseInt(this.getAttribute('data-index'));
-    if (dragSrcIndex !== null && dragSrcIndex !== targetIndex) {
-        const itemToMove = CURRENT_CRITERIA.splice(dragSrcIndex, 1)[0];
-        CURRENT_CRITERIA.splice(targetIndex, 0, itemToMove);
-        renderCriteriaList();
+    const j = await r.json();
+    if(j.status == 'success') {
+        LIB_HISTORY_DATA = j.data; // Lưu vào biến toàn cục
+        document.getElementById('libHist').innerHTML = j.data.map((v, idx) => {
+            let bgClass = (v.status === 'Active') ? 'badge-active' : (v.status === 'Rejected' ? 'badge-rejected' : 'badge-expired');
+            
+            // THÊM: onclick="selectHistoryVersion(${idx})"
+            return `
+                <div class="list-item" style="border:none; border-bottom:1px solid #eee; padding:6px 0; cursor:pointer;" onclick="selectHistoryVersion(${idx})">
+                    <span class="badge ${bgClass}">${v.status}</span> 
+                    <strong style="margin-left:5px;">v${v.version_no}</strong>
+                    <span style="font-size:0.85em; color:#64748b; margin-left:10px;">
+                        (${fmtDate(v.valid_from)} - ${fmtDate(v.valid_to)})
+                    </span>
+                </div>`;
+        }).join('');
     }
-    return false;
 }
-function handleDragEnd(e) { this.classList.remove('dragging'); document.querySelectorAll('.crit-row').forEach(row => row.classList.remove('drag-over')); }
+function selectHistoryVersion(idx) {
+    const v = LIB_HISTORY_DATA[idx];
+    if(!v) return;
 
-function updCrit(i, type, val) {
-    const item = CURRENT_CRITERIA[i];
-    
-    // Không còn dòng chặn manual ở đây nữa -> Cho phép sửa hết
-    let s = item.range[0];
-    let e = item.range[item.range.length - 1];
-    
-    if(type==='s') s = parseInt(val); else e = parseInt(val);
-    
-    // Tính lại mảng range
-    item.range = (s <= e) ? Array.from({length: e-s+1}, (_, k) => s + k) : Array.from({length: s-e+1}, (_, k) => s - k);
-    item.target = s;
-    
-    updateAllCharts();
-}
+    // Cập nhật PDF, Bảng tiêu chuẩn và Radar
+    document.getElementById('libPdf').innerHTML = v.pdf_path ? `<iframe src="${v.pdf_path}" class="pdf-iframe"></iframe>` : 'No PDF';
+    renderCrit(v.criteria || [], 'libCritBody', 'L'); 
+    updateCharts(v.criteria || [], 'L');
 
-// Vẽ Radar
-function initRadars() {
-    const opts = { scales: { r: { min: 0, max: 6, ticks: { display: false } } }, plugins: { legend: { display: false } }, maintainAspectRatio: false, responsive: true };
-    CHARTS.surf = new Chart(document.getElementById('radarSurf'), { type: 'radar', options: opts, data: { labels: [], datasets: [] } });
-    CHARTS.geo = new Chart(document.getElementById('radarGeo'), { type: 'radar', options: opts, data: { labels: [], datasets: [] } });
-    CHARTS.prop = new Chart(document.getElementById('radarProp'), { type: 'radar', options: opts, data: { labels: [], datasets: [] } });
-    CHARTS.app = new Chart(document.getElementById('radarApp'), { type: 'radar', options: opts, data: { labels: [], datasets: [] } });
-}
-
-function updateAllCharts() {
-    const grade = document.getElementById('gradeSelect').value;
-    const config = GRADE_CONFIGS[grade];
-    
-    const groups = { surface: [], geometry: [], prop: [], app: [] };
-
-    // 1. Phân loại Auto
-    if (config) {
-        for (const [key, val] of Object.entries(config)) {
-            if (val.group === 'surface') groups.surface.push(key);
-            else if (val.group === 'geometry') groups.geometry.push(key);
-            else if (val.group === 'mechanical' || val.group === 'chemical') groups.prop.push(key);
-        }
+    // Ẩn nút Gia hạn/Edit nếu không phải bản Active
+    const btnRenew = document.getElementById('btnRenew');
+    if(v.status === 'Active') {
+        LIB_ITEM = v; // Cập nhật LIB_ITEM để nếu nhấn Gia hạn thì lấy đúng bản v3 này
+        btnRenew.style.display = 'block';
+    } else {
+        btnRenew.style.display = 'none'; // Khóa edit cho bản Expired/Rejected
     }
-
-    // 2. Phân loại Manual
-    CURRENT_CRITERIA.forEach(c => {
-        if (groups.surface.includes(c.defect) || groups.geometry.includes(c.defect) || groups.prop.includes(c.defect)) return;
-        if (c.type === 'manual') {
-            if (c.manual_group === 'surface') groups.surface.push(c.defect);
-            else if (c.manual_group === 'geometry') groups.geometry.push(c.defect);
-            else if (c.manual_group === 'app') groups.app.push(c.defect);
-        }
-    });
-
-    const getDisplayName = (keys) => keys.map(k => {
-        const manualItem = MANUAL_LIB.find(m => m.code === k);
-        return manualItem ? manualItem.name.split(' (')[0] : k;
-    });
-
-    // [LOGIC MỚI] Tính toán Min và Max cho từng tiêu chí
-    const buildMinMax = (keys) => {
-        const mins = [], maxs = [];
-        keys.forEach(k => {
-            const f = CURRENT_CRITERIA.find(c => c.defect === k);
-            if (f && f.range && f.range.length) {
-                mins.push(Math.min(...f.range));
-                maxs.push(Math.max(...f.range));
-            } else {
-                // Nếu không có config, mặc định là 0-6 (hoặc 0-0 tùy logic của bạn, ở đây để 0-6 cho dễ nhìn)
-                mins.push(0);
-                maxs.push(6);
-            }
-        });
-        return { mins, maxs };
-    };
-
-    const updateOne = (chart, keys, color) => {
-        if (!chart) return; 
-        const { mins, maxs } = buildMinMax(keys);
-
-        chart.data.labels = getDisplayName(keys); 
-        chart.data.datasets = [
-            // Dataset 1: Max Limit (Đường đứt nét bên ngoài)
-            { 
-                label: 'Max',
-                data: maxs, 
-                borderColor: '#16a34a', // Màu xanh lá chuẩn TDC
-                borderWidth: 1, 
-                borderDash: [5, 5],
-                fill: false, // Không tô xuống tâm
-                pointRadius: 0
-            },
-            // Dataset 2: Min Limit (Đường đứt nét bên trong - Tô màu lên Max)
-            { 
-                label: 'Min',
-                data: mins, 
-                borderColor: '#16a34a',
-                borderWidth: 1, 
-                borderDash: [5, 5],
-                fill: '-1', // [QUAN TRỌNG] Tô màu khoảng cách đến dataset trước đó (Max)
-                backgroundColor: 'rgba(22, 163, 74, 0.1)', // Màu nền xanh nhạt giữa 2 đường
-                pointRadius: 0
-            }
-        ];
-        
-        // Cấu hình lại scale để đảm bảo 0 nằm ở tâm và max là 6
-        chart.options.scales.r.min = 0;
-        chart.options.scales.r.max = 6;
-        
-        chart.update();
-    };
-
-    updateOne(CHARTS.surf, groups.surface, 'rgba(220, 38, 38, 1)');
-    updateOne(CHARTS.geo,  groups.geometry, 'rgba(37, 99, 235, 1)');
-    updateOne(CHARTS.prop, groups.prop,     'rgba(22, 163, 74, 1)');
-    updateOne(CHARTS.app,  groups.app,      'rgba(147, 51, 234, 1)');
 }
-
-// --- LOGIC LƯU TRỮ (GIỮ NGUYÊN) ---
-async function saveTDC() {
-    const payload = {
-        id: document.getElementById('tdcId').value || null, 
-        customer_name: document.getElementById('custName').value,
-        usage_purpose: document.getElementById('usagePurpose').value,
-        tdc_code: document.getElementById('tdcCode').value,
-        grade: document.getElementById('gradeSelect').value,
-        criteria: CURRENT_CRITERIA,
-        pdf_path: CURRENT_PDF_PATH
-    };
-
-    if(!payload.customer_name || !payload.usage_purpose) return alert("Thiếu Tên Khách hoặc Mục đích sử dụng!");
+function copyLibCriteria() {
+    if (!LIB_ITEM || !LIB_ITEM.criteria) {
+        alert("Vui lòng chọn một tiêu chuẩn trong thư viện để copy!");
+        return;
+    }
+    CRIT_CLIPBOARD = JSON.parse(JSON.stringify(LIB_ITEM.criteria));
     
-    try {
-        const res = await fetch('/api/save_tdc_master', { 
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'}, 
-            body: JSON.stringify(payload) 
-        });
-        const d = await res.json();
-        if(d.status === 'success') { 
-            alert(d.msg); 
-            loadTDCList(); 
-            if(!payload.id) createNewTDC(); 
-        }
-    } catch(e) { alert("Lỗi kết nối: " + e); }
+    // Hiệu ứng cho nút Dán ở tab Editor
+    const btnPaste = document.getElementById('btnPaste');
+    if(btnPaste) btnPaste.classList.add('btn-paste-active');
+    
+    alert(`✅ Đã copy tiêu chuẩn của khách hàng ${LIB_ITEM.customer_name}`);
 }
-
-// --- LOGIC LƯU TRỮ (GỌI API MỚI) ---
-async function saveTDC() {
-    const payload = {
-        id: document.getElementById('tdcId').value || null, 
-        customer_name: document.getElementById('custName').value,
-        usage_purpose: document.getElementById('usagePurpose').value,
-        tdc_code: document.getElementById('tdcCode').value,
-        grade: document.getElementById('gradeSelect').value,
-        criteria: CURRENT_CRITERIA,
-        pdf_path: CURRENT_PDF_PATH
-    };
-
-    if(!payload.customer_name || !payload.usage_purpose) return alert("Thiếu Tên Khách hoặc Mục đích sử dụng!");
+function renewLib(){ 
+    if(!LIB_ITEM)return; 
+    switchTab('tabDraft'); 
+    const i=LIB_ITEM; 
+    document.getElementById('draftId').value=i.id; 
+    document.getElementById('draftCust').value=i.customer_name; 
+    document.getElementById('draftGrade').value=i.grade; 
+    document.getElementById('draftPurpose').value=i.usage_purpose; 
+    document.getElementById('draftCode').value=i.tdc_code; 
     
-    try {
-        const res = await fetch('/api/save_tdc_master', { 
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'}, 
-            body: JSON.stringify(payload) 
-        });
-        const d = await res.json();
-        
-        if(d.status === 'success') { 
-            alert(d.msg); 
-            loadTDCList(); 
-            if(!payload.id) createNewTDC(); 
-            alert(d.msg); 
-        }
-    } catch(e) { alert("Lỗi kết nối: " + e); }
-}
-// --- LOGIC LỌC DANH SÁCH (CLIENT-SIDE SEARCH) ---
-function filterCustList() {
-    // 1. Lấy từ khóa, chuyển về chữ thường
-    const term = document.getElementById('searchCust').value.toLowerCase();
+    document.getElementById('draftFrom').value = new Date().toISOString().split('T')[0]; 
+    document.getElementById('draftTo').value = ''; 
     
-    // 2. Lấy tất cả các nhóm khách hàng
-    const groups = document.querySelectorAll('.cust-group');
+    document.getElementById('draftPdfPath').value=i.pdf_path; 
+    if(i.pdf_path) document.getElementById('draftPdfView').innerHTML=`<iframe src="${i.pdf_path}" class="pdf-iframe"></iframe>`; 
+    CURR_CRIT = JSON.parse(JSON.stringify(i.criteria||[])); 
     
-    groups.forEach(group => {
-        // Lấy nội dung text của cả nhóm (Bao gồm Tên khách, Mác thép, Code...)
-        const textContent = group.innerText.toLowerCase();
-        
-        // 3. Kiểm tra: Nếu từ khóa xuất hiện trong nội dung -> Hiện, ngược lại -> Ẩn
-        if (textContent.includes(term)) {
-            group.style.display = 'block';
-        } else {
-            group.style.display = 'none';
-        }
-    });
+    renderCrit(CURR_CRIT,'draftCritBody','D'); 
+    updateCharts(CURR_CRIT,'D'); 
+    document.getElementById('draftBadge').innerText='RENEW v'+(i.version_no+1); 
 }
 </script>
 {% endblock %}

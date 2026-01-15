@@ -3,50 +3,154 @@
 
 {% block head %}
 <style>
-    /* LAYOUT 2 CỘT */
-    .hist-layout { display: grid; grid-template-columns: 350px 1fr; height: calc(100vh - 70px); background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; margin: 10px; overflow: hidden; }
-    
-    /* SIDEBAR */
-    .history-sidebar { background: #f8fafc; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; }
-    .sidebar-search { padding: 12px; border-bottom: 1px solid #e2e8f0; background: white; }
+    /* --- 1. LAYOUT CHÍNH (CỐ ĐỊNH CHIỀU CAO MÀN HÌNH) --- */
+    .hist-layout { 
+        display: grid; 
+        grid-template-columns: 350px 1fr; 
+        height: calc(100vh - 20px); /* Fix chiều cao để không bị tràn body */
+        background: #fff; 
+        margin: 10px; 
+        border-radius: 8px; 
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); 
+        overflow: hidden; 
+    }
+
+    /* --- 2. SIDEBAR (BÊN TRÁI) --- */
+    .history-sidebar { 
+        background: #f8fafc; 
+        border-right: 1px solid #e2e8f0; 
+        display: flex; 
+        flex-direction: column; 
+        height: 100%; 
+        overflow: hidden;
+    }
+    .sidebar-search { padding: 12px; border-bottom: 1px solid #e2e8f0; background: white; flex-shrink: 0; }
     .inp-search { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; }
     
     .so-list { flex: 1; overflow-y: auto; }
-    .so-card { padding: 12px 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: 0.2s; background: white; border-left: 4px solid transparent; position: relative; }
+    .so-card { padding: 12px 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: 0.2s; background: white; border-left: 4px solid transparent; }
     .so-card:hover { background: #f1f5f9; }
     .so-card.active { background: #eff6ff; border-left-color: #2563eb; }
     
     .so-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
     .so-code { font-weight: 700; color: #334155; font-size: 0.95em; }
     .so-status { font-size: 0.7em; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
-    
-    /* Progress Bar xịn */
     .prog-track { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; margin-top: 8px; }
-    .prog-fill { height: 100%; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
-    
-    /* MAIN VIEW */
-    .main-view { display: flex; flex-direction: column; background: white; height: 100%; overflow: hidden; }
-    .detail-header { padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #fff; }
-    
-    /* KPI Boxes */
-    .kpi-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1px; background: #e2e8f0; border-bottom: 1px solid #e2e8f0; }
-    .kpi-box { background: white; padding: 15px 20px; display: flex; flex-direction: column; justify-content: center; }
-    .kpi-val { font-size: 1.4em; font-weight: 700; color: #0f172a; }
-    .kpi-label { font-size: 0.8em; color: #64748b; text-transform: uppercase; font-weight: 600; }
+    .prog-fill { height: 100%; transition: width 0.5s; }
 
-    /* Bảng Breakdown (Tiến độ theo size) */
-    .breakdown-box { padding: 15px 20px; border-bottom: 1px solid #e2e8f0; background: #fdfcff; }
-    .bd-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
-    .bd-table th { text-align: left; color: #64748b; padding: 5px; border-bottom: 1px solid #e2e8f0; font-weight: 600; }
-    .bd-table td { padding: 6px 5px; border-bottom: 1px solid #f1f5f9; color: #334155; }
-    .mini-prog { width: 100px; height: 6px; background: #e2e8f0; border-radius: 3px; display: inline-block; vertical-align: middle; margin-right: 5px; }
+    /* --- 3. MAIN VIEW (BÊN PHẢI) --- */
+    .main-view { 
+        display: flex; 
+        flex-direction: column; 
+        height: 100%; 
+        overflow: hidden; 
+        background: white; 
+        position: relative;
+    }
+
+    /* Header cố định */
+    .detail-header-fixed { 
+        flex-shrink: 0; 
+        padding: 15px 20px; 
+        background: #fff; 
+        border-bottom: 1px solid #e2e8f0; 
+    }
+
+    /* [MỚI] Style cho thanh Tabs Material */
+    .mat-tabs-container {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 10px;
+        margin-bottom: 10px;
+        border-bottom: 1px dashed #e2e8f0;
+    }
+    .mat-tabs-container::-webkit-scrollbar { height: 4px; }
+    .mat-tabs-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+
+    .mat-tab {
+        flex-shrink: 0;
+        padding: 5px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 20px; /* Bo tròn kiểu viên thuốc */
+        font-size: 0.85rem;
+        cursor: pointer;
+        background: #f8fafc;
+        color: #64748b;
+        transition: all 0.2s;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        min-width: 100px;
+    }
+    .mat-tab:hover { background: #f1f5f9; border-color: #cbd5e1; }
+    .mat-tab.active {
+        background: #eff6ff;
+        border-color: #3b82f6;
+        color: #1e40af;
+        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+    }
+    .mat-tab-code { font-weight: 700; font-size: 0.9em; }
+    .mat-tab-desc { font-size: 0.75em; opacity: 0.8; margin-top: 1px;}
+
+    /* Wrapper chứa bảng */
+    .table-wrap { 
+        flex: 1;             
+        overflow-y: auto;    
+        padding: 0; 
+        position: relative;
+    }
+
+    /* Style Bảng */
+    .coil-tbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .coil-tbl th { 
+        position: sticky; top: 0; z-index: 50; 
+        background: #f1f5f9; padding: 10px; 
+        font-size: 0.75rem; text-transform: uppercase; color: #475569;
+        border-bottom: 2px solid #e2e8f0; text-align: left;
+    }
+    .coil-tbl td { 
+        padding: 8px 10px; 
+        border-bottom: 1px solid #f1f5f9; 
+        font-size: 0.85rem; 
+        vertical-align: top; 
+    }
+    .coil-tbl tr:hover { background: #f8fafc; }
+
+    /* Cột lỗi - Tags Wrap */
+    .error-cell-content {
+        display: flex; flex-wrap: wrap; gap: 4px;
+        max-height: 60px; overflow-y: auto;
+    }
+    .error-cell-content::-webkit-scrollbar { width: 4px; }
+    .error-tag { 
+        background: #fff1f2; color: #be123c; padding: 1px 5px; 
+        border-radius: 3px; font-size: 0.7rem; border: 1px solid #fecdd3; 
+        white-space: nowrap;
+    }
+
+    /* Thanh phân trang */
+    .pagination-footer {
+        flex-shrink: 0;      
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 10px 20px; background: #fff; border-top: 1px solid #e2e8f0;
+        z-index: 60;
+    }
+
+    /* Buttons & Badges */
+    .btn-release-all { background: #fff1f2; color: #e11d48; border: 1px solid #fda4af; padding: 6px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; font-size: 0.85rem; transition:0.2s;}
+    .btn-release-all:hover { background: #e11d48; color: white; }
     
-    /* Bảng Cuộn Detail */
-    .table-wrap { flex: 1; overflow: auto; }
-    .coil-tbl { width: 100%; border-collapse: collapse; }
-    .coil-tbl th { background: #f8fafc; color: #475569; padding: 10px 15px; text-align: left; font-size: 0.8em; font-weight: 700; text-transform: uppercase; position: sticky; top: 0; border-bottom: 1px solid #cbd5e1; }
-    .coil-tbl td { padding: 8px 15px; border-bottom: 1px solid #f1f5f9; font-size: 0.9em; }
-    .badge-score { font-size: 0.8em; font-weight: bold; padding: 2px 6px; border-radius: 4px; border: 1px solid transparent; }
+    .btn-page { padding: 4px 10px; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+    .btn-page:hover:not(:disabled) { background: #e2e8f0; }
+    .btn-page:disabled { background: #f1f5f9; color: #cbd5e1; cursor: not-allowed; }
+    
+    .badge-score { font-size: 0.8em; font-weight: 700; padding: 3px 6px; border-radius: 4px; display: inline-block; min-width: 50px; text-align: center; }
+    .badge-good { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .badge-bad  { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    
+    .btn-icon-del { width: 24px; height: 24px; border-radius: 4px; border: 1px solid #fee2e2; background: #fff; color: #ef4444; cursor: pointer; display:flex; align-items:center; justify-content:center;}
+    .btn-icon-del:hover { background: #ef4444; color: white; }
 </style>
 {% endblock %}
 
@@ -56,8 +160,7 @@
         <div class="sidebar-search">
             <input type="text" class="inp-search" placeholder="🔍 Tìm SO, Khách hàng..." onkeyup="filterSO(this.value)">
         </div>
-        <div class="so-list" id="soList">
-            </div>
+        <div class="so-list" id="soList"></div>
     </div>
 
     <div class="main-view">
@@ -66,98 +169,101 @@
             <h3>Chọn đơn hàng để xem chi tiết</h3>
         </div>
 
-        <div id="detailView" style="display:none; flex-direction:column; height:100%;">
-            <div class="detail-header">
-                <div>
-                    <h2 id="lblSO" style="margin:0; color:#1e293b;">SO-xxx</h2>
-                    <span id="lblCust" style="color:#64748b; font-weight:500;">Khách hàng ABC</span>
+        <div id="detailView" style="display:none; height:100%; flex-direction:column; overflow:hidden;">
+            
+            <div class="detail-header-fixed">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h2 id="detailTitle" style="margin:0; color:#1e293b; font-size:1.3em;">Chi tiết đơn hàng</h2>
+                    <button onclick="releaseCurrentScope()" class="btn-release-all">
+                        <span>🗑️</span> <span id="btnReleaseText">Gỡ toàn bộ</span>
+                    </button>
                 </div>
+
+                <div id="materialTabs" class="mat-tabs-container"></div>
+
                 <div style="display:flex; gap:10px;">
-                    <button onclick="exportExcel()" class="btn-reset" style="border:1px solid #cbd5e1;">📥 Xuất Excel</button>
-                    <button onclick="releaseSO()" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:6px 15px; border-radius:4px; font-weight:bold;">🗑️ Gỡ Hết</button>
+                    <div style="border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px; flex:1;">
+                        <div style="font-size:0.7em; color:#64748b; text-transform:uppercase;">Tổng yêu cầu</div>
+                        <div id="statTarget" style="font-size:1.1em; font-weight:bold;">0 kg</div>
+                    </div>
+                    <div style="border:1px solid #bfdbfe; background:#eff6ff; border-radius:6px; padding:8px 12px; flex:1;">
+                        <div style="font-size:0.7em; color:#1e40af; text-transform:uppercase;">Đã phân bổ</div>
+                        <div id="statAllocated" style="font-size:1.1em; font-weight:bold; color:#2563eb;">0 kg</div>
+                    </div>
+                    <div style="border:1px solid #fed7aa; background:#fff7ed; border-radius:6px; padding:8px 12px; flex:1;">
+                        <div style="font-size:0.7em; color:#9a3412; text-transform:uppercase;">Tiến độ</div>
+                        <div id="statProgress" style="font-size:1.1em; font-weight:bold; color:#ea580c;">0.0%</div>
+                    </div>
+                    <div style="border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px; min-width:80px; text-align:center;">
+                        <div style="font-size:0.7em; color:#64748b;">Số cuộn</div>
+                        <div id="statCount" style="font-size:1.1em; font-weight:bold;">0</div>
+                    </div>
                 </div>
-            </div>
-
-            <div class="kpi-row">
-                <div class="kpi-box">
-                    <span class="kpi-label">Tổng Yêu Cầu</span>
-                    <span class="kpi-val" id="valTarget">0 Tấn</span>
-                </div>
-                <div class="kpi-box">
-                    <span class="kpi-label">Đã Phân Bổ</span>
-                    <span class="kpi-val" id="valActual" style="color:#2563eb">0 Tấn</span>
-                </div>
-                <div class="kpi-box">
-                    <span class="kpi-label">Tiến Độ</span>
-                    <span class="kpi-val" id="valPct">0%</span>
-                </div>
-                <div class="kpi-box">
-                    <span class="kpi-label">Số Cuộn</span>
-                    <span class="kpi-val" id="valQty">0</span>
-                </div>
-            </div>
-
-            <div class="breakdown-box">
-                <h4 style="margin:0 0 10px 0; color:#475569; font-size:0.9em; text-transform:uppercase;">📦 Tiến độ theo Quy cách (Line Items)</h4>
-                <table class="bd-table">
-                    <thead>
-                        <tr>
-                            <th>Mô tả / Quy cách</th>
-                            <th width="150">Yêu cầu</th>
-                            <th width="150">Thực tế</th>
-                            <th width="200">Tiến độ</th>
-                        </tr>
-                    </thead>
-                    <tbody id="bdBody">
-                        </tbody>
-                </table>
             </div>
 
             <div class="table-wrap">
                 <table class="coil-tbl">
                     <thead>
                         <tr>
-                            <th width="40">#</th>
-                            <th>Mã Cuộn</th>
-                            <th>Mác Thép</th>
-                            <th>Quy cách</th>
-                            <th>Trọng lượng</th>
-                            <th>Điểm Phạt</th> <th style="text-align:center">Thao tác</th>
+                            <th style="width: 40px;">#</th>
+                            <th style="width: 120px;">Mã Cuộn</th>
+                            <th style="width: 120px;">Mã NL</th>
+                            <th style="width: 80px;">Mác Thép</th>
+                            <th style="width: 90px;">Quy cách</th>
+                            <th style="width: 90px;">Khối lượng</th>
+                            <th style="width: 80px; text-align:center;">Tỉ lệ</th>
+                            <th style="width: 70px; text-align:center;">Phạt</th>
+                            <th>Chi tiết lỗi</th>
+                            <th style="width: 50px; text-align:center;">Gỡ</th>
                         </tr>
                     </thead>
-                    <tbody id="tblBody"></tbody>
+                    <tbody id="coilTableBody"></tbody>
                 </table>
             </div>
+
+            <div id="paginationControls" class="pagination-footer" style="display:none;">
+                <span style="color:#64748b; font-size:0.85em;">
+                    <b id="pStart">0</b>-<b id="pEnd">0</b> / <b id="pTotal">0</b>
+                </span>
+                <div style="display:flex; gap:5px;">
+                    <button onclick="changePage(-1)" id="btnPrev" class="btn-page">Trước</button>
+                    <button onclick="changePage(1)" id="btnNext" class="btn-page">Sau</button>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
 
 <script>
     let ALL_DATA = { orders: [], coils: [] };
+    let CACHED_COILS_LIST = [];
+    
+    // State Variables
     let CURRENT_SO_ID = null;
+    let CURRENT_SO_OBJ = null; // Object SO đầy đủ (chứa items)
+    let CURRENT_MAT_CODE = 'ALL';
+    let CURRENT_PAGE = 1;
+    const ITEMS_PER_PAGE = 50;
 
     window.onload = loadData;
 
     async function loadData() {
-        // Fetch data từ API mới đã cập nhật
         try {
             const res = await fetch('/api/get_history_summary');
             ALL_DATA = await res.json();
             renderSOList(ALL_DATA.orders);
-        } catch(e) { alert("Lỗi tải dữ liệu: " + e); }
+        } catch(e) { console.error(e); }
     }
 
+    // --- 1. RENDER DANH SÁCH SO (SIDEBAR) ---
     function renderSOList(list) {
         const div = document.getElementById('soList');
         div.innerHTML = list.map(o => {
             const pct = o.total_target > 0 ? (o.total_actual / o.total_target * 100) : 0;
             const pctShow = Math.min(pct, 100).toFixed(0);
-            
-            // Logic màu sắc: <50% đỏ, <99% vàng, 100% xanh
-            let color = '#ef4444'; // Red
-            let status = 'Đang gom';
-            if(pct >= 99.5) { color = '#22c55e'; status = 'Hoàn thành'; }
-            else if(pct >= 50) { color = '#eab308'; status = 'Đang chạy'; }
+            let color = pct >= 99.5 ? '#22c55e' : (pct >= 50 ? '#eab308' : '#ef4444');
+            let status = pct >= 99.5 ? 'Hoàn thành' : 'Đang chạy';
 
             return `
             <div class="so-card" onclick="selectSO('${o.so_number}')" id="card-${o.so_number}">
@@ -165,12 +271,9 @@
                     <span class="so-code">${o.so_number}</span>
                     <span class="so-status" style="background:${color}20; color:${color}">${status}</span>
                 </div>
-                <div style="font-size:0.85em; color:#64748b; margin-bottom:5px;">${o.customer_name}</div>
-                
-                <div class="prog-track">
-                    <div class="prog-fill" style="width:${pctShow}%; background:${color}"></div>
-                </div>
-                <div style="display:flex; justify-content:space-between; font-size:0.75em; margin-top:4px; color:#64748b;">
+                <div style="font-size:0.8em; color:#64748b; margin-bottom:5px;">${o.customer_name}</div>
+                <div class="prog-track"><div class="prog-fill" style="width:${pctShow}%; background:${color}"></div></div>
+                <div style="display:flex; justify-content:space-between; font-size:0.7em; margin-top:4px; color:#64748b;">
                     <span><b>${(o.total_actual/1000).toFixed(1)}</b> / ${(o.total_target/1000).toFixed(1)} T</span>
                     <span>${pctShow}%</span>
                 </div>
@@ -178,84 +281,169 @@
         }).join('');
     }
 
-    function selectSO(soNum) {
-        // Highlight active card
-        document.querySelectorAll('.so-card').forEach(e => e.classList.remove('active'));
-        const card = document.getElementById(`card-${soNum}`);
-        if(card) card.classList.add('active');
+    // --- 2. CHỌN SO VÀ HIỂN THỊ TABS ---
+    function selectSO(soNumber) {
+        // Highlight Sidebar Item
+        document.querySelectorAll('.so-card').forEach(el => el.classList.remove('active'));
+        const activeItem = document.getElementById(`card-${soNumber}`); 
+        if(activeItem) activeItem.classList.add('active');
 
-        CURRENT_SO_ID = soNum;
-        const order = ALL_DATA.orders.find(o => o.so_number === soNum);
-        const coils = ALL_DATA.coils.filter(c => c.allocated_order === soNum);
-
+        // Set State
+        CURRENT_SO_ID = soNumber;
+        CURRENT_SO_OBJ = ALL_DATA.orders.find(o => o.so_number === soNumber);
+        
+        // Show Detail View
         document.getElementById('emptyView').style.display = 'none';
         document.getElementById('detailView').style.display = 'flex';
+        document.getElementById('detailTitle').innerText = `${soNumber} - ${CURRENT_SO_OBJ.customer_name}`;
+
+        // Render Tabs Material
+        renderMaterialTabs();
+
+        // Mặc định chọn tab ALL
+        selectMaterial('ALL');
+    }
+
+    function renderMaterialTabs() {
+        const container = document.getElementById('materialTabs');
+        const items = CURRENT_SO_OBJ.items || [];
         
-        // 1. Render Header Info
-        document.getElementById('lblSO').innerText = order.so_number;
-        document.getElementById('lblCust').innerText = order.customer_name;
+        // Tab Tổng hợp
+        let html = `
+            <div class="mat-tab" id="tab-ALL" onclick="selectMaterial('ALL')">
+                <div class="mat-tab-code">★ TỔNG HỢP</div>
+                <div class="mat-tab-desc">${items.length} quy cách</div>
+            </div>
+        `;
+        // Tabs Material con
+        html += items.map(item => `
+            <div class="mat-tab" id="tab-${item.material}" onclick="selectMaterial('${item.material}')">
+                <div class="mat-tab-code">${item.material}</div>
+                <div class="mat-tab-desc">${item.thick} x ${item.width} (${(item.req/1000).toFixed(1)}T)</div>
+            </div>
+        `).join('');
 
-        // 2. Render KPI
-        document.getElementById('valTarget').innerText = (order.total_target/1000).toFixed(2) + " T";
-        document.getElementById('valActual').innerText = (order.total_actual/1000).toFixed(2) + " T";
-        document.getElementById('valQty').innerText = coils.length + " Cuộn";
+        container.innerHTML = html;
+    }
+
+    // --- 3. CORE LOGIC: CHỌN MATERIAL & LỌC DỮ LIỆU ---
+    function selectMaterial(matCode) {
+        CURRENT_MAT_CODE = matCode;
+
+        // Active Tab Visual
+        document.querySelectorAll('.mat-tab').forEach(el => el.classList.remove('active'));
+        const activeTab = document.getElementById(`tab-${matCode}`);
+        if(activeTab) activeTab.classList.add('active');
+
+        // Lấy tất cả cuộn của SO
+        const allCoilsOfSO = ALL_DATA.coils.filter(c => c.allocated_order === CURRENT_SO_ID);
         
-        const overallPct = order.total_target > 0 ? (order.total_actual / order.total_target * 100) : 0;
-        const elPct = document.getElementById('valPct');
-        elPct.innerText = overallPct.toFixed(1) + "%";
-        elPct.style.color = overallPct >= 100 ? '#16a34a' : '#ea580c';
+        let targetWeight = 0;
+        let filteredCoils = [];
 
-        // 3. Render Breakdown (Chi tiết theo dòng hàng)
-        const bdBody = document.getElementById('bdBody');
-        if(order.items && order.items.length > 0) {
-            bdBody.innerHTML = order.items.map(it => {
-                const itPct = it.req > 0 ? (it.actual / it.req * 100) : 0;
-                const barColor = itPct >= 100 ? '#22c55e' : '#3b82f6';
-                
-                // [CẬP NHẬT] Hiển thị thêm Material Code để định danh chính xác
-                const matDisplay = it.material ? `<div style="font-size:0.8em; font-family:monospace; color:#6366f1; font-weight:bold;">${it.material}</div>` : '';
-
-                return `<tr>
-                    <td>
-                        ${matDisplay} <div style="font-weight:600;">${it.thick.toFixed(2)} x ${it.width.toFixed(0)}</div>
-                        <div style="font-size:0.85em; color:#94a3b8;">${it.desc || 'N/A'}</div>
-                    </td>
-                    <td>${it.req.toLocaleString()} kg</td>
-                    <td style="font-weight:bold; color:${barColor}">${it.actual.toLocaleString()} kg</td>
-                    <td>
-                        <div class="mini-prog"><div style="height:100%; width:${Math.min(itPct,100)}%; background:${barColor}"></div></div>
-                        <span>${itPct.toFixed(1)}%</span>
-                    </td>
-                </tr>`;
-            }).join('');
-
+        if (matCode === 'ALL') {
+            // Xem toàn bộ
+            targetWeight = CURRENT_SO_OBJ.total_target;
+            filteredCoils = allCoilsOfSO;
+            document.getElementById('btnReleaseText').innerText = "Gỡ toàn bộ";
         } else {
-            bdBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#999;">Không có dữ liệu chi tiết dòng hàng</td></tr>`;
+            // Xem chi tiết 1 Material
+            const lineItem = CURRENT_SO_OBJ.items.find(i => i.material === matCode);
+            targetWeight = lineItem ? lineItem.req : 0;
+            // Lọc cuộn khớp mã NL
+            filteredCoils = allCoilsOfSO.filter(c => c.allocated_material === matCode);
+            document.getElementById('btnReleaseText').innerText = `Gỡ ${filteredCoils.length} cuộn này`;
         }
 
-        // 4. Render Coil List (Bảng cuộn)
-        const tblBody = document.getElementById('tblBody');
-        tblBody.innerHTML = coils.map((c, i) => {
-            // Hiển thị điểm phạt nếu có
-            const penalty = c.penalty || 0; // Backend cần trả về cái này hoặc tính lại
-            let scoreBadge = '';
-            if(penalty === 0) scoreBadge = '<span class="badge-score" style="background:#dcfce7; color:#166534">Chuẩn</span>';
-            else scoreBadge = `<span class="badge-score" style="background:#ffedd5; color:#9a3412">Lỗi: ${penalty}</span>`;
+        // Tính toán KPI
+        const allocatedWeight = filteredCoils.reduce((sum, c) => sum + parseFloat(c.weight || 0), 0);
+        const progress = targetWeight > 0 ? (allocatedWeight / targetWeight * 100) : 0;
+
+        // Update UI
+        document.getElementById('statTarget').innerText = targetWeight.toLocaleString() + ' kg';
+        document.getElementById('statAllocated').innerText = allocatedWeight.toLocaleString() + ' kg';
+        document.getElementById('statProgress').innerText = progress.toFixed(1) + '%';
+        document.getElementById('statCount').innerText = filteredCoils.length;
+
+        // Update Table Data Cache & Render
+        CACHED_COILS_LIST = filteredCoils;
+        CURRENT_PAGE = 1;
+        renderTablePage();
+    }
+
+    // --- 4. RENDER BẢNG (PHÂN TRANG) ---
+    function renderTablePage() {
+        const tblBody = document.getElementById('coilTableBody');
+        const controls = document.getElementById('paginationControls');
+        const tableWrap = document.querySelector('.table-wrap');
+
+        if (!CACHED_COILS_LIST || CACHED_COILS_LIST.length === 0) {
+            tblBody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:40px; color:#94a3b8;">Không có dữ liệu trong mục này</td></tr>';
+            if(controls) controls.style.display = 'none';
+            return;
+        }
+
+        if(controls) controls.style.display = 'flex';
+        
+        const totalItems = CACHED_COILS_LIST.length;
+        const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+        const startIdx = (CURRENT_PAGE - 1) * ITEMS_PER_PAGE;
+        const endIdx = Math.min(startIdx + ITEMS_PER_PAGE, totalItems);
+        const pageData = CACHED_COILS_LIST.slice(startIdx, endIdx);
+
+        tblBody.innerHTML = pageData.map((c, i) => {
+            const realIndex = startIdx + i + 1;
+            const penalty = c.penalty || 0;
+            let scoreBadge = penalty === -1 ? '<span class="badge-score" style="background:#f1f5f9; color:#64748b;">N/A</span>'
+                : (penalty === 0 ? '<span class="badge-score badge-good">0</span>' 
+                : `<span class="badge-score badge-bad">-${penalty}</span>`);
+
+            const pct = c.match_pct || 0;
+            let pctColor = (pct >= 90) ? '#16a34a' : ((pct >= 70) ? '#d97706' : '#dc2626');
+
+            // Render Lỗi (Tags)
+            let errorHtml = '';
+            if (c.alloc_failed_msg) {
+                const errors = c.alloc_failed_msg.split(',');
+                const tags = errors.map(e => `<span class="error-tag">${e.trim()}</span>`).join('');
+                errorHtml = `<div class="error-cell-content">${tags}</div>`;
+            }
 
             return `<tr>
-                <td>${i+1}</td>
-                <td style="font-weight:bold; color:#2563eb;">${c.coil_id}</td>
-                <td>${c.grade}</td>
-                <td>${c.thick} x ${c.width}</td>
-                <td>${c.weight.toLocaleString()}</td>
-                <td>${scoreBadge}</td>
+                <td style="color:#64748b;">${realIndex}</td>
+                <td style="font-weight:700; color:#2563eb;">${c.coil_id}</td>
+                <td style="font-family:monospace; color:#475569;">${c.allocated_material || '-'}</td>
+                <td>${c.grade || '-'}</td>
+                <td>${c.thick}x${c.width}</td>
+                <td style="font-weight:600;">${parseFloat(c.weight).toLocaleString()}</td>
                 <td style="text-align:center;">
-                    <button onclick="releaseOne('${c.coil_id}')" style="color:#ef4444; border:none; background:none; cursor:pointer; font-weight:bold;">✕ Gỡ</button>
+                    <div style="color:${pctColor}; font-weight:700; font-size:0.9em;">${pct}%</div>
+                    <div style="font-size:0.65rem; color:#94a3b8;">${c.match_ratio || '-/-'}</div>
+                </td>
+                <td style="text-align:center;">${scoreBadge}</td>
+                <td>${errorHtml}</td>
+                <td style="text-align:center;">
+                    <button onclick="releaseOne('${c.coil_id}')" class="btn-icon-del" title="Gỡ cuộn này">✕</button>
                 </td>
             </tr>`;
         }).join('');
+
+        if(tableWrap) tableWrap.scrollTop = 0;
+
+        // Update Info
+        document.getElementById('pStart').innerText = startIdx + 1;
+        document.getElementById('pEnd').innerText = endIdx;
+        document.getElementById('pTotal').innerText = totalItems;
+        document.getElementById('btnPrev').disabled = (CURRENT_PAGE === 1);
+        document.getElementById('btnNext').disabled = (CURRENT_PAGE === totalPages || totalPages === 0);
     }
 
+    function changePage(delta) {
+        CURRENT_PAGE += delta;
+        renderTablePage();
+    }
+
+    // --- 5. TÌM KIẾM SO ---
     function filterSO(txt) {
         const term = txt.toLowerCase();
         const filtered = ALL_DATA.orders.filter(o => 
@@ -264,72 +452,67 @@
         );
         renderSOList(filtered);
     }
-    
-    // Hàm releaseOne, releaseSO giữ nguyên logic cũ
+
+    // --- 6. ACTION: GỠ 1 CUỘN ---
     async function releaseOne(coilId) {
-        if(!confirm(`Bạn chắc chắn muốn gỡ cuộn ${coilId} ra khỏi đơn hàng?`)) return;
-        
+        if(!confirm(`Gỡ cuộn ${coilId}?`)) return;
         try {
             const res = await fetch('/api/release_coils', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ 
-                    coil_ids: [coilId], // Gửi dạng mảng
-                    user_name: 'QC_Admin' // Sau này thay bằng tên user thật
-                })
+                body: JSON.stringify({ coil_ids: [coilId], user_name: 'QC_Admin' })
             });
             const data = await res.json();
-            
             if(data.status === 'success') {
-                // alert(data.msg); // Có thể bỏ alert cho đỡ phiền
-                loadData(); // Tải lại dữ liệu để cập nhật bảng
-                
-                // Mẹo UX: Nếu đang chọn SO nào thì vẫn giữ nguyên view SO đó
-                if(CURRENT_SO_ID) setTimeout(() => selectSO(CURRENT_SO_ID), 500);
-            } else {
-                alert("Lỗi: " + data.msg);
-            }
-        } catch(e) { alert("Lỗi kết nối: " + e); }
+                await loadData();
+                // Restore View
+                if(CURRENT_SO_ID) {
+                    CURRENT_SO_OBJ = ALL_DATA.orders.find(o => o.so_number === CURRENT_SO_ID);
+                    selectMaterial(CURRENT_MAT_CODE); 
+                }
+            } else alert(data.msg);
+        } catch(e) { alert("Lỗi: " + e); }
     }
-    async function releaseSO() {
-        if(!CURRENT_SO_ID) return;
-        
-        // Lấy danh sách cuộn hiện tại đang hiển thị
-        const currentOrder = ALL_DATA.orders.find(o => o.so_number === CURRENT_SO_ID);
-        // Lọc trong ALL_DATA.coils những cuộn thuộc SO này
-        const coilsOfSO = ALL_DATA.coils.filter(c => c.allocated_order === CURRENT_SO_ID);
-        
-        if(coilsOfSO.length === 0) return alert("Đơn hàng này chưa có cuộn nào!");
-        
-        const count = coilsOfSO.length;
-        if(!confirm(`⚠️ CẢNH BÁO: Bạn sắp gỡ TOÀN BỘ ${count} cuộn khỏi đơn ${CURRENT_SO_ID}.\nHành động này sẽ được ghi lại trong lịch sử.\n\nTiếp tục?`)) return;
 
-        const listIds = coilsOfSO.map(c => c.coil_id);
+    // --- 7. ACTION: GỠ NHIỀU (CONTEXT AWARE) ---
+    async function releaseCurrentScope() {
+        if(!CURRENT_SO_ID) return;
+        const coilsToRelease = CACHED_COILS_LIST; // Lấy danh sách đang hiển thị
+        
+        if(coilsToRelease.length === 0) {
+            alert("Không có cuộn nào trong mục này để gỡ!");
+            return;
+        }
+
+        let msg = "";
+        if (CURRENT_MAT_CODE === 'ALL') {
+            msg = `⚠️ CẢNH BÁO: Bạn đang gỡ TOÀN BỘ ${coilsToRelease.length} cuộn của đơn hàng ${CURRENT_SO_ID}?`;
+        } else {
+            msg = `Bạn muốn gỡ ${coilsToRelease.length} cuộn thuộc mã ${CURRENT_MAT_CODE}?`;
+        }
+
+        if(!confirm(msg)) return;
 
         try {
             const res = await fetch('/api/release_coils', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ 
-                    coil_ids: listIds,
-                    user_name: 'QC_Admin'
+                    coil_ids: coilsToRelease.map(c => c.coil_id),
+                    user_name: 'QC_Admin' 
                 })
             });
             const data = await res.json();
-            
             if(data.status === 'success') {
                 alert(data.msg);
-                loadData(); // Refresh lại
-                // Reset view về trạng thái trống hoặc cập nhật lại
-                document.getElementById('detailView').style.display = 'none';
-                document.getElementById('emptyView').style.display = 'flex';
-                CURRENT_SO_ID = null;
-            } else {
-                alert("Lỗi: " + data.msg);
-            }
-        } catch(e) { alert("Lỗi kết nối: " + e); }
+                await loadData();
+                // Restore View
+                if(CURRENT_SO_ID) {
+                    CURRENT_SO_OBJ = ALL_DATA.orders.find(o => o.so_number === CURRENT_SO_ID);
+                    selectMaterial(CURRENT_MAT_CODE);
+                }
+            } else alert(data.msg);
+        } catch(e) { alert("Lỗi: " + e); }
     }
-    function exportExcel() { alert('Chức năng đang phát triển'); }
-
 </script>
 {% endblock %}

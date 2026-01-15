@@ -100,45 +100,46 @@ def allocation_run_page():
 def run_batch_allocation():
     try:
         req_items = request.json.get('items', [])
-        if not req_items: return jsonify({'status':'error', 'msg':'Chưa có dữ liệu đầu vào!'})
         conn = db.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM tdc_master")
-        all_tdcs = db.fetchall_as_dict(cursor)
+        query_tdc = """
+            SELECT m.id as master_id, m.tdc_code, m.customer_name, m.grade, 
+                v.criteria_json, v.id as version_id
+            FROM tdc_master m
+            JOIN tdc_versions v ON m.id = v.master_id
+            WHERE v.status = 'Active'
+            AND CAST(GETDATE() AS DATE) >= v.valid_from 
+            AND (v.valid_to IS NULL OR CAST(GETDATE() AS DATE) <= v.valid_to) 
+        """
+        cursor.execute(query_tdc)
+        active_tdcs = db.fetchall_as_dict(cursor)
+        tdc_map = {row['master_id']: dict(row) for row in active_tdcs}
 
-        tdc_map = {row['id']: dict(row) for row in all_tdcs}
-        cursor = conn.cursor()
         cursor.execute("SELECT coil_id, scores, grade, weight, target_thick, target_width FROM coil_data WITH (NOLOCK) WHERE (allocated_to IS NULL OR allocated_to = '')")
         inventory_rows = db.fetchall_as_dict(cursor)
         conn.close()
+
         inventory = []
         for r in inventory_rows:
             item = dict(r)
             item['scores'] = json.loads(item['scores']) if item['scores'] else {}
             item['grade'] = str(item['grade']).strip().upper()
-            
-            # [QUAN TRỌNG] Ép kiểu Weight về số thực, nếu Null thì coi là 0
             item['weight'] = float(item['weight']) if item['weight'] is not None else 0.0
-            
-            # [QUAN TRỌNG] Ép kiểu Dày/Rộng luôn cho chắc
             item['thick'] = float(item['target_thick']) if item['target_thick'] else 0.0
             item['width'] = float(item['target_width']) if item['target_width'] else 0.0
-            
             inventory.append(item)
 
         final_results = []
         used_coil_ids = set()
 
+        # --- 2. XỬ LÝ TỪNG DÒNG YÊU CẦU ---
         for req in req_items:
             try:
-                # --- [UPDATE 1] LẤY THÊM THAM SỐ MIN/MAX ---
                 so_number = req.get('so_number', 'N/A')
                 tdc_id = int(req.get('tdc_id', 0))
                 req_thick = float(req.get('thick', 0))
                 req_width = float(req.get('width', 0))
                 req_weight_target = float(req.get('req_weight', 0))
-                
-                # Lấy giới hạn min/max (Mặc định là 0 nếu không nhập)
                 req_min_w = float(req.get('min_weight', 0))
                 req_max_w = float(req.get('max_weight', 0))
 
@@ -146,8 +147,11 @@ def run_batch_allocation():
                 if not tdc_info: continue
                 
                 target_grade = tdc_info['grade']
-                criteria_list = json.loads(tdc_info['criteria_json']) if tdc_info['criteria_json'] else []
                 cust_name = tdc_info['customer_name']
+                criteria_list = json.loads(tdc_info['criteria_json']) if tdc_info['criteria_json'] else []
+                
+                TOTAL_CRITERIA_COUNT = len(criteria_list)
+                CRITICAL_THRESHOLD = 15
 
                 candidates = []
                 current_weight_sum = 0
@@ -155,81 +159,93 @@ def run_batch_allocation():
                 for coil in inventory:
                     if coil['coil_id'] in used_coil_ids: continue
                     if coil['grade'] != target_grade: continue
-
-                    # [LỌC CỨNG] Kích thước
-                    if abs(coil['thick'] - req_thick) > 0.0: continue 
+                    if abs(coil['thick'] - req_thick) > 0.00: continue 
                     if abs(coil['width'] - req_width) > 0.0: continue
-
-                    # --- [UPDATE 2] LỌC CỨNG MIN/MAX WEIGHT ---
-                    # Nếu yêu cầu Min > 0 mà cuộn nhẹ hơn -> Bỏ
                     if req_min_w > 0 and coil['weight'] < req_min_w: continue
-                    # Nếu yêu cầu Max > 0 mà cuộn nặng hơn -> Bỏ
                     if req_max_w > 0 and coil['weight'] > req_max_w: continue
 
-                    # ... (Đoạn tính điểm Penalty giữ nguyên) ...
                     total_penalty = 0
                     failed_reasons = [] 
                     match_type = 'PERFECT'
-                    sort_diffs = [] # Danh sách các khoảng cách để so sánh chi tiết
+                    is_rejected = False 
+                    met_count = 0
+                    sort_priority_list = [] 
+                    
                     scores = coil['scores']
                     
-                    for crit in criteria_list:
-                        defect = crit['defect']
+                    for idx, crit in enumerate(criteria_list):
+                        defect_key = crit['defect']
+                        # Lấy tên tiếng Việt (nếu bạn đã thêm map như bài trước)
+                        defect_name = crit.get('name_vi', defect_key) 
                         
-                        # Target: Là điểm "Mơ ước" (Ví dụ C6 là tốt nhất thì set Target=6)
-                        target = crit.get('target', 1) 
-                        val = scores.get(defect, 1) # Nếu thiếu data coi như là 1 (hoặc 0 tùy bạn)
+                        val = scores.get(defect_key, 0)
                         allowed_range = crit.get('range', [])
-
-                        diff_from_target = abs(val - target)
-
-                        if val == 0:
-                            # Xử lý thiếu dữ liệu (Giữ nguyên)
-                            total_penalty += 20 
-                            failed_reasons.append(f"{defect}:Missing(C0)")
-                            match_type = 'PROP_MISMATCH'
-                            sort_diffs.append(99) 
-                            continue
+                        target = crit.get('target', 1)
                         
-                        if val not in allowed_range:
-                            dist_error = abs(val - target) # Khoảng cách lỗi
-                            if dist_error == 1: penalty = 20; reason = f"{defect}:C{val}"
-                            elif dist_error == 2: penalty = 50; reason = f"{defect}:C{val} (Lệch 2)"
-                            else: penalty = 999; reason = "FAIL"
-                            
+                        weight = TOTAL_CRITERIA_COUNT - idx 
+                        current_dist = 0 # Độ lệch của tiêu chí này
+                        
+                        if val == 0:
+                            # --- MISSING ---
+                            penalty = weight * 25
                             total_penalty += penalty
-                            if penalty < 999:
+                            failed_reasons.append(f"{defect_name}:Thiếu")
+                            match_type = 'MISSING_DATA'
+                            current_dist = 99 # Gán độ lệch lớn để đẩy xuống đáy khi sort phân cấp
+                        
+                        elif val in allowed_range:
+                            # --- PASS ---
+                            met_count += 1
+                            current_dist = 0 # Hoàn hảo = 0
+                        
+                        else:
+                            # --- FAIL / OUT OF RANGE ---
+                            dist = abs(val - target)
+                            current_dist = dist 
+                            if idx < CRITICAL_THRESHOLD:
+                                is_rejected = True
+                                break 
+                            else:
+                                penalty = weight * dist * 5
+                                total_penalty += penalty
+                                failed_reasons.append(f"{defect_name}:C{val}(Lệch {dist})")
                                 match_type = 'PROP_MISMATCH'
-                                failed_reasons.append(reason)
-                        sort_diffs.append(diff_from_target)
+                        
+                        sort_priority_list.append(current_dist)
 
-                    if total_penalty < 800:
-                        c_item = coil.copy()
-                        c_item.update({
-                            'penalty': total_penalty,
-                            'sort_keys': tuple(sort_diffs),
-                            'match_type': match_type,
-                            'failed_msg': ', '.join(failed_reasons),
-                            'customer_alloc': cust_name,
-                            'so_number': so_number,
-                            'req_desc': f"{req_thick} x {req_width}"
-                        })
-                        candidates.append(c_item)
+                    if is_rejected: continue
 
-                # Sắp xếp và Cắt theo Tổng khối lượng yêu cầu
-                candidates.sort(key=lambda x: (x['penalty'], x['sort_keys']))
+                    c_item = coil.copy()
+                    match_pct = round((met_count / TOTAL_CRITERIA_COUNT) * 100, 1) if TOTAL_CRITERIA_COUNT > 0 else 0
+                    
+                    c_item.update({
+                        'penalty': total_penalty,
+                        'sort_priority': tuple(sort_priority_list), # [QUAN TRỌNG] Convert sang Tuple để sort
+                        'match_type': match_type,
+                        'customer_alloc': cust_name,
+                        'so_number': so_number,
+                        'match_ratio': f"{met_count}/{TOTAL_CRITERIA_COUNT}", 
+                        'match_pct': match_pct,
+                        'failed_msg': ', '.join(failed_reasons)
+                    })
+                    candidates.append(c_item)
 
+                candidates.sort(key=lambda x: (
+                    0 if x['penalty'] == 0 else 1, 
+                    x['penalty'], 
+                    x['sort_priority'], 
+                    -x['match_pct']
+                ))
+
+                # --- 4. CHỌN CUỘN ---
                 for cand in candidates:
-                    final_results.append(cand) # Sửa lại logic add thẳng vào final list
+                    final_results.append(cand) 
                     current_weight_sum += cand['weight']
                     used_coil_ids.add(cand['coil_id'])
-                    
-                    # Đủ khối lượng thì dừng tìm cho dòng này
-                    if current_weight_sum >= req_weight_target:
-                        break
+                    if current_weight_sum >= req_weight_target: break
             
             except Exception as ex: 
-                print(f"❌ LỖI DÒNG REQUEST: {ex}")
+                print(f"Lỗi Alloc: {ex}")
                 continue
 
         return jsonify({'status': 'success', 'allocated': final_results})
@@ -312,7 +328,11 @@ def confirm_multi_so():
         for item in alloc_list:
             so = str(item['so_number']).strip()
             cid = item['coil_id']
-            user_note = item.get('note', '') # Lấy ghi chú nếu có
+            user_note = item.get('note', '')
+            p_penalty = item.get('penalty', 0)
+            p_pct = item.get('match_pct', 0)
+            p_ratio = item.get('match_ratio', '')
+            p_msg = item.get('failed_msg', '')
             allocated_so_set.add(so)
 
             # Tìm thông tin để update vào cuộn
@@ -330,10 +350,15 @@ def confirm_multi_so():
             update_sql = """
                 UPDATE coil_data 
                 SET allocated_to = ?, allocated_order = ?, allocated_material = ?, 
-                    allocated_at = ?, alloc_note = ?
+                    allocated_at = ?, alloc_note = ?,
+                    alloc_penalty = ?, alloc_match_pct = ?, alloc_match_ratio = ?, alloc_failed_msg = ?
                 WHERE coil_id = ? AND (allocated_to IS NULL OR allocated_to = '')
             """
-            cursor.execute(update_sql, (cust_name_alloc, so, mat_code, now, user_note, cid))
+            cursor.execute(update_sql, (
+                cust_name_alloc, so, mat_code, now, user_note, 
+                p_penalty, p_pct, p_ratio, p_msg, 
+                cid
+            ))
             
             if cursor.rowcount > 0:
                 success_count += 1
@@ -371,18 +396,18 @@ def get_backlog():
         # ISNULL(SUM(...), 0) để đảm bảo trả về 0 nếu chưa có cuộn nào
         query = """
         SELECT 
-            d.id, d.so_number, d.material_code, d.grade, 
-            d.thickness, d.width, d.total_weight, 
-            d.min_weight, d.max_weight, d.tdc_id,
+            d.*, 
             s.customer_name,
-            (
-                SELECT ISNULL(SUM(weight), 0) 
-                FROM coil_data c 
-                WHERE c.allocated_order = d.so_number 
-                  AND c.allocated_material = d.material_code
-            ) as allocated_actual
+            m.tdc_code,
+            v.version_no,  -- Lấy số phiên bản đang active
+            v.status as v_status,
+            (SELECT ISNULL(SUM(weight), 0) FROM coil_data c 
+            WHERE c.allocated_order = d.so_number AND c.allocated_material = d.material_code) as allocated_actual
         FROM so_details d
         LEFT JOIN sales_orders s ON d.so_number = s.so_number
+        LEFT JOIN tdc_master m ON d.tdc_id = m.id
+        -- Join để tìm version đang Active của TDC đó
+        LEFT JOIN tdc_versions v ON m.id = v.master_id AND v.status = 'Active'
         WHERE s.status != 'Done' OR s.status IS NULL
         ORDER BY d.id DESC
         """
@@ -442,7 +467,7 @@ def save_backlog_item():
             # INSERT: Nếu chưa có thì thêm mới
             cursor.execute("""
                 INSERT INTO so_details (so_number, material_code, description, grade, thickness, width, total_weight, min_weight, max_weight, tdc_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (so, mat, desc, grade, thick, width, weight, min_w, max_w, tdc_id))
             
             # Lấy ID vừa tạo

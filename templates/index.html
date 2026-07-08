@@ -1,0 +1,2980 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Quản Lý Vật Tư & PR Dịch Vụ NM.CĐ3 & CĐ6</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #0d6efd;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --success-color: #198754;
+            --tab-bg: #f8f9fa;
+            --tab-active-bg: #e9ecef;
+            --pr-stage-1: #6c757d;
+            --pr-stage-2: #0dcaf0;
+            --pr-stage-3: #ffc107;
+            --pr-stage-4: #fd7e14;
+            --pr-stage-5: #6f42c1; /* Đang thi công */
+            --pr-stage-6: #198754; /* Hoàn thành */
+        }
+        body { font-size: 0.92rem; background-color: #f0f2f5; }
+        .card-stat { transition: transform 0.2s; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .card-stat:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0,0,0.1); }
+        .table-responsive { border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #dee2e6; background: white;}
+        .table th { white-space: nowrap; vertical-align: middle; }
+        .table td { vertical-align: middle; border-bottom: 1px solid #eee; }
+        
+        /* Tree Grid Styles */
+        .tree-node { cursor: pointer; transition: background-color 0.2s; }
+        .tree-node:hover { background-color: #e2e6ea !important; }
+        .tree-level-1 { background-color: #e9ecef; font-weight: bold; color: #495057; border-top: 2px solid #dee2e6; }
+        .tree-level-2 { background-color: #f8f9fa; font-weight: bold; color: #6c757d; }
+        .tree-leaf { background-color: #ffffff; transition: all 0.3s ease; }
+        .tree-leaf:hover { background-color: #f1f8ff; }
+        .indent-1 { padding-left: 30px !important; position: relative; }
+        .indent-2 { padding-left: 60px !important; position: relative; }
+        .indent-1::before { content: ''; position: absolute; left: 15px; top: 0; bottom: 0; width: 1px; background-color: #adb5bd; }
+        .indent-2::before { content: ''; position: absolute; left: 45px; top: 0; bottom: 0; width: 1px; background-color: #dee2e6; }
+        .indent-2::after { content: ''; position: absolute; left: 45px; top: 50%; width: 10px; height: 1px; background-color: #dee2e6; }
+        .toggle-icon { display: inline-block; width: 20px; text-align: center; transition: transform 0.2s; }
+        .collapsed .toggle-icon { transform: rotate(-90deg); }
+        .hidden-row { display: none !important; }
+        
+        /* Global UI */
+        .factory-selector .btn { border-width: 2px; }
+        .factory-selector .btn-check:checked + .btn { background-color: #0d6efd; color: white; border-color: #0d6efd; }
+        .loading { position: relative; pointer-events: none; }
+        .loading::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.8) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%230d6efd' fill-opacity='0.8'%3E%3Ccircle cx='20' cy='5' r='3'%3E%3Canimate attributeName='cy' values='5;35;5' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3Ccircle cx='10' cy='5' r='3'%3E%3Canimate attributeName='cy' values='5;35;5' begin='0.2s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3Ccircle cx='30' cy='5' r='3'%3E%3Canimate attributeName='cy' values='5;35;5' begin='0.4s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3C/svg%3E") no-repeat center; z-index: 1000; }
+        
+        /* NEW TABS STYLING */
+        .main-tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #dee2e6; padding-bottom: 15px;}
+        .main-tab-btn { background: white; border: 1px solid #dee2e6; padding: 10px 20px; border-radius: 30px; font-weight: bold; color: #495057; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; align-items: center; gap: 8px;}
+        .main-tab-btn:hover { background: #f8f9fa; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.05);}
+        .main-tab-btn.active { background: var(--primary-color); color: white; border-color: var(--primary-color); box-shadow: 0 4px 8px rgba(13, 110, 253, 0.3);}
+        .main-tab-btn.active-pr { background: #fd7e14; color: white; border-color: #fd7e14; box-shadow: 0 4px 8px rgba(253, 126, 20, 0.3);}
+        
+        /* PR DASHBOARD STYLING */
+        .pr-stage-card { text-align: center; color: white; border-radius: 8px; padding: 15px 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); height: 100%;}
+        .bg-stage-1 { background-color: var(--pr-stage-1); }
+        .bg-stage-2 { background-color: var(--pr-stage-2); }
+        .bg-stage-3 { background-color: var(--pr-stage-3); color: #212529 !important;}
+        .bg-stage-4 { background-color: var(--pr-stage-4); }
+        .bg-stage-5 { background-color: var(--pr-stage-5); }
+        .bg-stage-6 { background-color: var(--pr-stage-6); }
+        .badge-stage-1 { background-color: var(--pr-stage-1); }
+        .badge-stage-2 { background-color: var(--pr-stage-2); }
+        .badge-stage-3 { background-color: var(--pr-stage-3); color: #000; }
+        .badge-stage-4 { background-color: var(--pr-stage-4); }
+        .badge-stage-5 { background-color: var(--pr-stage-5); }
+        .badge-stage-6 { background-color: var(--pr-stage-6); }
+        
+        /* Upload Area in Modal */
+        .file-upload-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 15px; }
+        .file-upload-input { font-size: 0.8rem; border: 1px solid #ced4da; border-radius: 4px; padding: 4px; width: 100%;}
+        .file-status { font-size: 0.75rem; color: #6c757d; font-style: italic; }
+        .file-upload-input[readonly], .file-upload-input:disabled { background-color: #e9ecef; cursor: not-allowed; opacity: 0.8; }
+
+        /* Timeline Styling */
+        .timeline { list-style: none; padding-left: 0; margin-bottom: 0; }
+        .timeline li { position: relative; padding-left: 20px; padding-bottom: 15px; border-left: 2px solid #dee2e6; }
+        .timeline li:last-child { border-left: 0; padding-bottom: 0; }
+        .timeline li::before { content: ''; position: absolute; left: -6px; top: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--primary-color); }
+        .timeline li.stage-done::before { background: var(--success-color); }
+        
+        @media (max-width: 768px) { .chart-container { height: 250px !important; } .main-tabs {flex-direction: column;} .main-tab-btn {width: 100%; justify-content: center;}}
+    </style>
+</head>
+<body>
+<div class="container-fluid py-4 px-3">
+    
+    <!-- Header & Factory Selection -->
+    <div class="row mb-3 align-items-center">
+        <div class="col-md-2 d-none d-md-block"></div>
+        <div class="col-md-8 text-center">
+            <h2 class="mb-3 fw-bold text-dark">
+                <i class="fas fa-industry text-primary me-2"></i>
+                Dashboard Quản Lý Vật Tư & Dịch Vụ - <span id="factoryTitle" class="text-primary">NM.CĐ3</span>
+            </h2>
+            
+            <div class="factory-selector d-inline-block shadow-sm rounded-pill overflow-hidden mb-2 bg-white p-1">
+                <input type="radio" class="btn-check" name="factoryRadio" id="btn-cd3" autocomplete="off" checked onchange="switchFactory('CĐ3')">
+                <label class="btn btn-outline-primary px-5 py-2 fw-bold border-0 rounded-pill" for="btn-cd3">NM.CĐ3</label>
+
+                <input type="radio" class="btn-check" name="factoryRadio" id="btn-cd6" autocomplete="off" onchange="switchFactory('CĐ6')">
+                <label class="btn btn-outline-primary px-5 py-2 fw-bold border-0 rounded-pill" for="btn-cd6">NM.CĐ6</label>
+            </div>
+        </div>
+        <div class="col-md-2 text-end mt-3 mt-md-0">
+            <button id="adminBtn" class="btn btn-outline-secondary fw-bold rounded-pill shadow-sm" onclick="toggleAdmin()">
+                <i class="fas fa-user-shield me-1"></i> Admin
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN NAVIGATION TABS -->
+    <div class="main-tabs" id="mainTabsNav">
+        <button class="main-tab-btn active" onclick="switchMainTab('tab-vattu-quantrong', this)">
+            <i class="fas fa-star"></i> VẬT TƯ QUAN TRỌNG
+        </button>
+        <button class="main-tab-btn" onclick="switchMainTab('tab-cbm', this)">
+            <i class="fas fa-sync-alt"></i> VT THAY THẾ ĐỊNH KỲ
+        </button>
+        <button class="main-tab-btn" onclick="switchMainTab('tab-thuong-xuyen', this)">
+            <i class="fas fa-tools"></i> VT THAY THẾ THƯỜNG XUYÊN
+        </button>
+        <button class="main-tab-btn" onclick="switchMainTab('tab-pr-dichvu', this, true)">
+            <i class="fas fa-file-contract"></i> PR DỊCH VỤ
+        </button>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- TAB 1: VẬT TƯ QUAN TRỌNG                                  -->
+    <!-- ========================================================= -->
+    <div id="tab-vattu-quantrong" class="main-tab-content">
+        
+        <div class="d-flex flex-wrap justify-content-center align-items-center gap-2 bg-white p-2 rounded-pill shadow-sm mx-auto mb-4" style="max-width: 1100px; border: 1px solid #dee2e6;">
+            <div class="d-flex align-items-center gap-1">
+                <i class="fas fa-building text-secondary ms-2"></i>
+                <select id="workshopFilter" class="form-select form-select-sm border-0 fw-bold text-primary shadow-none bg-light rounded-pill px-3" onchange="handleWorkshopChange()" style="cursor: pointer; width: auto; font-size: 0.85rem;">
+                    <option value="ALL">Tất cả Xưởng</option>
+                </select>
+            </div>
+            <div style="width: 1px; height: 20px; background-color: #dee2e6;"></div>
+            <div class="d-flex align-items-center gap-1">
+                <i class="fas fa-layer-group text-secondary"></i>
+                <select id="areaFilter" class="form-select form-select-sm border-0 fw-bold text-primary shadow-none bg-light rounded-pill px-3" onchange="applyFilters()" style="cursor: pointer; width: auto; font-size: 0.85rem;" disabled>
+                    <option value="ALL">Tất cả Khu vực</option>
+                </select>
+            </div>
+            <div style="width: 1px; height: 20px; background-color: #dee2e6;"></div>
+            <div class="d-flex align-items-center gap-1">
+                <i class="fas fa-tools text-secondary"></i>
+                <select id="typeFilter" class="form-select form-select-sm border-0 fw-bold text-primary shadow-none bg-light rounded-pill px-3" onchange="applyFilters()" style="cursor: pointer; width: auto; font-size: 0.85rem;">
+                    <option value="ALL">Loại Vật Tư</option>
+                    <option value="Cơ">Cơ</option>
+                    <option value="Điện">Điện</option>
+                </select>
+            </div>
+            <div style="width: 1px; height: 20px; background-color: #dee2e6;"></div>
+            <div class="d-flex align-items-center gap-1">
+                <i class="fas fa-filter text-secondary"></i>
+                <select id="statusFilter" class="form-select form-select-sm border-0 fw-bold text-primary shadow-none bg-light rounded-pill px-3" onchange="applyFilters()" style="cursor: pointer; width: auto; font-size: 0.85rem;">
+                    <option value="ALL">Mọi Trạng Thái</option>
+                    <option value="LATE">🔴 Trễ hạn</option>
+                    <option value="WARNING">⚠️ Cần mua bù</option>
+                    <option value="OK">✅ An toàn</option>
+                </select>
+            </div>
+            <div style="width: 1px; height: 20px; background-color: #dee2e6;"></div>
+            <div class="d-flex align-items-center">
+                <input type="text" id="searchInput" class="form-control form-control-sm border-0 bg-light rounded-pill px-3 shadow-none fw-semibold" placeholder="🔍 Lọc nhiều mã, PR, PO... (dùng dấu phẩy)" oninput="applyFilters()" style="width: 280px; font-size: 0.85rem;">
+            </div>
+        </div>
+
+        <div id="adminControlsVT" class="admin-panel bg-white p-3 rounded shadow-sm border border-top-0 d-none mb-4" style="border-top: 4px solid var(--primary-color) !important;">
+            <h5 class="fw-bold text-primary mb-3"><i class="fas fa-cogs me-2"></i>Quản lý & Cập nhật Dữ liệu VT Quan Trọng - <span class="adminFactoryNameDisplay">CĐ3</span></h5>
+            
+            <div class="row">
+                <div class="col-md-4 border-end pe-3">
+                    <h6 class="fw-bold text-secondary mb-3"><i class="fas fa-file-upload me-1"></i> 1. Cấu trúc Base Data</h6>
+                    <div class="mb-2">
+                        <input type="text" id="workshopNameInput" class="form-control form-control-sm mb-2" placeholder="Tên Xưởng / Tên Báo cáo...">
+                        <input type="file" id="fileInput" class="form-control form-control-sm" accept=".xlsx,.xls">
+                    </div>
+                    <div class="d-flex gap-2 mb-2">
+                        <button class="btn btn-primary btn-sm w-50 fw-bold shadow-sm" type="button" onclick="uploadWorkshopFile(false)" title="Xóa cũ, ghi đè file mới">
+                            <i class="fas fa-upload me-1"></i> Ghi Đè
+                        </button>
+                        <button class="btn btn-success btn-sm w-50 fw-bold shadow-sm" type="button" onclick="uploadWorkshopFile(true)" title="Giữ nguyên dữ liệu cũ, ghép thêm dữ liệu từ file mới vào">
+                            <i class="fas fa-plus-circle me-1"></i> Bổ Sung
+                        </button>
+                    </div>
+                    <button class="btn btn-info btn-sm w-100 text-white fw-bold shadow-sm" onclick="downloadTemplate()">
+                        <i class="fas fa-download"></i> Tải Template Mẫu
+                    </button>
+                    
+                    <div class="mt-3 border rounded bg-light p-2" style="max-height: 120px; overflow-y: auto;">
+                        <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-1">
+                            <small class="fw-bold text-secondary">File Gốc hiện tại:</small>
+                            <button class="btn btn-xs btn-danger fw-bold py-0" style="font-size: 0.7rem;" onclick="deleteAllWorkshops()">Xóa Hết</button>
+                        </div>
+                        <ul class="list-group list-group-flush" id="adminFileList">
+                            <li class="list-group-item bg-transparent text-muted small py-1">Chưa có dữ liệu nào...</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="col-md-4 border-end px-3">
+                    <h6 class="fw-bold text-success mb-3"><i class="fas fa-sync-alt me-1"></i> 2. Đồng bộ mua hàng (SAP)</h6>
+                    <p class="small text-muted mb-2">Upload file SAP để cập nhật PO, PR, Ngày về, Tồn xưởng...</p>
+                    <div class="mb-3">
+                        <input type="file" id="sapFileInput" class="form-control form-control-sm border-success" accept=".csv,.xlsx,.xls">
+                    </div>
+                    <button class="btn btn-success btn-sm w-100 fw-bold shadow-sm" type="button" onclick="uploadSAPFile()">
+                        <i class="fas fa-magic me-1"></i> Đồng bộ SAP
+                    </button>
+                </div>
+
+                <div class="col-md-4 ps-3">
+                    <h6 class="fw-bold text-primary mb-3"><i class="fas fa-warehouse me-1"></i> 3. Cập nhật Tồn Kho NM</h6>
+                    <p class="small text-muted mb-2">Upload file (Mã Vật Tư, Tồn Kho) để cập nhật Tồn kho tổng NM.</p>
+                    <div class="mb-3">
+                        <input type="file" id="factoryStockInput" class="form-control form-control-sm border-primary" accept=".xlsx,.xls,.csv">
+                    </div>
+                    <button class="btn btn-primary btn-sm w-100 fw-bold shadow-sm" type="button" onclick="uploadFactoryStockFile()">
+                        <i class="fas fa-boxes me-1"></i> Cập nhật Tồn Kho NM
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="overviewSection" class="mb-4" style="display: none;">
+            <div class="d-flex align-items-center mb-2 px-1">
+                <h5 class="fw-bold text-secondary mb-0"><i class="fas fa-eye text-primary me-2"></i>Đang xem: <span id="overviewScope" class="text-primary fw-bolder bg-white px-3 py-1 rounded shadow-sm border">Toàn Bộ NM.CĐ3</span></h5>
+            </div>
+            <div class="row">
+                <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                    <div class="card card-stat bg-primary text-white h-100">
+                        <div class="card-body text-center d-flex flex-column justify-content-center">
+                            <i class="fas fa-boxes fa-2x mb-2 opacity-75"></i>
+                            <h6 class="card-title text-uppercase fw-semibold">Tổng mã vật tư</h6>
+                            <h2 id="totalItems" class="mb-0 fw-bold">0</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                    <div class="card card-stat bg-danger text-white h-100">
+                        <div class="card-body text-center d-flex flex-column justify-content-center">
+                            <i class="fas fa-clock fa-2x mb-2 opacity-75"></i>
+                            <h6 class="card-title text-uppercase fw-semibold">Tổng Trễ Hạn</h6>
+                            <h2 class="mb-0 fw-bold"><span id="delayedItems">0</span> <small id="delayedPercent" class="fs-6 fw-normal opacity-75"></small></h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                    <div class="card card-stat bg-warning text-dark h-100">
+                        <div class="card-body text-center d-flex flex-column justify-content-center">
+                            <i class="fas fa-exclamation-triangle fa-2x mb-2 opacity-75"></i>
+                            <h6 class="card-title text-uppercase fw-semibold" style="font-size: 0.85rem;">SL VTDP còn thiếu</h6>
+                            <h2 id="lowStockItems" class="mb-0 fw-bold">0</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                    <div class="card card-stat bg-success text-white h-100">
+                        <div class="card-body text-center d-flex flex-column justify-content-center">
+                            <i class="fas fa-file-signature fa-2x mb-2 opacity-75"></i>
+                            <h6 class="card-title text-uppercase fw-semibold" style="font-size: 0.8rem;">Tỷ lệ lên PR / Tổng VT</h6>
+                            <h2 id="prItems" class="mb-0 fw-bold"><span id="prSumAnim">0</span> <span class="fs-5 fw-normal opacity-75">/ 0 (0%)</span></h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                    <div class="card card-stat bg-info text-white h-100">
+                        <div class="card-body text-center d-flex flex-column justify-content-center">
+                            <i class="fas fa-chart-line fa-2x mb-2 opacity-75"></i>
+                            <h6 class="card-title text-uppercase fw-semibold" style="font-size: 0.8rem;">Tỷ lệ Tồn / Tổng ĐB</h6>
+                            <h2 id="avgStockRate" class="mb-0 fw-bold">0%</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                    <button class="btn btn-outline-primary w-100 h-100 fw-bold d-flex flex-column align-items-center justify-content-center border-2 bg-white" onclick="exportSummary()" style="min-height: 100px;">
+                        <i class="fas fa-file-export fa-2x mb-2"></i>
+                        <span id="exportTextBtn" class="text-center px-2">Xuất Báo Cáo</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="mainContentContainer" style="display: none;">
+            <div class="bg-white p-3 rounded-3 shadow-sm border" id="mainContent">
+            </div>
+        </div>
+        
+        <div id="emptyState" class="text-center py-5" style="display: block;">
+            <i class="fas fa-folder-open fa-4x text-muted mb-3 opacity-50"></i>
+            <h4 class="text-muted">Chưa có dữ liệu cho <span class="emptyFactoryNameDisplay">NM.CĐ3</span></h4>
+            <p class="text-muted">Hệ thống chưa có số liệu. Hãy đăng nhập Admin để tải lên báo cáo từng xưởng.</p>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- TAB 2: VẬT TƯ THAY THẾ ĐỊNH KỲ (CBM)                      -->
+    <!-- ========================================================= -->
+    <div id="tab-cbm" class="main-tab-content d-none">
+        
+        <div id="adminControlsCBM" class="admin-panel bg-white p-3 rounded shadow-sm border border-top-0 d-none mb-4" style="border-top: 4px solid var(--warning-color) !important;">
+            <h5 class="fw-bold text-warning mb-3" style="color: #d39e00 !important;"><i class="fas fa-tools me-2"></i>Quản lý Dữ liệu CBM - <span class="adminFactoryNameDisplay">CĐ3</span></h5>
+            
+            <div class="row">
+                <div class="col-md-5 border-end pe-3">
+                    <h6 class="fw-bold text-secondary mb-2"><i class="fas fa-file-excel me-1"></i>1. Cấu trúc Base Data CBM</h6>
+                    <div class="d-flex align-items-center mb-2">
+                        <input type="file" id="cbmFileInput" class="form-control form-control-sm me-2" accept=".xlsx,.xls">
+                        <button class="btn btn-warning btn-sm fw-bold shadow-sm text-nowrap" type="button" onclick="uploadCBMFile()">
+                            <i class="fas fa-upload me-1"></i> Upload
+                        </button>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-info btn-sm w-50 fw-bold" onclick="downloadCBMTemplate()">
+                            <i class="fas fa-download"></i> Tải File Mẫu
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm w-50 fw-bold" onclick="clearCBMData()">
+                            <i class="fas fa-trash"></i> Xóa Data
+                        </button>
+                    </div>
+                </div>
+
+                <div class="col-md-7 ps-3">
+                    <h6 class="fw-bold text-success mb-2"><i class="fas fa-sync-alt me-1"></i>2. Đồng bộ Mua hàng từ SAP</h6>
+                    <p class="small text-muted mb-2">Upload file xuất từ SAP để cập nhật Tồn kho, PR, PO và Ngày về dự kiến.</p>
+                    <div class="d-flex align-items-center">
+                        <input type="file" id="sapCbmInput" class="form-control form-control-sm border-success me-2" accept=".csv,.xlsx,.xls">
+                        <button class="btn btn-success btn-sm fw-bold shadow-sm text-nowrap" type="button" onclick="uploadSapCbm()">
+                            <i class="fas fa-magic me-1"></i> Đồng bộ SAP
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card card-stat bg-white border border-primary h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-cogs fa-2x text-primary mb-2"></i>
+                        <h6 class="text-muted fw-bold text-uppercase">Tổng mã CBM theo dõi</h6>
+                        <h2 class="mb-0 fw-bold text-primary" id="cbmTotal">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card card-stat bg-white border border-success h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                        <h6 class="text-muted fw-bold text-uppercase">An toàn / Đã có đủ hàng</h6>
+                        <h2 class="mb-0 fw-bold text-success" id="cbmSafe">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card card-stat bg-white border border-warning h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
+                        <h6 class="text-muted fw-bold text-uppercase">Chuẩn bị lên PR (+60d)</h6>
+                        <h2 class="mb-0 fw-bold text-warning" id="cbmWarning" style="color: #d39e00 !important;">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card card-stat bg-danger text-white h-100 shadow">
+                    <div class="card-body text-center">
+                        <i class="fas fa-skull-crossbones fa-2x mb-2 opacity-75"></i>
+                        <h6 class="fw-bold text-uppercase">Cảnh báo Quá hạn / Trễ PO</h6>
+                        <h2 class="mb-0 fw-bold" id="cbmOverdue">0</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end mb-2">
+            <button class="btn btn-outline-success fw-bold shadow-sm" onclick="exportCBMExcel()">
+                <i class="fas fa-file-excel me-1"></i> Xuất Excel CBM
+            </button>
+        </div>
+
+        <div class="bg-white p-3 rounded-3 shadow-sm border">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2 flex-wrap gap-2">
+                <h5 class="fw-bold text-dark mb-0"><i class="fas fa-clipboard-list text-warning me-2"></i>Danh sách Vật Tư CBM Cần Theo Dõi</h5>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <select id="cbmXuongFilter" class="form-select form-select-sm w-auto fw-bold text-secondary" onchange="renderCBMTable()">
+                        <option value="ALL">Tất cả Xưởng</option>
+                    </select>
+                    <select id="cbmStatusFilter" class="form-select form-select-sm w-auto fw-bold text-secondary" onchange="renderCBMTable()">
+                        <option value="ALL">Mọi Tình Trạng</option>
+                        <option value="SAFE">✅ An toàn / Đủ thay</option>
+                        <option value="WARNING">⚠️ Cần mua / Chờ PO</option>
+                        <option value="OVERDUE">🔴 Quá hạn / Trễ</option>
+                    </select>
+                    <input type="text" id="cbmSearch" class="form-control form-control-sm" style="width: 200px;" placeholder="Tìm kiếm mã, tên, vị trí..." oninput="renderCBMTable()">
+                </div>
+            </div>
+            <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0 text-center">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th class="text-start">Mã / Tên Vật Tư</th>
+                            <th class="text-start">Xưởng</th>
+                            <th class="text-start">Vị Trí</th>
+                            <th>Thay Gần Nhất</th>
+                            <th>Tuổi Thọ (Tháng)</th>
+                            <th class="text-primary">Dự Kiến Thay</th>
+                            <th>Định Mức</th>
+                            <th class="text-success">Tồn Kho</th>
+                            <th class="text-info">Đang Mua</th>
+                            <th>Số PR</th>
+                            <th>PO / Ngày Về</th>
+                            <th style="width: 18%;">Tình Trạng PR / Hàng</th>
+                            <th>Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cbmTableBody">
+                        <tr><td colspan="12" class="py-4 text-muted fst-italic">Chưa có dữ liệu CBM. Vui lòng upload file.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- TAB 3: VẬT TƯ THAY THẾ THƯỜNG XUYÊN                       -->
+    <!-- ========================================================= -->
+    <div id="tab-thuong-xuyen" class="main-tab-content d-none">
+        
+        <div id="adminControlsReg" class="admin-panel bg-white p-3 rounded shadow-sm border border-top-0 d-none mb-4" style="border-top: 4px solid var(--info-color, #0dcaf0) !important;">
+            <h5 class="fw-bold text-info mb-3" style="color: #087990 !important;"><i class="fas fa-cogs me-2"></i>Quản lý Dữ liệu VT Thường Xuyên - <span class="adminFactoryNameDisplay">CĐ3</span></h5>
+            
+            <div class="row">
+                <div class="col-md-5 border-end pe-3">
+                    <h6 class="fw-bold text-secondary mb-2"><i class="fas fa-file-excel me-1"></i>1. Cấu trúc Base Data</h6>
+                    <div class="d-flex align-items-center mb-2">
+                        <input type="file" id="regFileInput" class="form-control form-control-sm me-2" accept=".xlsx,.xls">
+                        <button class="btn btn-info text-white btn-sm fw-bold shadow-sm text-nowrap" type="button" onclick="uploadRegFile()">
+                            <i class="fas fa-upload me-1"></i> Upload
+                        </button>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary btn-sm w-50 fw-bold" onclick="downloadRegTemplate()">
+                            <i class="fas fa-download"></i> Tải File Mẫu
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm w-50 fw-bold" onclick="clearRegData()">
+                            <i class="fas fa-trash"></i> Xóa Data
+                        </button>
+                    </div>
+                </div>
+
+                <div class="col-md-7 ps-3">
+                    <h6 class="fw-bold text-success mb-2"><i class="fas fa-sync-alt me-1"></i>2. Đồng bộ Tồn Kho từ SAP</h6>
+                    <p class="small text-muted mb-2">Upload file xuất từ SAP để cập nhật Số lượng Tồn Kho hiện tại.</p>
+                    <div class="d-flex align-items-center">
+                        <input type="file" id="sapRegInput" class="form-control form-control-sm border-success me-2" accept=".csv,.xlsx,.xls">
+                        <button class="btn btn-success btn-sm fw-bold shadow-sm text-nowrap" type="button" onclick="uploadSapReg()">
+                            <i class="fas fa-magic me-1"></i> Đồng bộ Tồn Kho
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card card-stat bg-white border border-secondary h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-cubes fa-2x text-secondary mb-2"></i>
+                        <h6 class="text-muted fw-bold text-uppercase">Tổng mã quản lý</h6>
+                        <h2 class="mb-0 fw-bold text-secondary" id="regTotal">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card card-stat bg-white border border-success h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                        <h6 class="text-muted fw-bold text-uppercase">Tồn kho An toàn</h6>
+                        <h2 class="mb-0 fw-bold text-success" id="regSafe">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card card-stat bg-white border border-warning h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
+                        <h6 class="text-muted fw-bold text-uppercase">Thấp hơn Tối Thiểu (Cần Mua)</h6>
+                        <h2 class="mb-0 fw-bold text-warning" id="regWarning" style="color: #d39e00 !important;">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card card-stat bg-danger text-white h-100 shadow">
+                    <div class="card-body text-center">
+                        <i class="fas fa-ban fa-2x mb-2 opacity-75"></i>
+                        <h6 class="fw-bold text-uppercase">Khẩn Cấp (Hết hàng / = 0)</h6>
+                        <h2 class="mb-0 fw-bold" id="regCritical">0</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end mb-2">
+            <button class="btn btn-outline-success fw-bold shadow-sm" onclick="exportRegExcel()">
+                <i class="fas fa-file-excel me-1"></i> Xuất Excel Báo Cáo
+            </button>
+        </div>
+
+        <div class="bg-white p-3 rounded-3 shadow-sm border">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                <h5 class="fw-bold text-dark mb-0"><i class="fas fa-list text-info me-2"></i>Danh sách Vật Tư Thường Xuyên</h5>
+                <div class="d-flex gap-2 justify-content-end flex-wrap">
+                    <select id="regTypeFilter" class="form-select form-select-sm w-auto fw-bold text-secondary" onchange="renderRegTable()">
+                        <option value="ALL">Tất cả Cơ/Điện</option>
+                        <option value="Cơ">Vật tư Cơ</option>
+                        <option value="Điện">Vật tư Điện</option>
+                    </select>
+                    <select id="regStatusFilter" class="form-select form-select-sm w-auto fw-bold text-secondary" onchange="renderRegTable()">
+                        <option value="ALL">Mọi Trạng Thái Kho</option>
+                        <option value="SAFE">✅ An toàn / Vượt mức</option>
+                        <option value="WARNING">⚠️ Cần mua bù</option>
+                        <option value="CRITICAL">🔴 Hết hàng</option>
+                    </select>
+                    <select id="regSuggestFilter" class="form-select form-select-sm w-auto fw-bold text-secondary" onchange="renderRegTable()">
+                        <option value="ALL">Mọi Mức Xuất (6 Tháng)</option>
+                        <option value="TANG">Tăng định biên</option>
+                        <option value="GIAM">Giảm định biên</option>
+                        <option value="HOPLY">Hợp lý</option>
+                    </select>
+                    <input type="text" id="regSearch" class="form-control form-control-sm" style="width: 200px;" placeholder="Tìm kiếm mã, tên..." oninput="renderRegTable()">
+                </div>
+            </div>
+            <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0 text-center">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th class="text-start">Mã / Tên Vật Tư</th>
+                            <th class="text-start">Vị Trí</th>
+                            <th class="text-secondary">Định Biên<br><small>(Min - Max)</small></th>
+                            <th class="text-success fs-6">Tồn Kho</th>
+                            <th class="text-danger">SL Cần Mua<br><small>(Kích hoạt khi < Min)</small></th>
+                            <th style="width: 15%;">Trạng Thái Tồn Kho</th>
+                            <th class="border-start">SL Xuất<br><small>(6 Tháng)</small></th>
+                            <th>Đề Xuất Định Biên<br><small>(Dựa trên lượng xuất)</small></th>
+                            <th>Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="regTableBody">
+                        <tr><td colspan="9" class="py-4 text-muted fst-italic">Chưa có dữ liệu. Vui lòng upload file Base Data.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- TAB 4: PR DỊCH VỤ                                         -->
+    <!-- ========================================================= -->
+    <div id="tab-pr-dichvu" class="main-tab-content d-none">
+        
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="fw-bold text-dark mb-0"><i class="fas fa-file-signature text-warning me-2" style="color: #fd7e14 !important;"></i> Dashboard Theo Dõi PR Dịch Vụ</h4>
+            <div class="d-flex gap-2 align-items-center">
+                <input type="file" id="prExcelUpload" class="d-none" accept=".xlsx,.xls" onchange="uploadPrExcel(event)">
+                <button class="btn btn-outline-info fw-bold shadow-sm admin-only-btn d-none" onclick="downloadPrTemplate()">
+                    <i class="fas fa-download me-1"></i> Tải File Mẫu Nhập
+                </button>
+                <button class="btn btn-outline-primary fw-bold shadow-sm admin-only-btn d-none" onclick="document.getElementById('prExcelUpload').click()">
+                    <i class="fas fa-upload me-1"></i> Import Từ Excel
+                </button>
+                <button class="btn btn-outline-success fw-bold shadow-sm" onclick="exportPrExcel()">
+                    <i class="fas fa-file-excel me-1"></i> Xuất Báo Cáo
+                </button>
+                <button class="btn btn-warning fw-bold shadow-sm" style="background-color: #fd7e14; border-color: #fd7e14; color: white;" onclick="openAddPrModal()">
+                    <i class="fas fa-plus-circle me-1"></i> Thêm Gói Thầu
+                </button>
+            </div>
+        </div>
+
+        <div class="row g-2 mb-4 row-cols-2 row-cols-md-4 row-cols-xl-auto justify-content-center">
+            <div class="col" style="flex: 1 0 13%;">
+                <div class="pr-stage-card bg-secondary text-white">
+                    <h6 class="text-uppercase fw-bold" style="font-size: 0.8rem;">Tổng Gói Thầu</h6>
+                    <h2 class="mb-0 fw-bold" id="prCountTotal">0</h2>
+                </div>
+            </div>
+            <div class="col" style="flex: 1 0 13%;">
+                <div class="pr-stage-card bg-stage-1">
+                    <h6 class="text-uppercase fw-bold" style="font-size: 0.75rem;">1. Đang Tạo PR</h6>
+                    <h2 class="mb-0 fw-bold" id="prCount1">0</h2>
+                </div>
+            </div>
+            <div class="col" style="flex: 1 0 13%;">
+                <div class="pr-stage-card bg-stage-2">
+                    <h6 class="text-uppercase fw-bold" style="font-size: 0.75rem;">2. Lập YCKT</h6>
+                    <h2 class="mb-0 fw-bold" id="prCount2">0</h2>
+                </div>
+            </div>
+            <div class="col" style="flex: 1 0 13%;">
+                <div class="pr-stage-card bg-stage-3">
+                    <h6 class="text-uppercase fw-bold" style="font-size: 0.75rem;">3. Đánh Giá SSKT</h6>
+                    <h2 class="mb-0 fw-bold" id="prCount3">0</h2>
+                </div>
+            </div>
+            <div class="col" style="flex: 1 0 13%;">
+                <div class="pr-stage-card bg-stage-4">
+                    <h6 class="text-uppercase fw-bold" style="font-size: 0.75rem;">4. Chốt ĐKKT</h6>
+                    <h2 class="mb-0 fw-bold" id="prCount4">0</h2>
+                </div>
+            </div>
+            <div class="col" style="flex: 1 0 13%;">
+                <div class="pr-stage-card bg-stage-5">
+                    <h6 class="text-uppercase fw-bold" style="font-size: 0.75rem;">5. Đang Thi Công</h6>
+                    <h2 class="mb-0 fw-bold" id="prCount5">0</h2>
+                </div>
+            </div>
+            <div class="col" style="flex: 1 0 13%;">
+                <div class="pr-stage-card bg-stage-6">
+                    <h6 class="text-uppercase fw-bold" style="font-size: 0.75rem;">6. Hoàn Thành</h6>
+                    <h2 class="mb-0 fw-bold" id="prCount6">0</h2>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-3 rounded-3 shadow-sm border">
+            <div class="d-flex gap-2 mb-3 bg-light p-2 rounded border flex-wrap">
+                <div class="fw-bold text-secondary d-flex align-items-center me-2"><i class="fas fa-filter me-1"></i> Bộ Lọc:</div>
+                <select id="prFilterWorkshop" class="form-select form-select-sm w-auto fw-bold text-secondary" onchange="renderPrTable()">
+                    <option value="ALL">Tất cả Xưởng / Đơn vị</option>
+                </select>
+                <select id="prFilterStage" class="form-select form-select-sm w-auto fw-bold text-secondary" onchange="renderPrTable()">
+                    <option value="ALL">Tất cả Giai Đoạn</option>
+                    <option value="1">1. Đang tạo PR / Tờ trình</option>
+                    <option value="2">2. Lập YCKT - PVCC</option>
+                    <option value="3">3. Đánh giá SSKT</option>
+                    <option value="4">4. Chốt ĐKKT - PLKT</option>
+                    <option value="5">5. Đang thi công</option>
+                    <option value="6">6. Hoàn thành / Ký HSNT</option>
+                </select>
+                <input type="text" id="prFilterPic" class="form-control form-control-sm w-auto" placeholder="Tìm người phụ trách..." oninput="renderPrTable()">
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 text-center" style="font-size: 0.85rem;">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-start">Số PR</th>
+                            <th class="text-start" style="width: 15%;">Tên Gói Thầu / Dịch Vụ</th>
+                            <th>Xưởng / Đơn vị</th>
+                            <th class="text-info fw-bold">Nhà Thầu Thực Hiện</th>
+                            <th>Người Phụ Trách</th>
+                            <th>Ngày Thực Hiện</th>
+                            <th>Giai Đoạn Hiện Tại</th>
+                            <th style="width: 15%;">Tình Trạng / Vướng Mắc</th>
+                            <th>Tài Liệu (PDF)</th>
+                            <th>Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="prTableBody">
+                        <tr><td colspan="10" class="text-center py-4 text-muted fst-italic">Đang tải dữ liệu PR dịch vụ...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- CÁC MODAL GLOBAL & MỚI                                    -->
+    <!-- ========================================================= -->
+    <!-- ... existing modals ... -->
+
+    <!-- Modal Confirm Custom thay thế native window.confirm -->
+    <div class="modal fade" id="customConfirmModal" tabindex="-1" aria-hidden="true" style="z-index: 9999;">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>Xác nhận</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirmMessage" class="mb-0 fw-semibold"></p>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-danger fw-bold" id="confirmActionBtn">Đồng ý</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Sửa Thủ Công Thường Xuyên (Reg Edit Modal) -->
+    <div class="modal fade" id="regEditModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white" style="background-color: #0dcaf0;">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>Chỉnh Sửa VT Thường Xuyên</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <input type="hidden" id="regEditMa">
+                    
+                    <div class="row mb-3 border-bottom pb-2">
+                        <div class="col-md-6">
+                            <p class="mb-1 small text-muted">Mã VT:</p>
+                            <h6 class="fw-bold font-monospace text-primary" id="regEditMaDisplay"></h6>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-1 small text-muted">Tên VT:</p>
+                            <h6 class="fw-bold" id="regEditTenDisplay"></h6>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Phân Loại</label>
+                            <select id="regEditChungLoai" class="form-select form-select-sm border-info">
+                                <option value="Cơ">Cơ</option>
+                                <option value="Điện">Điện</option>
+                                <option value="Khác">Khác</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Vị Trí Lắp Đặt</label>
+                            <input type="text" id="regEditViTri" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-success">Tồn Kho Hiện Tại</label>
+                            <input type="number" id="regEditTonKho" class="form-control form-control-sm border-success">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-secondary">SL Xuất 6 Tháng</label>
+                            <input type="number" id="regEditXuat" class="form-control form-control-sm border-secondary">
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold text-info border-bottom pb-1 mb-2 mt-3">Quản Lý Định Biên</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Định Biên Tối Thiểu (Min)</label>
+                            <input type="number" id="regEditMin" class="form-control form-control-sm border-warning">
+                            <small class="text-muted" style="font-size: 0.7rem;">Kích hoạt cảnh báo mua khi Tồn kho < Min</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Định Biên Tối Đa (Max)</label>
+                            <input type="number" id="regEditMax" class="form-control form-control-sm border-primary">
+                            <small class="text-muted" style="font-size: 0.7rem;">Số lượng đề xuất mua = Max - Tồn kho</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top-0">
+                    <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-info fw-bold text-white" onclick="saveRegCorrection()">Lưu Chỉnh Sửa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Thêm/Sửa PR Dịch Vụ -->
+    <div class="modal fade" id="prModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header text-white" style="background-color: #fd7e14;">
+                    <h5 class="modal-title fw-bold" id="prModalTitle"><i class="fas fa-edit me-2"></i>Thêm Gói Thầu Mới</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <input type="hidden" id="prDocId">
+                    
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-7">
+                            <label class="form-label fw-bold small">Tên Gói Thầu / Dịch Vụ <span class="text-danger">*</span></label>
+                            <input type="text" id="prName" class="form-control form-control-sm" placeholder="VD: Thuê bảo dưỡng máy nén khí">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label fw-bold small">Giai đoạn hiện tại</label>
+                            <select id="prStage" class="form-select form-select-sm fw-bold text-primary">
+                                <option value="1">1. Đang tạo PR / Tờ trình</option>
+                                <option value="2">2. Lập YCKT - PVCC</option>
+                                <option value="3">3. Đánh giá SSKT</option>
+                                <option value="4">4. Chốt ĐKKT - PLKT</option>
+                                <option value="5">5. Đang thi công</option>
+                                <option value="6">6. Hoàn thành / Ký HSNT</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">Số PR</label>
+                            <input type="text" id="prNumber" class="form-control form-control-sm" placeholder="VD: PR-2026-001">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">Xưởng / Đơn vị</label>
+                            <select id="prWorkshop" class="form-select form-select-sm fw-bold text-secondary">
+                                <!-- Nạp danh sách qua JS -->
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small text-info">Nhà thầu thực hiện</label>
+                            <input type="text" id="prNhaThau" class="form-control form-control-sm border-info" placeholder="Nhập tên nhà thầu...">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">Người phụ trách</label>
+                            <input type="text" id="prPIC" class="form-control form-control-sm" placeholder="Tên PIC...">
+                        </div>
+                    </div>
+
+                    <div class="mb-4 row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">Ngày Thực Hiện</label>
+                            <input type="date" id="prNgayThucHien" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-9">
+                            <label class="form-label fw-bold small text-danger"><i class="fas fa-exclamation-triangle me-1"></i> Nội dung tình trạng / Vướng mắc hiện tại</label>
+                            <textarea id="prIssues" class="form-control form-control-sm border-danger" rows="2" placeholder="Ghi chú các vướng mắc, lý do thay đổi giai đoạn, tiến độ thực tế... (Sẽ được ghi lại vào lịch sử)"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-primary"><i class="fas fa-link me-1"></i> Link Tài Liệu Chung (Google Drive, OneDrive...)</label>
+                        <input type="url" id="prDocLink" class="form-control form-control-sm border-primary file-upload-input" placeholder="Dán đường link thư mục tài liệu vào đây để xem nhanh...">
+                    </div>
+
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="fas fa-folder-open me-2"></i> Hồ Sơ Đính Kèm (Hỗ trợ nhiều File / Link)</h6>
+                    <div class="row">
+                        <div class="col-md-4 file-upload-row">
+                            <label class="fw-bold small text-dark">1. Tờ trình / PR</label>
+                            <div id="existingData1" class="d-flex flex-wrap gap-1 mb-1"></div>
+                            <input type="file" id="file1" class="file-upload-input mb-1" accept=".pdf,.zip,.rar,.doc,.docx,.xls,.xlsx" multiple title="Chọn nhiều file">
+                            <textarea id="link1" class="form-control form-control-sm border-info file-upload-input" rows="2" placeholder="Dán nhiều Link (cách nhau dấu phẩy hoặc xuống dòng)..."></textarea>
+                        </div>
+                        <div class="col-md-4 file-upload-row">
+                            <label class="fw-bold small text-dark">2. YCKT - PVCC</label>
+                            <div id="existingData2" class="d-flex flex-wrap gap-1 mb-1"></div>
+                            <input type="file" id="file2" class="file-upload-input mb-1" accept=".pdf,.zip,.rar,.doc,.docx,.xls,.xlsx" multiple>
+                            <textarea id="link2" class="form-control form-control-sm border-info file-upload-input" rows="2" placeholder="Dán nhiều Link..."></textarea>
+                        </div>
+                        <div class="col-md-4 file-upload-row">
+                            <label class="fw-bold small text-dark">3. Hồ sơ SSKT</label>
+                            <div id="existingData3" class="d-flex flex-wrap gap-1 mb-1"></div>
+                            <input type="file" id="file3" class="file-upload-input mb-1" accept=".pdf,.zip,.rar,.doc,.docx,.xls,.xlsx" multiple>
+                            <textarea id="link3" class="form-control form-control-sm border-info file-upload-input" rows="2" placeholder="Dán nhiều Link..."></textarea>
+                        </div>
+                        <div class="col-md-4 file-upload-row mt-2">
+                            <label class="fw-bold small text-dark">4. ĐKKT - PLKT</label>
+                            <div id="existingData4" class="d-flex flex-wrap gap-1 mb-1"></div>
+                            <input type="file" id="file4" class="file-upload-input mb-1" accept=".pdf,.zip,.rar,.doc,.docx,.xls,.xlsx" multiple>
+                            <textarea id="link4" class="form-control form-control-sm border-info file-upload-input" rows="2" placeholder="Dán nhiều Link..."></textarea>
+                        </div>
+                        <div class="col-md-4 file-upload-row mt-2">
+                            <label class="fw-bold small text-dark">5. Đang Thi Công (Biên bản...)</label>
+                            <div id="existingData5" class="d-flex flex-wrap gap-1 mb-1"></div>
+                            <input type="file" id="file5" class="file-upload-input mb-1" accept=".pdf,.zip,.rar,.doc,.docx,.xls,.xlsx" multiple>
+                            <textarea id="link5" class="form-control form-control-sm border-info file-upload-input" rows="2" placeholder="Dán nhiều Link..."></textarea>
+                        </div>
+                        <div class="col-md-4 file-upload-row mt-2">
+                            <label class="fw-bold small text-dark">6. Hồ sơ NT (HSNT)</label>
+                            <div id="existingData6" class="d-flex flex-wrap gap-1 mb-1"></div>
+                            <input type="file" id="file6" class="file-upload-input mb-1" accept=".pdf,.zip,.rar,.doc,.docx,.xls,.xlsx" multiple>
+                            <textarea id="link6" class="form-control form-control-sm border-info file-upload-input" rows="2" placeholder="Dán nhiều Link..."></textarea>
+                        </div>
+                    </div>
+                    <p class="text-danger small mt-2 fst-italic">* Tính năng upload file vật lý cần kết nối Firebase Storage Bucket. Dữ liệu đính kèm đã lưu chỉ Admin mới có quyền xóa. Bạn có thể chọn nhiều file cùng lúc để thêm mới.</p>
+                </div>
+                <div class="modal-footer bg-light border-top-0">
+                    <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn fw-bold text-white" style="background-color: #fd7e14;" onclick="savePrData()">Lưu Gói Thầu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Lịch Sử PR Dịch Vụ -->
+    <div class="modal fade" id="prHistoryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header text-white" style="background-color: #fd7e14;">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-history me-2"></i>Lịch Sử Thực Hiện Gói Thầu</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <p class="mb-3 fw-bold text-primary border-bottom pb-2">Tên gói thầu: <span id="prHistoryNameDisplay" class="text-dark"></span></p>
+                    <div style="max-height: 400px; overflow-y: auto;" class="pe-2">
+                        <ul class="timeline" id="prHistoryTimeline">
+                            <!-- Lịch sử sẽ được render vào đây -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ... existing modals CBM, Admin, SAP, Data Edit ... -->
+    <!-- Modal Sửa Thủ Công CBM (CBM Edit Modal) -->
+    <div class="modal fade" id="cbmEditModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>Chỉnh Sửa Vật Tư CBM Bằng Tay</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <input type="hidden" id="cbmEditMa">
+                    
+                    <div class="row mb-3 border-bottom pb-2">
+                        <div class="col-md-6">
+                            <p class="mb-1 small text-muted">Mã VT:</p>
+                            <h6 class="fw-bold font-monospace text-primary" id="cbmEditMaDisplay"></h6>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-1 small text-muted">Tên VT:</p>
+                            <h6 class="fw-bold" id="cbmEditTenDisplay"></h6>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Xưởng</label>
+                            <input type="text" id="cbmEditXuong" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Vị Trí Lắp Đặt</label>
+                            <input type="text" id="cbmEditViTri" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Định Mức Thay</label>
+                            <input type="number" id="cbmEditDinhMuc" class="form-control form-control-sm border-secondary">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-success">Tồn Kho Hiện Tại</label>
+                            <input type="number" id="cbmEditTonKho" class="form-control form-control-sm border-success">
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Ngày Thay Gần Nhất</label>
+                            <input type="text" id="cbmEditNgayThay" class="form-control form-control-sm" placeholder="VD: 01/15/2026">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Tuổi Thọ (Tháng)</label>
+                            <input type="number" id="cbmEditTuoiTho" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Leadtime (Ngày)</label>
+                            <input type="number" id="cbmEditLeadtime" class="form-control form-control-sm">
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold text-info border-bottom pb-1 mb-2 mt-4"><i class="fas fa-shopping-cart me-2"></i>Tiến Độ Mua Hàng</h6>
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-info">Số Lượng Đang Mua</label>
+                            <input type="number" id="cbmEditDangMua" class="form-control form-control-sm border-info">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Mã PR</label>
+                            <input type="text" id="cbmEditPR" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Mã PO</label>
+                            <input type="text" id="cbmEditPO" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Ngày Về (DD/MM/YYYY)</label>
+                            <input type="text" id="cbmEditNgayVe" class="form-control form-control-sm" placeholder="VD: 25/03/2026">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top-0">
+                    <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-warning fw-bold text-dark" onclick="saveCbmCorrection()">Lưu Chỉnh Sửa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Modal Admin Login -->
+    <div class="modal fade" id="adminModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-lock text-warning me-2"></i> Xác thực Admin</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label text-muted small">Nhập mật khẩu để quản lý dữ liệu:</label>
+                    <input type="password" id="adminPassword" class="form-control" placeholder="Mật khẩu...">
+                    <div id="pwdError" class="text-danger mt-2 fw-semibold" style="display:none; font-size: 0.85rem;">
+                        <i class="fas fa-exclamation-circle me-1"></i> Mật khẩu không đúng!
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-primary w-100 fw-bold" onclick="verifyAdmin()">Xác nhận</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cảnh Báo SAP Missing Materials -->
+    <div class="modal fade" id="missingSapModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>Cảnh Báo: Bổ sung cấu trúc dữ liệu</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <p class="text-dark fw-semibold mb-2">Hệ thống phát hiện các mã vật tư đang có trong file SAP nhưng <b class="text-danger">CHƯA TỒN TẠI</b> trong Cấu trúc gốc.</p>
+                    <p class="small text-muted mb-3"><i>* Các mã này tạm thời hiển thị tại nhóm <span class="badge bg-warning text-dark">⚠️ THIẾU CẤU TRÚC (SAP)</span>. Hãy xuất file mẫu dưới đây để điền thêm thông tin (Định biên, Vị trí...) và upload lại vào Bước 1.</i></p>
+                    
+                    <div class="table-responsive bg-white rounded border" style="max-height: 300px;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th>Mã Vật Tư</th>
+                                    <th>Tên Vật Tư (Theo SAP)</th>
+                                    <th>Mã PR</th>
+                                    <th>Mã PO</th>
+                                </tr>
+                            </thead>
+                            <tbody id="missingSapTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 d-flex justify-content-between bg-light rounded-bottom">
+                    <button type="button" class="btn btn-success fw-bold shadow-sm" onclick="downloadMissingSapTemplate()">
+                        <i class="fas fa-file-excel me-1"></i> Tải File Mẫu Bổ Sung
+                    </button>
+                    <button type="button" class="btn btn-secondary fw-bold shadow-sm" data-bs-dismiss="modal">Đã hiểu & Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Lịch Sử Tồn Đọng -->
+    <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold" id="historyModalTitle"><i class="fas fa-history me-2"></i>Chi Tiết & Lịch Sử Tồn Đọng</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <div class="row">
+                        <div class="col-md-5 mb-3 mb-md-0">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body">
+                                    <h6 class="text-muted border-bottom pb-2 mb-3">Thông Tin Vật Tư</h6>
+                                    <p class="mb-1 small"><strong>Mã VT:</strong> <span id="histMa" class="font-monospace text-primary"></span></p>
+                                    <p class="mb-1 small"><strong>Tên VT:</strong> <span id="histTen"></span></p>
+                                    <p class="mb-1 small"><strong>Khu Vực:</strong> <span id="histArea"></span></p>
+                                    <p class="mb-3 small"><strong>Vị Trí Cụ Thể:</strong> <span id="histViTri" class="badge bg-secondary"></span></p>
+                                    
+                                    <div class="p-3 rounded" id="histStatusBox" style="background-color: #fff3cd; border: 1px solid #ffe69c;">
+                                        <h6 class="fw-bold mb-1"><i class="fas fa-stopwatch me-1"></i> Tình trạng Tồn đọng</h6>
+                                        <h3 class="fw-bold text-danger mb-0" id="histTonDongDays">0 Ngày</h3>
+                                        <small class="text-muted" id="histTonDongSub">Kể từ lần nhập kho cuối cùng</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-7">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body">
+                                    <h6 class="text-muted border-bottom pb-2 mb-3">Lịch Sử Ghi Nhận Kho</h6>
+                                    <ul class="timeline" id="histTimeline"></ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ghi chú & Mã Tương Đương -->
+    <div class="modal fade" id="noteModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-dark">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>Ghi Chú Đánh Giá Vật Tư</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <p class="mb-1 small text-muted">Mã VT: <strong id="noteMaDisplay" class="text-primary font-monospace"></strong></p>
+                    <p class="mb-3 small text-muted border-bottom pb-2">Tên VT: <strong id="noteTenDisplay"></strong></p>
+                    
+                    <input type="hidden" id="noteMaValue">
+                    
+                    <div class="mb-3 p-2 bg-white border border-danger rounded shadow-sm">
+                        <label class="form-label fw-bold small text-danger mb-1"><i class="fas fa-exchange-alt me-1"></i>1. Mã vật tư tương đương (Cách nhau bằng dấu phẩy):</label>
+                        <input type="text" id="noteMaTuongDuong" class="form-control form-control-sm border-danger text-danger fw-bold" placeholder="VD: 125159X, 125159Y...">
+                        <small class="text-muted d-block mt-1" style="font-size: 0.7rem;">* Các mã này sẽ được làm nổi bật thành thẻ màu đỏ dưới mã chính.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small"><i class="fas fa-comment-dots me-1"></i>2. Ý kiến đánh giá / Tình trạng tồn đọng:</label>
+                        <textarea id="noteInputText" class="form-control form-control-sm" rows="3" placeholder="Ví dụ: Đang đợi duyệt PR, Hàng đang nằm kho..."></textarea>
+                    </div>
+                    
+                    <button class="btn btn-primary w-100 fw-bold shadow-sm mb-3" onclick="saveMaterialNote()">
+                        <i class="fas fa-save me-1"></i> Lưu Thông Tin
+                    </button>
+
+                    <h6 class="fw-bold text-secondary mb-2" style="font-size: 0.85rem;"><i class="fas fa-history me-1"></i> Lịch sử đánh giá:</h6>
+                    <div id="noteHistoryList" class="list-group list-group-flush rounded border bg-white" style="max-height: 200px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cập nhật Dữ Liệu Ảo (Admin Edit) -->
+    <div class="modal fade" id="editDataModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-pencil-alt me-2"></i>Chỉnh sửa trực tiếp (Ghi đè)</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <div class="alert alert-info small py-2 mb-3">
+                        <i class="fas fa-info-circle me-1"></i> Dữ liệu sửa tại đây sẽ <b>ưu tiên hiển thị</b> thay cho file Excel/SAP gốc. Xóa trắng để khôi phục.
+                    </div>
+                    <p class="mb-1 small text-muted">Mã VT: <strong id="editMa" class="text-primary font-monospace"></strong></p>
+                    <p class="mb-3 small text-muted border-bottom pb-2">Tên VT: <strong id="editTen"></strong></p>
+                    
+                    <input type="hidden" id="editMaValue">
+                    
+                    <div class="row g-2 mb-2">
+                        <div class="col-4">
+                            <label class="form-label small fw-bold mb-1">Lắp đặt</label>
+                            <input type="number" id="editLapDat" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label small fw-bold mb-1">Định biên</label>
+                            <input type="number" id="editDinhBien" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label small fw-bold mb-1 text-primary">Tồn Tổ</label>
+                            <input type="number" id="editTonKho" class="form-control form-control-sm border-primary">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold mb-1 text-success">Đặt Mua (PR)</label>
+                            <input type="number" id="editDatMua" class="form-control form-control-sm border-success">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold mb-1 text-info">Đã Về (GR)</label>
+                            <input type="number" id="editDaVe" class="form-control form-control-sm border-info">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold mb-1">Mã PR</label>
+                            <input type="text" id="editPR" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold mb-1">Mã PO</label>
+                            <input type="text" id="editPO" class="form-control form-control-sm">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold mb-1">P.VT Phụ trách</label>
+                            <input type="text" id="editPVT" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold mb-1">Vị trí lắp đặt</label>
+                            <input type="text" id="editViTri" class="form-control form-control-sm">
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary w-75 fw-bold shadow-sm" onclick="saveDataCorrection()">
+                            <i class="fas fa-save me-1"></i> Lưu Chỉnh Sửa
+                        </button>
+                        <button class="btn btn-outline-danger w-25 fw-bold shadow-sm" onclick="clearDataCorrection()" title="Xóa chỉnh sửa">
+                            Khôi phục
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, doc, setDoc, collection, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+// Utility Toast
+function showToast(message, type = 'success') {
+    const toastHtml = `
+        <div class="toast align-items-center text-white bg-${type === 'success' ? 'success' : type === 'danger' ? 'danger' : type === 'warning' ? 'warning text-dark' : 'info'} border-0 position-fixed shadow-lg" 
+             style="top: 20px; right: 20px; z-index: 9999; min-width: 250px;" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body fw-bold fs-6">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>`;
+    document.body.insertAdjacentHTML('beforeend', toastHtml);
+    const toastEl = document.querySelector('.toast:last-child');
+    const bsToast = new bootstrap.Toast(toastEl, { delay: 3000 });
+    bsToast.show();
+    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+}
+window.showToast = showToast; 
+
+// ====================== FIREBASE CẤU HÌNH (AUTO DETECT) ======================
+const firebaseConfig = {
+  apiKey: "AIzaSyCDl3yIWpNt1eRlB2QkAkaeND-16wNIa4E",
+  authDomain: "htql-vat-tu-nmcd3.firebaseapp.com",
+  projectId: "htql-vat-tu-nmcd3",
+  storageBucket: "htql-vat-tu-nmcd3.firebasestorage.app",
+  messagingSenderId: "584415196101",
+  appId: "1:584415196101:web:acb912c828bca51aee51ac",
+  measurementId: "G-RB87843GCJ"
+};
+
+if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+    try { firebaseConfig = JSON.parse(__firebase_config); } catch (e) {}
+}
+
+let isLocalMode = !firebaseConfig.apiKey || firebaseConfig.apiKey.trim() === "" || firebaseConfig.apiKey.includes("ĐIỀN_"); 
+if (isLocalMode) console.warn("⚠️ CHƯA CẤU HÌNH FIREBASE: Đang chạy chế độ Local.");
+
+let app, auth, db;
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'dashboard-vattu-chinh-thuc';
+let currentUser = null;
+
+if (!isLocalMode) {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+}
+
+const initAuth = async () => {
+    if (isLocalMode) return;
+    try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+            await signInAnonymously(auth);
+        }
+    } catch(e) { isLocalMode = true; }
+};
+initAuth();
+
+if (!isLocalMode) {
+    onAuthStateChanged(auth, (user) => {
+        currentUser = user;
+        if (user) {
+            listenToCloudData();
+            listenToNotesData();
+            listenToCorrectionsData();
+            listenToFactoryStockData();
+            listenToCbmData(); 
+            listenToRegData(); 
+            listenToPrData(); 
+        }
+    });
+}
+
+// ====================== THAY THẾ WINDOW CONFIRM ======================
+let confirmActionCallback = null;
+let confirmModalInstance = null;
+document.addEventListener("DOMContentLoaded", function() {
+    confirmModalInstance = new bootstrap.Modal(document.getElementById('customConfirmModal'));
+    document.getElementById('confirmActionBtn').addEventListener('click', () => {
+        if(confirmActionCallback) confirmActionCallback();
+        confirmModalInstance.hide();
+    });
+});
+window.customConfirm = function(message, callback) {
+    document.getElementById('confirmMessage').innerText = message;
+    confirmActionCallback = callback;
+    confirmModalInstance.show();
+};
+
+
+// ====================== STATE GLOBAL ======================
+const TODAY = new Date(); 
+let currentFactory = 'CĐ3'; 
+let isAdmin = false;
+const ADMIN_PWD = "VH020498";
+
+let materialNotes = {};
+let materialCorrections = {}; 
+let factoryStockData = {}; 
+const appState = {
+    'CĐ3': { files: [], allParsedData: [] },
+    'CĐ6': { files: [], allParsedData: [] }
+};
+let chartInstances = [];
+let renderChartTimeout = null; 
+let currentViewData = [];
+let currentViewName = '';
+let animationIds = {}; 
+
+const COL = { 
+    area: 0, viTri: 1, viTriLapDat: 2, chungLoai: 3, maVatTu: 4, tenVatTu: 5,   
+    lapDat: 7, datMua: 8, daVe: 9, dinhBien: 10, tonKho: 12, pvt: 13,        
+    thongTinPR: 14, ngayPR: 15, po: 16, ngayVeDuKien: 17 
+};
+
+// LIST XƯỞNG DÙNG CHO PR
+const listXuongCD3 = ["Phụ trợ cán thép HRC", "Phụ trợ cán thép dài", "Phụ trợ luyện thép", "Xưởng cán thép HRC", "Xưởng Cán thép dài", "Xưởng Luyện Thép", "Xưởng đúc phôi tấm", "Xưởng đúc phôi vuông", "Xưởng Khuôn-Segment"];
+const listXuongCD6 = ["Xưởng bảo trì phục hồi nguội", "Xưởng cán", "Xưởng Luyện thép", "Xưởng đúc lò"];
+
+const prStageNames = {
+    '1': '1. Đang tạo PR / Tờ trình', 
+    '2': '2. Lập YCKT - PVCC', 
+    '3': '3. Đánh giá SSKT', 
+    '4': '4. Chốt ĐKKT - PLKT', 
+    '5': '5. Đang thi công',
+    '6': '6. Hoàn thành / Ký HSNT'
+};
+
+// TABS LOGIC
+window.switchMainTab = function(tabId, btnElement, isPrTab = false) {
+    document.querySelectorAll('.main-tab-content').forEach(el => el.classList.add('d-none'));
+    document.getElementById(tabId).classList.remove('d-none');
+    
+    document.querySelectorAll('.main-tab-btn').forEach(btn => {
+        btn.classList.remove('active', 'active-pr');
+    });
+    
+    if (isPrTab) btnElement.classList.add('active-pr');
+    else btnElement.classList.add('active');
+};
+
+// HÀM HELPER CHUNG
+function parseNumber(val) {
+    if (val === undefined || val === null || val === '') return 0;
+    if (typeof val === 'number') return val;
+    return parseFloat(val.toString().replace(/,/g, '').replace(/\s/g, '')) || 0;
+}
+function formatNum(num) {
+    if (num === null || num === undefined) return 0;
+    return Number.isInteger(num) ? num.toLocaleString('en-US') : num.toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 2});
+}
+function safeStr(val) {
+    if (val === undefined || val === null) return '';
+    const str = String(val).trim();
+    if (str.toLowerCase() === 'undefined' || str.toLowerCase() === 'null') return '';
+    return str;
+}
+function excelToDate(serial) {
+    if (serial === undefined || serial === null || serial === '') return null;
+    if (typeof serial === 'string') {
+        const str = String(serial).trim();
+        if (!str || str.toLowerCase() === 'undefined' || str.toLowerCase() === 'null') return null;
+        const parts = str.split(/[-/.]/);
+        if (parts.length === 3) {
+            let d, m, y;
+            if (parts[0].length === 4) { y = parseInt(parts[0]); m = parseInt(parts[1]); d = parseInt(parts[2]); } 
+            else { d = parseInt(parts[0]); m = parseInt(parts[1]); y = parseInt(parts[2]); if(y < 100) y += 2000; }
+            const pd = new Date(y, m - 1, d);
+            if (!isNaN(pd.getTime())) return pd;
+        }
+        const fallback = new Date(str);
+        return isNaN(fallback.getTime()) ? null : fallback;
+    }
+    if (typeof serial === 'number' && !isNaN(serial) && serial > 0) {
+        const date = new Date(Math.round((serial - 25569) * 86400 * 1000));
+        date.setMinutes(date.getMinutes() + date.getTimezoneOffset());
+        return date;
+    }
+    return null;
+}
+
+// ====================== QUẢN LÝ ADMIN CHUNG ======================
+let adminModalInstance = null;
+document.addEventListener("DOMContentLoaded", function() {
+    adminModalInstance = new bootstrap.Modal(document.getElementById('adminModal'));
+    document.getElementById('adminPassword').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') window.verifyAdmin();
+    });
+});
+
+window.toggleAdmin = function() {
+    if (isAdmin) {
+        isAdmin = false;
+        document.querySelectorAll('.admin-panel').forEach(el => el.classList.add('d-none'));
+        document.querySelectorAll('.admin-only-btn').forEach(el => el.classList.add('d-none'));
+        document.getElementById('adminBtn').innerHTML = '<i class="fas fa-user-shield me-1"></i> Admin';
+        document.getElementById('adminBtn').classList.replace('btn-danger', 'btn-outline-secondary');
+        showToast('Đã thoát phiên làm việc Admin', 'info');
+        window.applyFilters(); 
+        renderPrTable();
+    } else {
+        document.getElementById('adminPassword').value = '';
+        document.getElementById('pwdError').style.display = 'none';
+        adminModalInstance.show();
+        setTimeout(() => document.getElementById('adminPassword').focus(), 500);
+    }
+};
+
+window.verifyAdmin = function() {
+    const pwd = document.getElementById('adminPassword').value;
+    if (pwd === ADMIN_PWD) {
+        isAdmin = true;
+        adminModalInstance.hide();
+        document.querySelectorAll('.admin-panel').forEach(el => el.classList.remove('d-none'));
+        document.querySelectorAll('.admin-only-btn').forEach(el => el.classList.remove('d-none'));
+        document.getElementById('adminBtn').innerHTML = '<i class="fas fa-sign-out-alt me-1"></i> Thoát Admin';
+        document.getElementById('adminBtn').classList.replace('btn-outline-secondary', 'btn-danger');
+        updateAdminFileList();
+        window.applyFilters(); 
+        renderPrTable();
+        showToast('Đăng nhập Admin thành công!', 'success');
+    } else {
+        document.getElementById('pwdError').style.display = 'block';
+    }
+};
+
+window.switchFactory = function(factory) {
+    currentFactory = factory;
+    document.getElementById('factoryTitle').innerText = `NM.${factory}`;
+    document.querySelectorAll('.adminFactoryNameDisplay').forEach(el => el.innerText = factory);
+    document.querySelectorAll('.emptyFactoryNameDisplay').forEach(el => el.innerText = `NM.${factory}`);
+    
+    reloadCurrentFactoryData();
+    if(isAdmin) updateAdminFileList();
+    
+    renderCBMTable();
+    renderRegTable(); // Tab 3
+    renderPrTable();
+};
+
+// =========================================================================================
+// GIỮ NGUYÊN HOÀN TOÀN LOGIC CỦA 3 TAB (Vật Tư Quan Trọng, CBM, Thường Xuyên)
+// =========================================================================================
+// [TOÀN BỘ PHẦN 1, 2, 3 HOÀN TOÀN KHÔNG BỊ SỬA LỖI]
+
+function listenToCloudData() {
+    if (isLocalMode || !db) return;
+    const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'workshops');
+    onSnapshot(colRef, (snapshot) => {
+        appState['CĐ3'].files = [];
+        appState['CĐ6'].files = [];
+        snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (data.factory && appState[data.factory]) appState[data.factory].files.push({ id: docSnap.id, ...data });
+        });
+        reloadCurrentFactoryData();
+        if(isAdmin) updateAdminFileList();
+    });
+}
+
+function listenToNotesData() {
+    if (isLocalMode || !db) return;
+    const notesRef = collection(db, 'artifacts', appId, 'public', 'data', 'material_notes');
+    onSnapshot(notesRef, (snapshot) => {
+        materialNotes = {};
+        snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (data.maVatTu) materialNotes[data.maVatTu] = data;
+        });
+        if (currentViewData.length > 0) window.applyFilters(); 
+    });
+}
+
+function listenToCorrectionsData() {
+    if (isLocalMode || !db) return;
+    const corrRef = collection(db, 'artifacts', appId, 'public', 'data', 'material_corrections');
+    onSnapshot(corrRef, (snapshot) => {
+        materialCorrections = {};
+        snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (data.maVatTu) materialCorrections[data.maVatTu] = data;
+        });
+        if (currentViewData.length > 0) reloadCurrentFactoryData(); 
+    });
+}
+
+function listenToFactoryStockData() {
+    if (isLocalMode || !db) return;
+    const stockRef = collection(db, 'artifacts', appId, 'public', 'data', 'factory_stock');
+    onSnapshot(stockRef, (snapshot) => {
+        factoryStockData = {};
+        snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (data.maVatTu) factoryStockData[data.maVatTu] = data.tonKhoNM;
+        });
+        if (currentViewData.length > 0) reloadCurrentFactoryData(); 
+    });
+}
+
+function updateAdminFileList() {
+    const listEl = document.getElementById('adminFileList');
+    const files = appState[currentFactory].files;
+    if (files.length === 0) {
+        listEl.innerHTML = '<li class="list-group-item bg-transparent text-muted small py-3 text-center fst-italic">Chưa có dữ liệu nào...</li>';
+        return;
+    }
+    let html = '';
+    files.forEach(f => {
+        html += `
+            <li class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-md-center py-2 px-3 mb-2 border rounded bg-white shadow-sm">
+                <div class="mb-2 mb-md-0">
+                    <span class="fw-bold text-primary me-2"><i class="fas fa-building me-1"></i>${f.workshopName}</span>
+                    <small class="text-muted d-block d-md-inline"><i class="fas fa-file-excel text-success me-1"></i>${f.fileName}</small>
+                </div>
+                <div class="btn-group shadow-sm">
+                    <button class="btn btn-sm btn-outline-info fw-bold" onclick="viewWorkshop('${f.workshopName}')"><i class="fas fa-eye"></i> Xem</button>
+                    <button class="btn btn-sm btn-outline-success fw-bold" onclick="downloadWorkshopFile('${f.id}')"><i class="fas fa-download"></i> Tải gốc</button>
+                    <button class="btn btn-sm btn-outline-danger fw-bold" onclick="deleteWorkshopFile('${f.id}')"><i class="fas fa-trash-alt"></i> Xóa</button>
+                </div>
+            </li>`;
+    });
+    listEl.innerHTML = html;
+}
+
+window.deleteWorkshopFile = async function(docId) {
+    if (!isAdmin) return;
+    window.customConfirm("Bạn có chắc chắn muốn xóa dữ liệu của báo cáo này?", async () => {
+        document.body.classList.add('loading');
+        try {
+            appState[currentFactory].files = appState[currentFactory].files.filter(f => f.id !== docId);
+            if (!isLocalMode && currentUser && !docId.startsWith('local_')) {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workshops', docId));
+                showToast(`Đã xóa sạch dữ liệu khỏi Đám Mây!`, 'success');
+            }
+            reloadCurrentFactoryData();
+            if(isAdmin) updateAdminFileList();
+        } catch(e) { showToast(`Lỗi xóa dữ liệu: ${e.message}`, 'danger'); } finally { document.body.classList.remove('loading'); }
+    });
+};
+
+window.deleteAllWorkshops = async function() {
+    if (!isAdmin) return;
+    const filesToDelete = appState[currentFactory].files;
+    if (filesToDelete.length === 0) { showToast(`Nhà máy NM.${currentFactory} hiện chưa có dữ liệu để xóa!`, 'warning'); return; }
+    
+    window.customConfirm(`⚠️ NGUY HIỂM: Bạn có chắc chắn muốn XÓA SẠCH TOÀN BỘ (${filesToDelete.length}) file dữ liệu của NM.${currentFactory} không?`, async () => {
+        document.body.classList.add('loading');
+        try {
+            if (!isLocalMode && currentUser) {
+                for (const f of filesToDelete) {
+                    if (!f.id.startsWith('local_')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workshops', f.id));
+                }
+                showToast(`Đã dọn dẹp sạch dữ liệu NM.${currentFactory} khỏi Cloud!`, 'success');
+            }
+            appState[currentFactory].files = [];
+            reloadCurrentFactoryData();
+            if(isAdmin) updateAdminFileList();
+        } catch(e) { showToast(`Lỗi xóa dữ liệu: ${e.message}`, 'danger'); } finally { document.body.classList.remove('loading'); }
+    });
+};
+
+function recalculateItemLogic(item) {
+    const tongTonKho = item.tonKho + item.tonKhoNM;
+    item.tyLeTon = item.dinhBien > 0 ? parseFloat(((tongTonKho / item.dinhBien) * 100).toFixed(1)) : 0.0;
+    const dangMuaChuaVe = Math.max(0, item.datMua - item.daVe);
+    item.thieuQty = Math.max(0, item.dinhBien - (tongTonKho + dangMuaChuaVe));
+    
+    item.hasPR = item.thongTinPR !== ''; 
+    item.hasPO = item.po !== '' && item.po.toLowerCase() !== 'chưa có' && item.po.toLowerCase() !== 'chưa có po';
+    if (!item.hasPO && item.po === '') item.po = 'Chưa có';
+
+    const ngayPR = excelToDate(item.ngayPRStr);
+    const ngayVe = excelToDate(item.ngayVeStr);
+    
+    let isPrDelayed = false; 
+    let isDeliveryDelayed = false; 
+    let treTexts = [];
+    let isWarning = false;
+
+    if (item.hasPR) {
+        if (ngayPR && !item.hasPO) {
+            const prPlus60 = new Date(ngayPR);
+            prPlus60.setDate(prPlus60.getDate() + 60);
+            if (TODAY > prPlus60) {
+                isPrDelayed = true;
+                treTexts.push(`Trễ lên PO ${Math.ceil((TODAY - prPlus60) / (1000 * 3600 * 24))} ngày`);
+            }
+        }
+        if (ngayVe && item.daVe < item.datMua) {
+            if (TODAY > ngayVe) {
+                isDeliveryDelayed = true;
+                treTexts.push(`Trễ hàng về ${Math.ceil((TODAY - ngayVe) / (1000 * 3600 * 24))} ngày`);
+            }
+        }
+        if (treTexts.length === 0) treTexts.push('Đúng tiến độ');
+    } else {
+        if (item.thieuQty > 0) { treTexts.push(`⚠️ Cần mua bù`); isWarning = true; } 
+        else { treTexts.push(`✅ An toàn`); }
+    }
+    
+    item.isDelayed = isPrDelayed || isDeliveryDelayed;
+    item.isPrDelayed = isPrDelayed;
+    item.isDeliveryDelayed = isDeliveryDelayed;
+    item.isWarning = isWarning;
+    item.treStatus = treTexts.join('<br>');
+    item.status = item.thieuQty === 0 ? 'good' : 'low';
+}
+
+function reloadCurrentFactoryData() {
+    const files = appState[currentFactory].files;
+    document.body.classList.add('loading');
+    let combinedData = [];
+    let hasErrors = false;
+    
+    if (files.length > 0) {
+        files.forEach(fileObj => {
+            try {
+                const workbook = XLSX.read(fileObj.base64, { type: 'base64' });
+                workbook.SheetNames.forEach((sheetName) => {
+                    const sheet = workbook.Sheets[sheetName];
+                    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                    for (let i = 2; i < rows.length; i++) {
+                        const r = rows[i];
+                        if (!r || !r[COL.maVatTu] || safeStr(r[COL.maVatTu]) === '') continue;
+
+                        const maVTRaw = safeStr(r[COL.maVatTu]);
+                        const maVTClean = maVTRaw.replace(/^0+/, ''); 
+                        
+                        let chungLoaiVal = safeStr(r[COL.chungLoai]) || 'Khác';
+                        if(chungLoaiVal.toLowerCase().includes('cơ')) chungLoaiVal = 'Cơ';
+                        else if(chungLoaiVal.toLowerCase().includes('điện')) chungLoaiVal = 'Điện';
+
+                        let item = {
+                            xuong: fileObj.workshopName,
+                            area: safeStr(r[COL.area]) || sheetName,
+                            viTri: safeStr(r[COL.viTri]) || 'Chưa phân nhóm',
+                            viTriLapDat: safeStr(r[COL.viTriLapDat]), 
+                            chungLoai: chungLoaiVal, ma: maVTRaw, ten: safeStr(r[COL.tenVatTu]) || 'Chưa cập nhật',
+                            lapDat: parseNumber(r[COL.lapDat]), datMua: parseNumber(r[COL.datMua]), daVe: parseNumber(r[COL.daVe]), 
+                            dinhBien: parseNumber(r[COL.dinhBien]), tonKho: parseNumber(r[COL.tonKho]), 
+                            tonKhoNM: factoryStockData[maVTRaw] || factoryStockData[maVTClean] || 0, 
+                            pvt: safeStr(r[COL.pvt]), thongTinPR: safeStr(r[COL.thongTinPR]), po: safeStr(r[COL.po]),
+                            ngayPRStr: excelToDate(r[COL.ngayPR]) ? excelToDate(r[COL.ngayPR]).toLocaleDateString('vi-VN') : '-',
+                            ngayVeStr: excelToDate(r[COL.ngayVeDuKien]) ? excelToDate(r[COL.ngayVeDuKien]).toLocaleDateString('vi-VN') : '-',
+                        };
+
+                        if (materialCorrections[maVTRaw]) {
+                            const corr = materialCorrections[maVTRaw];
+                            if (corr.lapDat !== '') item.lapDat = parseNumber(corr.lapDat);
+                            if (corr.dinhBien !== '') item.dinhBien = parseNumber(corr.dinhBien);
+                            if (corr.tonKho !== '') item.tonKho = parseNumber(corr.tonKho);
+                            if (corr.datMua !== '') item.datMua = parseNumber(corr.datMua);
+                            if (corr.daVe !== '') item.daVe = parseNumber(corr.daVe);
+                            if (corr.thongTinPR !== undefined) item.thongTinPR = corr.thongTinPR;
+                            if (corr.po !== undefined) item.po = corr.po;
+                            if (corr.pvt !== undefined) item.pvt = corr.pvt;
+                            if (corr.viTriLapDat !== undefined) item.viTriLapDat = corr.viTriLapDat;
+                        }
+                        recalculateItemLogic(item); combinedData.push(item);
+                    }
+                });
+            } catch (e) { hasErrors = true; }
+        });
+    }
+
+    if (window.currentMissingSapItems && window.currentMissingSapItems.length > 0) {
+        window.currentMissingSapItems.forEach(m => {
+            let virtualItem = {
+                xuong: '⚠️ THIẾU CẤU TRÚC (SAP)', area: 'Chưa phân loại', viTri: 'Chưa phân nhóm', viTriLapDat: '',
+                chungLoai: 'Khác', ma: m.ma, ten: m.ten, lapDat: 0, datMua: m.req, daVe: m.gr, dinhBien: 0,
+                tonKho: m.unr, tonKhoNM: factoryStockData[m.ma] || 0, pvt: m.pvt, thongTinPR: m.pr, po: m.po,
+                ngayPRStr: m.prDateStr, ngayVeStr: m.delivDateStr
+            };
+            recalculateItemLogic(virtualItem); combinedData.push(virtualItem);
+        });
+    }
+
+    appState[currentFactory].allParsedData = combinedData;
+    updateWorkshopFilterOptions();
+    window.applyFilters();
+    document.body.classList.remove('loading');
+}
+
+window.uploadWorkshopFile = async function(isAppend = false) {
+    if (!isAdmin) return;
+    const workshopName = document.getElementById('workshopNameInput').value.trim();
+    if (!workshopName) { showToast('Vui lòng nhập Tên Xưởng/Báo cáo!', 'warning'); return; }
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
+    if (!file) { showToast('Vui lòng chọn file Template cơ sở!', 'warning'); return; }
+    
+    document.body.classList.add('loading');
+    const reader = new FileReader();
+    reader.onload = async function(ev) {
+        try {
+            const base64Data = ev.target.result.split(',')[1];
+            let finalBase64 = base64Data;
+            let fileNameToSave = file.name;
+            const existingIndex = appState[currentFactory].files.findIndex(f => f.workshopName === workshopName);
+
+            if (isAppend && existingIndex >= 0) {
+                const oldFileObj = appState[currentFactory].files[existingIndex];
+                const oldWb = XLSX.read(oldFileObj.base64, {type: 'base64'});
+                const newWb = XLSX.read(base64Data, {type: 'base64'});
+
+                newWb.SheetNames.forEach(sheetName => {
+                    const newRows = XLSX.utils.sheet_to_json(newWb.Sheets[sheetName], {header: 1, defval: ''});
+                    if (newRows.length <= 2) return; 
+                    const dataToAppend = newRows.slice(2); 
+                    if (oldWb.SheetNames.includes(sheetName)) {
+                        const oldRows = XLSX.utils.sheet_to_json(oldWb.Sheets[sheetName], {header: 1, defval: ''});
+                        const combinedRows = oldRows.concat(dataToAppend);
+                        oldWb.Sheets[sheetName] = XLSX.utils.aoa_to_sheet(combinedRows);
+                    } else { XLSX.utils.book_append_sheet(oldWb, newWb.Sheets[sheetName], sheetName); }
+                });
+                finalBase64 = XLSX.write(oldWb, {type: 'base64', bookType: 'xlsx'});
+                fileNameToSave = oldFileObj.fileName + " (+Bổ sung)";
+                appState[currentFactory].files[existingIndex] = { ...oldFileObj, base64: finalBase64, fileName: fileNameToSave };
+                showToast(`Đã BỔ SUNG mã mới vào [${workshopName}]!`, 'success');
+            } else {
+                const fileId = `local_${Date.now()}`;
+                const newFileObj = { id: fileId, factory: currentFactory, workshopName, fileName: fileNameToSave, base64: finalBase64 };
+                if (existingIndex >= 0) appState[currentFactory].files[existingIndex] = newFileObj;
+                else appState[currentFactory].files.push(newFileObj);
+                showToast(`Đã GHI ĐÈ dữ liệu [${workshopName}]!`, 'success');
+            }
+            
+            reloadCurrentFactoryData();
+            if(isAdmin) updateAdminFileList();
+
+            if (!isLocalMode && currentUser) {
+                const docId = `${currentFactory}_${workshopName.replace(/[^a-zA-Z0-9À-ỹ_]/g, '_')}`;
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workshops', docId), { factory: currentFactory, workshopName, fileName: fileNameToSave, base64: finalBase64, updatedAt: new Date().toISOString() });
+            }
+            fileInput.value = ''; document.getElementById('workshopNameInput').value = '';
+        } catch (error) { showToast('Lỗi tải file: ' + error.message, 'danger'); } finally { document.body.classList.remove('loading'); }
+    };
+    reader.readAsDataURL(file); 
+};
+
+window.uploadSAPFile = async function() {
+    if (!isAdmin) return;
+    const fileInput = document.getElementById('sapFileInput');
+    const file = fileInput.files[0];
+    if (!file) return;
+    document.body.classList.add('loading');
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const sapRows = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: ''});
+            
+            if (sapRows.length < 2) throw new Error("File SAP trống");
+            
+            const headers = sapRows[0].map(h => h.toString().toLowerCase().trim());
+            const getIdx = (name) => headers.findIndex(h => h === name.toLowerCase());
+            const iMat = getIdx("material"); const iDel = getIdx("deletion indicator");
+            const iRem = getIdx("remain quantity"); const iUnr = getIdx("unrestricted");
+            const iReq = getIdx("quantity requested"); const iGR = getIdx("gr quantity");
+            const iPVT = getIdx("description p. group"); const iPR = getIdx("purchase requisition");
+            const iPRDate = getIdx("requisition date"); const iPO = getIdx("purchase order"); const iDesc = getIdx("short text"); 
+            let iDelivDate = iPO > 0 ? iPO - 1 : -1; 
+            
+            if (iMat === -1) throw new Error("Không có cột 'Material'");
+
+            let existingCodes = new Set();
+            appState[currentFactory].allParsedData.forEach(item => {
+                existingCodes.add(item.ma); existingCodes.add(item.ma.replace(/^0+/, '')); 
+            });
+
+            let sapMap = {}; let missingItems = []; 
+            for(let i = 1; i < sapRows.length; i++) {
+                const row = sapRows[i]; const matRaw = safeStr(row[iMat]); if(!matRaw) continue;
+                const delInd = safeStr(row[iDel]).toLowerCase(); if (delInd === 'true' || delInd === 'x' || delInd === 'l') continue; 
+                sapMap[matRaw] = row; sapMap[matRaw.replace(/^0+/, '')] = row; 
+
+                if (!existingCodes.has(matRaw) && !existingCodes.has(matRaw.replace(/^0+/, ''))) {
+                    if (parseNumber(row[iRem]) > 0 || (safeStr(row[iPR]) && safeStr(row[iPR]) !== '')) {
+                        const pDate = excelToDate(row[iPRDate]); const dDate = iDelivDate !== -1 ? excelToDate(row[iDelivDate]) : null;
+                        missingItems.push({ ma: matRaw, ten: safeStr(row[iDesc]), pr: safeStr(row[iPR]), po: safeStr(row[iPO]), req: parseNumber(row[iReq]), gr: parseNumber(row[iGR]), unr: parseNumber(row[iUnr]), pvt: safeStr(row[iPVT]), prDateStr: pDate ? pDate.toLocaleDateString('en-GB') : '', delivDateStr: dDate ? dDate.toLocaleDateString('en-GB') : '' });
+                    }
+                }
+            }
+
+            let updatedCount = 0;
+            for (let f of [...appState[currentFactory].files]) {
+                const wb = XLSX.read(f.base64, {type: 'base64'});
+                let fileUpdated = false;
+                wb.SheetNames.forEach(sheetName => {
+                    const ws = wb.Sheets[sheetName]; const rows = XLSX.utils.sheet_to_json(ws, {header: 1, defval: ''});
+                    for (let i = 2; i < rows.length; i++) {
+                        const r = rows[i]; const baseMatRaw = safeStr(r[COL.maVatTu]); if (!baseMatRaw) continue;
+                        const sapRow = sapMap[baseMatRaw] || sapMap[baseMatRaw.replace(/^0+/, '')];
+                        if (sapRow) {
+                            r[COL.tonKho] = parseNumber(sapRow[iUnr]);
+                            const remainQty = parseNumber(sapRow[iRem]);
+                            if (remainQty !== 0) {
+                                r[COL.datMua] = parseNumber(sapRow[iReq]); r[COL.daVe] = parseNumber(sapRow[iGR]); r[COL.pvt] = safeStr(sapRow[iPVT]); r[COL.thongTinPR] = safeStr(sapRow[iPR]); r[COL.po] = safeStr(sapRow[iPO]);
+                                const pDate = excelToDate(sapRow[iPRDate]); r[COL.ngayPR] = pDate ? pDate.toLocaleDateString('en-GB') : '';
+                                const dDate = excelToDate(iDelivDate !== -1 ? sapRow[iDelivDate] : null); r[COL.ngayVeDuKien] = dDate ? dDate.toLocaleDateString('en-GB') : '';
+                                fileUpdated = true; updatedCount++;
+                            } else if (remainQty === 0 && safeStr(r[COL.thongTinPR]) !== '' && safeStr(r[COL.thongTinPR]) === safeStr(sapRow[iPR])) {
+                                r[COL.daVe] = Math.max(parseNumber(r[COL.datMua]), parseNumber(sapRow[iGR])); 
+                                fileUpdated = true; updatedCount++;
+                            } else { fileUpdated = true; }
+                        }
+                    }
+                    wb.Sheets[sheetName] = XLSX.utils.aoa_to_sheet(rows);
+                });
+                
+                if (fileUpdated) {
+                    f.base64 = XLSX.write(wb, {type: 'base64', bookType: 'xlsx'});
+                    if (!isLocalMode && currentUser && !f.id.startsWith('local_')) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workshops', f.id), { ...f, updatedAt: new Date().toISOString() }, {merge: true});
+                }
+            }
+            
+            if (missingItems.length > 0) {
+                window.currentMissingSapItems = missingItems; 
+                document.getElementById('missingSapTableBody').innerHTML = missingItems.map(m => `<tr><td class="font-monospace fw-bold text-primary">${m.ma}</td><td class="small text-truncate" style="max-width: 200px;" title="${m.ten}">${m.ten}</td><td><span class="badge bg-warning text-dark">${m.pr}</span></td><td class="small fw-bold">${m.po}</td></tr>`).join('');
+                new bootstrap.Modal(document.getElementById('missingSapModal')).show();
+            } else { window.currentMissingSapItems = []; }
+            
+            reloadCurrentFactoryData();
+            showToast(`Đã đồng bộ SAP thành công cho ${updatedCount} mã!`, 'success');
+        } catch (err) { showToast('Lỗi xử lý file SAP: ' + err.message, 'danger'); } finally { document.body.classList.remove('loading'); fileInput.value = ''; }
+    };
+    reader.readAsArrayBuffer(file);
+};
+
+window.uploadFactoryStockFile = async function() {
+    if (!isAdmin) return;
+    const fileInput = document.getElementById('factoryStockInput');
+    const file = fileInput.files[0];
+    if (!file) return;
+    document.body.classList.add('loading');
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            const stockRows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1, defval: ''});
+            
+            for(let i = 1; i < stockRows.length; i++) {
+                const maVT = safeStr(stockRows[i][0]);
+                if (maVT) {
+                    factoryStockData[maVT] = parseNumber(stockRows[i][1]);
+                    factoryStockData[maVT.replace(/^0+/, '')] = parseNumber(stockRows[i][1]);
+                }
+            }
+            reloadCurrentFactoryData(); 
+            if (!isLocalMode && currentUser) {
+                let optimizedStock = {};
+                Object.keys(factoryStockData).forEach(k => { if(factoryStockData[k] > 0) optimizedStock[k] = factoryStockData[k]; });
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'factory_stock', 'latest_stock'), { tonKhoNM: optimizedStock, updatedAt: new Date().toISOString() });
+            }
+            showToast(`Cập nhật Tồn Kho NM thành công!`, 'success');
+        } catch (err) { showToast('Lỗi Tồn Kho NM: ' + err.message, 'danger'); } finally { document.body.classList.remove('loading'); fileInput.value = ''; }
+    };
+    reader.readAsArrayBuffer(file);
+};
+
+function updateWorkshopFilterOptions() {
+    const select = document.getElementById('workshopFilter');
+    const currentVal = select.value;
+    let workshopNames = new Set(appState[currentFactory].files.map(f => f.workshopName));
+    if (window.currentMissingSapItems && window.currentMissingSapItems.length > 0) workshopNames.add('⚠️ THIẾU CẤU TRÚC (SAP)');
+    
+    select.innerHTML = `<option value="ALL">Tất cả Xưởng</option>` + Array.from(workshopNames).map(wsName => `<option value="${wsName}">${wsName}</option>`).join('');
+    if (Array.from(select.options).some(o => o.value === currentVal)) select.value = currentVal;
+    window.handleWorkshopChange();
+}
+
+window.handleWorkshopChange = function() {
+    const ws = document.getElementById('workshopFilter').value;
+    const areaSelect = document.getElementById('areaFilter');
+    if (ws === 'ALL') {
+        areaSelect.innerHTML = '<option value="ALL">Tất cả Khu vực</option>'; areaSelect.disabled = true;
+    } else {
+        areaSelect.disabled = false;
+        const areas = [...new Set(appState[currentFactory].allParsedData.filter(i => i.xuong === ws).map(i => i.area))];
+        areaSelect.innerHTML = '<option value="ALL">Tất cả Khu vực</option>' + areas.map(a => `<option value="${a}">${a}</option>`).join('');
+    }
+    window.applyFilters();
+};
+
+window.applyFilters = function() {
+    const ws = document.getElementById('workshopFilter')?.value || 'ALL';
+    const area = document.getElementById('areaFilter')?.value || 'ALL';
+    const type = document.getElementById('typeFilter')?.value || 'ALL';
+    const status = document.getElementById('statusFilter')?.value || 'ALL';
+    const searchKeywords = (document.getElementById('searchInput')?.value.toLowerCase() || '').split(/[,;\n]+/).map(k => k.trim()).filter(k => k !== '');
+    
+    clearViewOnly();
+    if (appState[currentFactory].allParsedData.length === 0) {
+        document.getElementById('emptyState').style.display = 'block'; return;
+    }
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('mainContentContainer').style.display = 'block';
+
+    let filteredData = appState[currentFactory].allParsedData;
+    currentViewName = `Toàn Bộ NM.${currentFactory}`;
+    
+    if (ws !== 'ALL') {
+        filteredData = filteredData.filter(i => i.xuong === ws); currentViewName = `Xưởng: ${ws}`;
+        if (area !== 'ALL') { filteredData = filteredData.filter(i => i.area === area); currentViewName = `${ws} - ${area}`; }
+    }
+    if (type !== 'ALL') filteredData = filteredData.filter(i => i.chungLoai === type);
+    if (status !== 'ALL') {
+        if (status === 'LATE') filteredData = filteredData.filter(i => i.isDelayed);
+        else if (status === 'WARNING') filteredData = filteredData.filter(i => i.isWarning);
+        else if (status === 'OK') filteredData = filteredData.filter(i => !i.isDelayed && !i.isWarning);
+    }
+    if (searchKeywords.length > 0) {
+        filteredData = filteredData.filter(i => searchKeywords.some(kw => i.ma.toLowerCase().includes(kw) || i.ten.toLowerCase().includes(kw) || i.thongTinPR.toLowerCase().includes(kw) || i.po.toLowerCase().includes(kw) || i.pvt.toLowerCase().includes(kw) || i.viTriLapDat.toLowerCase().includes(kw)));
+    }
+    
+    currentViewData = filteredData;
+    updateOverviewCards(filteredData, currentViewName);
+    renderMainContent(filteredData, currentViewName);
+};
+
+function clearViewOnly() {
+    document.getElementById('mainContentContainer').style.display = 'none';
+    document.getElementById('overviewSection').style.display = 'none';
+    chartInstances.forEach(chart => { try { chart.destroy(); } catch(e) {} });
+    chartInstances = [];
+    if (renderChartTimeout) clearTimeout(renderChartTimeout);
+}
+
+function updateOverviewCards(dataToCalculate, scopeName) {
+    if (!dataToCalculate || dataToCalculate.length === 0) { document.getElementById('overviewSection').style.display = 'none'; return; }
+    document.getElementById('overviewSection').style.display = 'flex';
+    document.getElementById('overviewScope').innerText = scopeName;
+
+    const total = dataToCalculate.length;
+    let missingQty = 0; let sumTonKho = 0; let sumDinhBien = 0;
+    dataToCalculate.forEach(i => { missingQty += i.thieuQty; sumTonKho += (i.tonKho + i.tonKhoNM); sumDinhBien += i.dinhBien; });
+
+    const prCount = dataToCalculate.filter(i => i.hasPR).length;
+    animateValue("totalItems", total, 600);
+    animateValue("delayedItems", dataToCalculate.filter(i => i.isDelayed).length, 600);
+    const dEl = document.getElementById('delayedPercent'); if(dEl) dEl.innerText = `(${((dataToCalculate.filter(i => i.isDelayed).length / total) * 100).toFixed(1)}%)`;
+    animateValue("lowStockItems", missingQty, 600);
+    
+    let oldPr = parseFloat((document.getElementById('prSumAnim') || {}).innerHTML?.replace(/,/g, '') || 0);
+    document.getElementById('prItems').innerHTML = `<span id="prSumAnim">${formatNum(oldPr)}</span> <span class="fs-5 fw-normal opacity-75">/ ${formatNum(total)} (${((prCount / total) * 100).toFixed(1)}%)</span>`;
+    animateValue("prSumAnim", prCount, 600);
+    document.getElementById('avgStockRate').innerText = `${sumDinhBien > 0 ? ((sumTonKho / sumDinhBien) * 100).toFixed(1) : '0.0'}%`;
+}
+
+function animateValue(id, end, duration) {
+    const obj = document.getElementById(id); if (!obj) return;
+    if (animationIds[id]) cancelAnimationFrame(animationIds[id]);
+    const start = parseFloat(obj.innerHTML.replace(/,/g, '')) || 0;
+    if (start === end) { obj.innerHTML = formatNum(end); return; }
+    
+    let startTs = null;
+    const step = (ts) => {
+        if (!startTs) startTs = ts;
+        const progress = Math.min((ts - startTs) / duration, 1);
+        obj.innerHTML = formatNum(Number.isInteger(end) ? Math.floor(progress * (end - start) + start) : progress * (end - start) + start);
+        if (progress < 1) animationIds[id] = window.requestAnimationFrame(step); else obj.innerHTML = formatNum(end);
+    };
+    animationIds[id] = window.requestAnimationFrame(step);
+}
+
+function groupByHierarchy(items) {
+    const tree = {};
+    items.forEach(i => { if (!tree[i.area]) tree[i.area] = {}; if (!tree[i.area][i.viTri]) tree[i.area][i.viTri] = []; tree[i.area][i.viTri].push(i); });
+    return tree;
+}
+
+window.toggleTreeNode = function(targetClass, iconId) {
+    const rows = document.querySelectorAll(`.${targetClass}`); const icon = document.getElementById(iconId);
+    if (rows.length > 0) {
+        const isHidden = rows[0].classList.contains('hidden-row');
+        rows.forEach(r => isHidden ? r.classList.remove('hidden-row') : r.classList.add('hidden-row'));
+        if (icon) { icon.classList.remove(isHidden ? 'fa-chevron-right' : 'fa-chevron-down'); icon.classList.add(isHidden ? 'fa-chevron-down' : 'fa-chevron-right'); }
+    }
+};
+
+window.showMaterialHistory = function(ma, ten, area, viTri, viTriLapDat, tonKho) {
+    document.getElementById('histMa').innerText = ma; document.getElementById('histTen').innerText = ten;
+    document.getElementById('histArea').innerText = area; document.getElementById('histViTri').innerText = viTri + (viTriLapDat ? ` ➡️ ${viTriLapDat}` : '');
+    
+    const stagnantDays = tonKho === 0 ? 0 : (parseInt(ma.replace(/\D/g, '') || '123') % 100) + 10;
+    const box = document.getElementById('histStatusBox'); const dayText = document.getElementById('histTonDongDays');
+    
+    if (tonKho === 0) {
+        box.style.backgroundColor = '#f8f9fa'; box.style.borderColor = '#dee2e6'; dayText.className = "fw-bold text-secondary mb-0"; dayText.innerText = "0 Ngày (Hết hàng)";
+    } else if (stagnantDays > 60) {
+        box.style.backgroundColor = '#f8d7da'; box.style.borderColor = '#f5c2c7'; dayText.className = "fw-bold text-danger mb-0"; dayText.innerText = `${stagnantDays} Ngày (Báo động)`;
+    } else {
+        box.style.backgroundColor = '#d1e7dd'; box.style.borderColor = '#badbcc'; dayText.className = "fw-bold text-success mb-0"; dayText.innerText = `${stagnantDays} Ngày (An toàn)`;
+    }
+
+    const tl = document.getElementById('histTimeline');
+    if (tonKho === 0) {
+        tl.innerHTML = `<li><small class="text-muted d-block">Hôm nay</small><strong>Tình trạng:</strong> Đã hết hàng trong kho tổ. Cần theo dõi PR.</li>`;
+    } else {
+        const d1 = new Date(TODAY); d1.setDate(d1.getDate() - stagnantDays);
+        tl.innerHTML = `<li><small class="text-muted d-block">Hôm nay</small><strong>Tình trạng:</strong> Hàng nằm trong kho chưa được sử dụng.</li><li><small class="text-muted d-block">${d1.toLocaleDateString('vi-VN')}</small><strong>Nhập kho:</strong> Lần nhập kho gần nhất.</li>`;
+    }
+    new bootstrap.Modal(document.getElementById('historyModal')).show();
+};
+
+function renderMainContent(items, viewName) {
+    const content = document.getElementById('mainContent');
+    let html = `<div class="d-flex align-items-center mb-4 pb-2 border-bottom"><h5 class="fw-bold text-dark mb-0"><i class="fas fa-sitemap text-primary me-2"></i>Cấu Trúc Cây Vật Tư - ${viewName}</h5><span class="badge bg-secondary ms-3 fs-6">${formatNum(items.length)} Mã VT</span></div>`;
+    if (items.length > 0) html += `<div class="row justify-content-center mb-4"><div class="col-lg-5 mb-3 mb-lg-0"><div class="chart-container shadow-sm border rounded bg-light p-3" style="position: relative; height: 260px; width: 100%;"><canvas id="stockChart"></canvas></div></div><div class="col-lg-7"><div class="chart-container shadow-sm border rounded bg-light p-3" style="position: relative; height: 260px; width: 100%;"><canvas id="supplyChart"></canvas></div></div></div>`;
+
+    html += `<div class="table-responsive"><table class="table table-sm mb-0 align-middle"><thead class="table-dark text-center align-middle" style="font-size: 0.85rem;"><tr><th class="text-start ps-3" style="width: 22%;">Vị Trí Chức Năng / Mã Vật Tư</th><th style="width: 4%;">Lắp Đặt</th><th style="width: 4%;">Định Biên</th><th style="width: 4%;">Tồn Tổ</th><th style="width: 4%; color: #ffeb3b;"><i class="fas fa-warehouse"></i> Tồn NM</th><th style="width: 6%;">Tỷ lệ Tồn/ĐB</th><th style="width: 5%;">P.VT</th><th style="width: 8%;">Thông tin PR</th><th style="width: 9%;">Số PO / Ngày Về</th><th style="width: 9%;">Trạng Thái</th><th style="width: 15%;">Ghi Chú Đánh Giá</th><th style="width: 10%;">Hành động</th></tr></thead><tbody>`;
+                
+    if(items.length === 0) {
+        html += `<tr><td colspan="12" class="text-center py-4 text-muted fst-italic">Không có dữ liệu phù hợp bộ lọc.</td></tr>`;
+    } else {
+        const treeData = groupByHierarchy(items); let areaIdx = 0;
+        for (const [areaName, viTriObj] of Object.entries(treeData)) {
+            areaIdx++; const areaClass = `child-of-area-${areaIdx}`; const iconAreaId = `icon-area-${areaIdx}`;
+            let areaItemCount = 0; Object.values(viTriObj).forEach(arr => areaItemCount += arr.length);
+            html += `<tr class="tree-node tree-level-1" onclick="toggleTreeNode('${areaClass}', '${iconAreaId}')"><td colspan="12" class="ps-2"><i id="${iconAreaId}" class="fas fa-chevron-down text-secondary toggle-icon me-1"></i><i class="fas fa-folder-open text-warning me-2"></i>${areaName} <span class="badge bg-secondary ms-2 rounded-pill">${areaItemCount} mã</span></td></tr>`;
+            let viTriIdx = 0;
+            for (const [viTriName, materials] of Object.entries(viTriObj)) {
+                viTriIdx++; const viTriClass = `child-of-vitri-${areaIdx}-${viTriIdx}`; const iconViTriId = `icon-vitri-${areaIdx}-${viTriIdx}`;
+                html += `<tr class="tree-node tree-level-2 ${areaClass}" onclick="toggleTreeNode('${viTriClass}', '${iconViTriId}')"><td colspan="12" class="indent-1"><i id="${iconViTriId}" class="fas fa-chevron-down text-muted toggle-icon me-1"></i><i class="fas fa-cogs text-secondary me-2"></i>${viTriName}<span class="badge bg-light text-dark border ms-2">${materials.length}</span></td></tr>`;
+
+                materials.forEach(i => {
+                    const rowClass = i.isDelayed ? 'table-danger' : (i.isWarning ? 'table-warning' : '');
+                    const noteObj = materialNotes[i.ma]; const maTuongDuong = noteObj && noteObj.maTuongDuong ? noteObj.maTuongDuong : '';
+                    const latestNote = noteObj && noteObj.history && noteObj.history.length > 0 ? noteObj.history[0].text : '';
+                    const shortNote = latestNote ? (latestNote.length > 15 ? latestNote.substring(0, 15) + '...' : latestNote) : 'Chưa có ĐG';
+                    const typeBadge = i.chungLoai === 'Cơ' ? `<span class="badge bg-secondary me-1" style="font-size:0.7rem;">CƠ</span>` : (i.chungLoai === 'Điện' ? `<span class="badge bg-info text-dark me-1" style="font-size:0.7rem;">ĐIỆN</span>` : '');
+                    let mtdHtml = ''; if (maTuongDuong) mtdHtml = `<div class="ms-4">${maTuongDuong.split(/[,;\n]+/).map(c => c.trim()).filter(c => c).map(c => `<span class="badge bg-danger me-1 mt-1" style="font-size: 0.7rem;"><i class="fas fa-exchange-alt me-1"></i>${c}</span>`).join('')}</div>`;
+
+                    html += `<tr class="tree-leaf ${areaClass} ${viTriClass} ${rowClass}"><td class="indent-2"><div class="fw-bold font-monospace text-primary"><i class="fas fa-box-open text-muted me-2" style="font-size:0.8rem;"></i>${typeBadge}${i.ma}${materialCorrections[i.ma] ? '<i class="fas fa-magic text-warning ms-1" title="Dữ liệu ảo"></i>' : ''}</div><div class="small text-muted text-truncate ms-4" style="max-width: 230px;" title="${i.ten}">${i.ten}</div>${mtdHtml}${i.viTriLapDat ? `<div class="small text-secondary ms-4 mt-1"><i class="fas fa-map-marker-alt text-danger me-1"></i>Vị trí: ${i.viTriLapDat}</div>` : ''}</td><td class="text-end pe-2 border-start">${formatNum(i.lapDat)}</td><td class="text-end pe-2">${formatNum(i.dinhBien)}</td><td class="text-end pe-2 fw-bold text-secondary">${formatNum(i.tonKho)}</td><td class="text-end pe-2 fw-bold text-primary" style="background-color: rgba(13, 110, 253, 0.05);">${formatNum(i.tonKhoNM)}</td><td class="align-middle"><div class="d-flex align-items-center justify-content-between mb-1"><small class="fw-bold" style="font-size:0.75rem;">${i.tyLeTon}%</small></div><div class="progress" style="height: 6px;"><div class="progress-bar ${i.tyLeTon < 50 ? 'bg-danger' : (i.tyLeTon < 100 ? 'bg-warning text-dark' : 'bg-success')}" style="width: ${Math.min(Math.max(i.tyLeTon, 0), 100)}%;"></div></div></td><td class="text-center"><span class="badge bg-light text-dark border">${i.pvt}</span></td><td class="text-center"><small class="text-primary fw-bold">${i.thongTinPR}</small></td><td class="text-center"><div class="fw-semibold small">${i.po}</div><div class="text-muted" style="font-size:0.7rem;">${i.ngayVeStr}</div></td><td class="text-start ps-1 fw-bold ${i.isDelayed || i.isWarning ? 'text-danger' : 'text-success'}"><small style="font-size:0.75rem;">${i.treStatus}</small></td><td class="text-center"><div class="small text-muted text-truncate mb-1" style="max-width: 120px; margin: 0 auto;" title="${latestNote}">${shortNote}</div><button class="btn btn-sm btn-outline-info py-0 px-2 fw-bold shadow-sm" style="font-size:0.75rem;" onclick="openNoteModal('${i.ma}', '${i.ten.replace(/'/g, "\\'")}')"><i class="fas fa-edit"></i> Ghi chú</button></td><td class="text-center"><div class="d-flex flex-column align-items-center justify-content-center"><button class="btn btn-sm btn-outline-primary py-0 px-2 fw-bold shadow-sm" style="font-size:0.75rem;" onclick="showMaterialHistory('${i.ma}', '${i.ten.replace(/'/g, "\\'")}', '${i.area}', '${i.viTri}', '${i.viTriLapDat ? i.viTriLapDat.replace(/'/g, "\\'") : ''}', ${i.tonKho})"><i class="fas fa-history"></i> Lịch sử</button>${isAdmin ? `<button class="btn btn-sm btn-outline-warning text-dark py-0 px-1 fw-bold mt-1 shadow-sm" style="font-size:0.7rem;" onclick="openEditDataModal('${i.ma}')"><i class="fas fa-pencil-alt"></i> Sửa DL</button>` : ''}</div></td></tr>`;
+                });
+            }
+        }
+    }
+    content.innerHTML = html + `</tbody></table></div>`;
+    if (renderChartTimeout) clearTimeout(renderChartTimeout);
+    if (items.length > 0) renderChartTimeout = setTimeout(() => renderCharts(items), 50);
+}
+
+function renderCharts(items) {
+    const stockCtx = document.getElementById('stockChart'); const supplyCtx = document.getElementById('supplyChart');
+    if (!stockCtx || !supplyCtx) return;
+    if (typeof ChartDataLabels !== 'undefined') Chart.register(ChartDataLabels);
+    chartInstances.forEach(chart => { try { chart.destroy(); } catch(e) {} }); chartInstances = [];
+
+    let sumMissingQty = 0; let sumFulfilledQty = 0;
+    items.forEach(i => { sumMissingQty += i.thieuQty; if (i.dinhBien > 0) sumFulfilledQty += (i.dinhBien - i.thieuQty); });
+    
+    const prItems = items.filter(i => i.hasPR); const poItems = items.filter(i => i.hasPO);
+    const countPrDone = prItems.length; const countPrPending = items.length - countPrDone;
+    const countPoDone = poItems.length; const countPoDelayed = prItems.filter(i => i.isPrDelayed).length;
+    const countPoPending = Math.max(0, countPrDone - countPoDone - countPoDelayed);
+    const countDeliveryDone = poItems.filter(i => i.daVe > 0).length; const countDeliveryDelayed = poItems.filter(i => i.isDeliveryDelayed).length;
+    const countDeliveryPending = Math.max(0, poItems.length - countDeliveryDone - countDeliveryDelayed);
+
+    chartInstances.push(new Chart(stockCtx, {
+        type: 'doughnut', data: { labels: ['Tồn kho đảm bảo định mức', 'Chưa đủ số lượng tồn'], datasets: [{ data: [sumFulfilledQty, sumMissingQty], backgroundColor: ['rgba(25, 135, 84, 0.85)', 'rgba(255, 193, 7, 0.85)'], borderColor: ['#ffffff', '#ffffff'], borderWidth: 2 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { font: { size: 12 } } }, title: { display: true, text: 'TÌNH TRẠNG TỒN KHO' }, datalabels: { color: (ctx) => ctx.dataIndex === 0 ? '#fff' : '#212529', font: { weight: 'bold', size: 14 }, formatter: (v, ctx) => v === 0 ? '' : `${formatNum(v)}\n(${((v * 100) / ctx.chart._metasets[ctx.datasetIndex].total).toFixed(1)}%)` } } }
+    }));
+
+    chartInstances.push(new Chart(supplyCtx, {
+        type: 'bar', data: { labels: ['1. PR', '2. PO', '3. Giao hàng'], datasets: [ { label: 'Hoàn thành', data: [countPrDone, countPoDone, countDeliveryDone], backgroundColor: 'rgba(25, 135, 84, 0.85)' }, { label: 'Đang xử lý', data: [countPrPending, countPoPending, countDeliveryPending], backgroundColor: 'rgba(13, 110, 253, 0.85)' }, { label: 'Trễ hạn', data: [0, countPoDelayed, countDeliveryDelayed], backgroundColor: 'rgba(220, 53, 69, 0.85)' } ] },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'PHÂN TÍCH TIẾN ĐỘ' }, datalabels: { color: '#fff', font: { weight: 'bold' }, formatter: v => v === 0 ? '' : formatNum(v) } }, scales: { x: { stacked: true }, y: { stacked: true } } }
+    }));
+}
+
+window.openNoteModal = function(ma, ten) {
+    document.getElementById('noteMaDisplay').innerText = ma; document.getElementById('noteTenDisplay').innerText = ten; document.getElementById('noteMaValue').value = ma;
+    document.getElementById('noteMaTuongDuong').value = ''; document.getElementById('noteInputText').value = '';
+    const noteObj = materialNotes[ma];
+    if (noteObj && noteObj.maTuongDuong) document.getElementById('noteMaTuongDuong').value = noteObj.maTuongDuong;
+    const listEl = document.getElementById('noteHistoryList');
+    if (noteObj && noteObj.history && noteObj.history.length > 0) {
+        listEl.innerHTML = noteObj.history.map(item => `<div class="list-group-item px-2 py-2"><div class="d-flex w-100 justify-content-between mb-1"><small class="fw-bold text-dark">${item.author || 'User'}</small><small class="text-muted" style="font-size: 0.7rem;">${item.date}</small></div><p class="mb-0 small text-secondary">${item.text}</p></div>`).join('');
+    } else { listEl.innerHTML = `<div class="list-group-item text-center text-muted small py-3 fst-italic">Chưa có lịch sử.</div>`; }
+    new bootstrap.Modal(document.getElementById('noteModal')).show();
+};
+
+window.saveMaterialNote = async function() {
+    const ma = document.getElementById('noteMaValue').value; const maTuongDuong = document.getElementById('noteMaTuongDuong').value.trim(); const text = document.getElementById('noteInputText').value.trim();
+    if (!text && !maTuongDuong && (!materialNotes[ma] || !materialNotes[ma].history || materialNotes[ma].history.length === 0)) { showToast('Vui lòng nhập thông tin!', 'warning'); return; }
+    
+    const btn = document.querySelector('#noteModal .btn-primary'); btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Đang lưu...';
+    try {
+        const safeMaId = ma ? ma.replace(/[^a-zA-Z0-9_]/g, '_') : 'unknown_item_' + Date.now();
+        let newHistory = materialNotes[ma]?.history || [];
+        if (text) newHistory = [{ text: text, date: new Date().toLocaleString('vi-VN'), author: 'Kỹ thuật viên' }, ...newHistory];
+
+        if (!materialNotes[ma]) materialNotes[ma] = { history: [] };
+        materialNotes[ma].history = newHistory; materialNotes[ma].maTuongDuong = maTuongDuong; 
+        
+        window.applyFilters(); bootstrap.Modal.getInstance(document.getElementById('noteModal'))?.hide();
+        
+        if (!isLocalMode && currentUser) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'material_notes', safeMaId), { maVatTu: ma, maTuongDuong: maTuongDuong, history: newHistory, lastUpdated: new Date().toISOString() }, { merge: true });
+        showToast('Lưu ghi chú thành công!', 'success');
+    } catch (e) { showToast('Lưu lỗi: ' + e.message, 'warning'); } finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save me-1"></i> Lưu Thông Tin'; }
+};
+
+window.openEditDataModal = function(ma) {
+    if (!isAdmin) return; const item = appState[currentFactory].allParsedData.find(x => x.ma === ma); if (!item) return;
+    document.getElementById('editMa').innerText = item.ma; document.getElementById('editMaValue').value = item.ma; document.getElementById('editTen').innerText = item.ten;
+    document.getElementById('editLapDat').value = item.lapDat; document.getElementById('editDinhBien').value = item.dinhBien; document.getElementById('editTonKho').value = item.tonKho;
+    document.getElementById('editDatMua').value = item.datMua; document.getElementById('editDaVe').value = item.daVe; document.getElementById('editPR').value = item.thongTinPR;
+    document.getElementById('editPO').value = item.po === 'Chưa có' ? '' : item.po; document.getElementById('editPVT').value = item.pvt; document.getElementById('editViTri').value = item.viTriLapDat;
+    new bootstrap.Modal(document.getElementById('editDataModal')).show();
+};
+
+window.saveDataCorrection = async function() {
+    const ma = document.getElementById('editMaValue').value;
+    const correctionData = { maVatTu: ma, lapDat: document.getElementById('editLapDat').value, dinhBien: document.getElementById('editDinhBien').value, tonKho: document.getElementById('editTonKho').value, datMua: document.getElementById('editDatMua').value, daVe: document.getElementById('editDaVe').value, thongTinPR: document.getElementById('editPR').value, po: document.getElementById('editPO').value, pvt: document.getElementById('editPVT').value, viTriLapDat: document.getElementById('editViTri').value, lastUpdated: new Date().toISOString(), author: 'Admin' };
+    materialCorrections[ma] = correctionData; reloadCurrentFactoryData();
+    bootstrap.Modal.getInstance(document.getElementById('editDataModal'))?.hide();
+    if (!isLocalMode && currentUser) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'material_corrections', ma.replace(/[^a-zA-Z0-9_]/g, '_')), correctionData, { merge: true });
+    showToast('Lưu chỉnh sửa ảo thành công!', 'success');
+};
+
+window.clearDataCorrection = async function() {
+    const ma = document.getElementById('editMaValue').value;
+    window.customConfirm("Xóa chỉnh sửa sẽ khôi phục lại dữ liệu gốc từ Excel/SAP. Bạn có chắc chắn?", async () => {
+        delete materialCorrections[ma]; reloadCurrentFactoryData();
+        bootstrap.Modal.getInstance(document.getElementById('editDataModal'))?.hide();
+        if (!isLocalMode && currentUser) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'material_corrections', ma.replace(/[^a-zA-Z0-9_]/g, '_')));
+        showToast('Đã khôi phục dữ liệu gốc!', 'success');
+    });
+};
+
+window.exportSummary = function() {
+    if (!currentViewData || currentViewData.length === 0) { showToast('Không có dữ liệu', 'warning'); return; }
+    const exportData = currentViewData.map(i => ({
+        'Nhà Máy': currentFactory, 'Xưởng (Level 1)': i.xuong, 'Khu Vực (Level 2)': i.area, 'Mã Vật Tư': i.ma, 'Mã Tương Đương': (materialNotes[i.ma] && materialNotes[i.ma].maTuongDuong) ? materialNotes[i.ma].maTuongDuong : '', 'Tên Vật Tư': i.ten, 'Vị Trí Cụ Thể': i.viTriLapDat, 'Cụm Thiết Bị': i.viTri, 'Phân Loại': i.chungLoai, 'SL Lắp Đặt': i.lapDat, 'SL Định Biên': i.dinhBien, 'Tồn Tổ': i.tonKho, 'Tồn NM': i.tonKhoNM, 'Tổng Đặt Mua': i.datMua, 'Đã Nhận Hàng': i.daVe, 'SL Còn Thiếu (Cần Mua)': i.thieuQty, 'Tỷ Lệ Tồn/ĐB (%)': i.tyLeTon, 'Tình Trạng Tồn Kho': i.status === 'good' ? 'Đủ' : 'Thiếu', 'P.VT': i.pvt, 'Thông tin PR': i.thongTinPR, 'Ngày Lên PR': i.ngayPRStr, 'Mã PO': i.po, 'Ngày Về Dự Kiến': i.ngayVeStr, 'Trạng Thái Giao Hàng': i.treStatus.replace(/<br>/g, " | "), 'Lịch Sử Ghi Chú': (materialNotes[i.ma] && materialNotes[i.ma].history && materialNotes[i.ma].history.length > 0) ? materialNotes[i.ma].history[0].text : '', 'Ghi chú Admin': materialCorrections[i.ma] ? 'Đã ghi đè thủ công' : ''
+    }));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportData), `BaoCao`); XLSX.writeFile(wb, `BaoCao_${currentFactory}.xlsx`);
+};
+
+window.downloadTemplate = function() {
+    const ws = XLSX.utils.aoa_to_sheet([["BẢNG THEO DÕI TÌNH TRẠNG VẬT TƯ (CẤU TRÚC PHÂN CẤP)", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], [ "Khu Vực Chức Năng (Cấp 1)", "Cụm Thiết Bị (Cấp 2)", "Vị Trí Lắp Đặt", "Phân Loại (Cơ/Điện)", "Mã Vật Tư", "Tên Vật Tư", "ĐVT", "Lắp Đặt", "Đặt Mua", "Đã Về", "Định Biên", "Sử dụng", "Tồn Kho Tổ", "P.VT", "Thông tin PR", "Ngày lên PR", "Số PO", "Ngày Về Dự Kiến" ], ["1-T07-PT1-01 Hố xỉ chìm", "1-T07-PT1-01-1 Hố xỉ 1", "Khớp trên trục A", "Cơ", "1251599902223", "Cơ cấu ống dẫn khói bụi", "Cái", 8, 0, 0, 10, 0, 8, "PVT-01", "PR-2026-A1", "01/15/2026", "PO-2026-001", "03/25/2026"]]);
+    ws['!cols'] = [ {wch: 25}, {wch: 25}, {wch: 20}, {wch: 15}, {wch: 15}, {wch: 25}, {wch: 8}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 18} ];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Sheet1"); XLSX.writeFile(wb, `Template_VatTu_Moi.xlsx`); showToast(`Đã tải Template!`, 'success');
+};
+
+window.downloadMissingSapTemplate = function() {
+    if (!window.currentMissingSapItems || window.currentMissingSapItems.length === 0) return;
+    const wsData = [["BẢNG THEO DÕI TÌNH TRẠNG VẬT TƯ (CẤU TRÚC PHÂN CẤP)", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], [ "Khu Vực Chức Năng (Cấp 1)", "Cụm Thiết Bị (Cấp 2)", "Vị Trí Lắp Đặt", "Phân Loại (Cơ/Điện)", "Mã Vật Tư", "Tên Vật Tư", "ĐVT", "Lắp Đặt", "Đặt Mua", "Đã Về", "Định Biên", "Sử dụng", "Tồn Kho Tổ", "P.VT", "Thông tin PR", "Ngày lên PR", "Số PO", "Ngày Về Dự Kiến" ]];
+    window.currentMissingSapItems.forEach(m => wsData.push(["CẦN ĐIỀN", "CẦN ĐIỀN", "CẦN ĐIỀN", "Cơ/Điện", m.ma, m.ten, "Cái", 0, m.req, m.gr, 0, 0, m.unr, m.pvt, m.pr, m.prDateStr, m.po, m.delivDateStr]));
+    const ws = XLSX.utils.aoa_to_sheet(wsData); ws['!cols'] = [ {wch: 25}, {wch: 25}, {wch: 20}, {wch: 15}, {wch: 15}, {wch: 25}, {wch: 8}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 18} ];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Can_Bo_Sung"); XLSX.writeFile(wb, `DS_Bo_Sung_Tu_SAP_${currentFactory}.xlsx`);
+};
+
+// TAB 2: CBM
+let globalCbmData = []; let cbmEditModalInstance = null;
+document.addEventListener("DOMContentLoaded", function() { cbmEditModalInstance = new bootstrap.Modal(document.getElementById('cbmEditModal')); });
+function listenToCbmData() { if (!isLocalMode && db) onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'cbm_data'), (snap) => { globalCbmData = []; snap.forEach((doc) => { globalCbmData = globalCbmData.concat(doc.data().items || []); }); renderCBMTable(); }); }
+window.downloadCBMTemplate = function() {
+    const ws = XLSX.utils.aoa_to_sheet([["DANH SÁCH VẬT TƯ THAY THẾ ĐỊNH KỲ (CBM)", "", "", "", "", "", "", "", ""], ["Nhà Máy", "Mã Vật Tư", "Tên Vật Tư", "Vị Trí Lắp Đặt", "Định Mức Thay Thế (SL)", "Tồn Kho Hiện Tại", "Leadtime Mua Hàng (Ngày)", "Ngày Thay Gần Nhất (MM/DD/YYYY)", "Định Mức Tuổi Thọ (Tháng)", "Xưởng (Không bắt buộc)"], ["CĐ3", "123456", "Vòng bi SKF", "Trục Bơm A", 2, 0, 45, "01/15/2026", 6, "Xưởng Mạ"]]);
+    ws['!cols'] = [{wch: 10}, {wch: 15}, {wch: 25}, {wch: 20}, {wch: 20}, {wch: 15}, {wch: 25}, {wch: 30}, {wch: 25}, {wch: 25}]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "CBM"); XLSX.writeFile(wb, `Template_CBM.xlsx`);
+};
+window.uploadCBMFile = async function() {
+    if (!isAdmin) return; const file = document.getElementById('cbmFileInput').files[0]; if (!file) return;
+    document.body.classList.add('loading'); const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const rows = XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(e.target.result), {type: 'array'}).Sheets[XLSX.read(new Uint8Array(e.target.result), {type: 'array'}).SheetNames[0]], {header: 1, defval: ''});
+            let newCbmItems = [];
+            for (let i = 2; i < rows.length; i++) { if (!rows[i][1]) continue; newCbmItems.push({ factory: safeStr(rows[i][0]), ma: safeStr(rows[i][1]), ten: safeStr(rows[i][2]), viTri: safeStr(rows[i][3]), dinhMuc: parseNumber(rows[i][4]), tonKho: parseNumber(rows[i][5]), leadtime: parseNumber(rows[i][6]), ngayThayTruocStr: rows[i][7], tuoiThoThang: parseNumber(rows[i][8]), xuong: safeStr(rows[i][9]), dangMua: 0, pr: '', po: '', ngayVeStr: '' }); }
+            const fItems = newCbmItems.filter(item => item.factory === currentFactory || item.factory === '');
+            if (!isLocalMode && currentUser) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'cbm_data', currentFactory), { factory: currentFactory, items: fItems, updatedAt: new Date().toISOString() });
+            else { globalCbmData = fItems; renderCBMTable(); }
+            showToast('Tải CBM thành công!', 'success');
+        } catch(err) { showToast('Lỗi: ' + err.message, 'danger'); } finally { document.body.classList.remove('loading'); document.getElementById('cbmFileInput').value = ''; }
+    }; reader.readAsArrayBuffer(file);
+};
+window.uploadSapCbm = async function() {
+    if (!isAdmin) return; const file = document.getElementById('sapCbmInput').files[0]; if (!file || globalCbmData.length === 0) return;
+    document.body.classList.add('loading'); const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const sapRows = XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(e.target.result), {type: 'array'}).Sheets[XLSX.read(new Uint8Array(e.target.result), {type: 'array'}).SheetNames[0]], {header: 1, defval: ''});
+            const h = sapRows[0].map(h => h.toString().toLowerCase().trim());
+            let sm = {}; for(let i = 1; i < sapRows.length; i++) { const row = sapRows[i]; const m = safeStr(row[h.indexOf("material")]); if(m) { sm[m] = row; sm[m.replace(/^0+/, '')] = row; } }
+            let fItems = globalCbmData.filter(i => i.factory === currentFactory);
+            fItems.forEach(item => {
+                const sRow = sm[item.ma] || sm[item.ma.replace(/^0+/, '')];
+                if (sRow) { item.tonKho = parseNumber(sRow[h.indexOf("unrestricted")]); item.dangMua = parseNumber(sRow[h.indexOf("quantity requested")]); item.pr = safeStr(sRow[h.indexOf("purchase requisition")]); item.po = safeStr(sRow[h.indexOf("purchase order")]); const dDate = h.indexOf("purchase order") > 0 ? excelToDate(sRow[h.indexOf("purchase order") - 1]) : null; item.ngayVeStr = dDate ? dDate.toLocaleDateString('en-GB') : ''; }
+            });
+            if (!isLocalMode && currentUser) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'cbm_data', currentFactory), { factory: currentFactory, items: fItems, updatedAt: new Date().toISOString() });
+            renderCBMTable(); showToast(`Đồng bộ SAP CBM thành công!`, 'success');
+        } catch (err) { showToast('Lỗi: ' + err.message, 'danger'); } finally { document.body.classList.remove('loading'); document.getElementById('sapCbmInput').value = ''; }
+    }; reader.readAsArrayBuffer(file);
+};
+window.clearCBMData = async function() {
+    if(!isAdmin) return; window.customConfirm("Xóa dữ liệu CBM?", async () => { if (!isLocalMode && currentUser) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'cbm_data', currentFactory)); showToast('Đã xóa CBM!', 'success'); } });
+};
+window.exportCBMExcel = function() {
+    const items = globalCbmData.filter(i => i.factory === currentFactory); if (!items.length) return;
+    const ws = XLSX.utils.json_to_sheet(items.map(i => ({ 'Nhà Máy': i.factory, 'Xưởng': i.xuong || '', 'Mã Vật Tư': i.ma, 'Tên Vật Tư': i.ten, 'Vị Trí': i.viTri, 'Định Mức': i.dinhMuc, 'Tồn Kho': i.tonKho, 'Đang Mua': i.dangMua, 'Leadtime': i.leadtime, 'Tuổi Thọ': i.tuoiThoThang, 'Ngày Thay': i.ngayThayTruocStr, 'Mã PR': i.pr, 'Mã PO': i.po, 'Ngày Về': i.ngayVeStr })));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, `CBM`); XLSX.writeFile(wb, `CBM_${currentFactory}.xlsx`);
+};
+window.openEditCbmModal = function(ma) {
+    const item = globalCbmData.find(x => x.ma === ma && x.factory === currentFactory); if (!item) return;
+    document.getElementById('cbmEditMa').value = item.ma; document.getElementById('cbmEditMaDisplay').innerText = item.ma; document.getElementById('cbmEditTenDisplay').innerText = item.ten;
+    document.getElementById('cbmEditXuong').value = item.xuong || ''; document.getElementById('cbmEditViTri').value = item.viTri; document.getElementById('cbmEditDinhMuc').value = item.dinhMuc; document.getElementById('cbmEditTonKho').value = item.tonKho; document.getElementById('cbmEditDangMua').value = item.dangMua; document.getElementById('cbmEditLeadtime').value = item.leadtime; document.getElementById('cbmEditNgayThay').value = item.ngayThayTruocStr; document.getElementById('cbmEditTuoiTho').value = item.tuoiThoThang; document.getElementById('cbmEditPR').value = item.pr; document.getElementById('cbmEditPO').value = item.po; document.getElementById('cbmEditNgayVe').value = item.ngayVeStr;
+    cbmEditModalInstance.show();
+};
+window.saveCbmCorrection = async function() {
+    const ma = document.getElementById('cbmEditMa').value; let fItems = globalCbmData.filter(i => i.factory === currentFactory); let idx = fItems.findIndex(x => x.ma === ma);
+    if (idx > -1) {
+        fItems[idx] = { ...fItems[idx], xuong: document.getElementById('cbmEditXuong').value, viTri: document.getElementById('cbmEditViTri').value, dinhMuc: parseNumber(document.getElementById('cbmEditDinhMuc').value), tonKho: parseNumber(document.getElementById('cbmEditTonKho').value), dangMua: parseNumber(document.getElementById('cbmEditDangMua').value), leadtime: parseNumber(document.getElementById('cbmEditLeadtime').value), ngayThayTruocStr: document.getElementById('cbmEditNgayThay').value, tuoiThoThang: parseNumber(document.getElementById('cbmEditTuoiTho').value), pr: document.getElementById('cbmEditPR').value, po: document.getElementById('cbmEditPO').value, ngayVeStr: document.getElementById('cbmEditNgayVe').value };
+        if (!isLocalMode && currentUser) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'cbm_data', currentFactory), { factory: currentFactory, items: fItems, updatedAt: new Date().toISOString() });
+        else { const gIdx = globalCbmData.findIndex(x => x.ma === ma && x.factory === currentFactory); if(gIdx > -1) globalCbmData[gIdx] = fItems[idx]; renderCBMTable(); }
+    }
+    cbmEditModalInstance.hide();
+};
+window.renderCBMTable = function() {
+    const tbody = document.getElementById('cbmTableBody'); 
+    const kw = document.getElementById('cbmSearch').value.toLowerCase();
+    const xuongFilter = document.getElementById('cbmXuongFilter').value;
+    const statusFilter = document.getElementById('cbmStatusFilter').value;
+
+    let items = globalCbmData.filter(i => i.factory === currentFactory || !i.factory);
+    
+    // Thu thập danh sách Xưởng để nạp vào dropdown
+    const xuongList = [...new Set(items.map(i => i.xuong).filter(x => x))].sort();
+    const xuongSelect = document.getElementById('cbmXuongFilter');
+    if (xuongSelect.options.length <= 1 || xuongSelect.options.length !== xuongList.length + 1) {
+        let htmlXuong = '<option value="ALL">Tất cả Xưởng</option>';
+        xuongList.forEach(x => htmlXuong += `<option value="${x}">${x}</option>`);
+        xuongSelect.innerHTML = htmlXuong;
+        xuongSelect.value = xuongFilter; // Giữ lại giá trị đang chọn
+    }
+
+    if (xuongFilter !== 'ALL') items = items.filter(i => i.xuong === xuongFilter);
+    if (kw) items = items.filter(i => i.ma.toLowerCase().includes(kw) || i.ten.toLowerCase().includes(kw) || i.viTri.toLowerCase().includes(kw));
+
+    let processedItems = items.map(i => {
+        let cloned = {...i};
+        const lDate = excelToDate(i.ngayThayTruocStr); 
+        cloned._nDateStr = "Chưa xác định"; 
+        cloned._alrtHtml = `<span class="badge bg-secondary">Thiếu thông tin</span>`;
+        cloned._status = 'SAFE';
+
+        if (lDate && i.tuoiThoThang > 0) {
+            let nDate = new Date(lDate); nDate.setMonth(nDate.getMonth() + i.tuoiThoThang); 
+            cloned._nDateStr = nDate.toLocaleDateString('vi-VN');
+            const dl = Math.ceil((nDate.getTime() - TODAY.getTime()) / 86400000); 
+            const od = new Date(nDate); od.setDate(od.getDate() - i.leadtime); 
+            const dto = Math.ceil((od.getTime() - TODAY.getTime()) / 86400000);
+            const tq = i.dinhMuc - (i.tonKho + i.dangMua);
+
+            if (dl < 0 && i.tonKho < i.dinhMuc) { 
+                cloned._status = 'OVERDUE'; 
+                cloned._alrtHtml = `<span class="badge bg-danger shadow"><i class="fas fa-skull-crossbones me-1"></i> Quá Hạn (${Math.abs(dl)}d)</span>`; 
+            }
+            else if (i.tonKho >= i.dinhMuc) { 
+                cloned._status = 'SAFE'; 
+                cloned._alrtHtml = `<span class="badge bg-success"><i class="fas fa-check"></i> Đủ thay</span>`; 
+            }
+            else if (i.dangMua > 0 && tq <= 0) {
+                if (i.po && i.ngayVeStr) { 
+                    const nv = new Date(i.ngayVeStr.split('/')[2], i.ngayVeStr.split('/')[1] - 1, i.ngayVeStr.split('/')[0]); 
+                    if (nv > nDate) { cloned._status = 'OVERDUE'; cloned._alrtHtml = `<span class="badge bg-danger">Hàng về trễ</span>`; } 
+                    else { cloned._status = 'SAFE'; cloned._alrtHtml = `<span class="badge bg-info text-dark">Hàng đang về kịp</span>`; } 
+                }
+                else if (i.pr) { cloned._status = 'WARNING'; cloned._alrtHtml = `<span class="badge bg-warning text-dark">Chờ PO</span>`; } 
+                else { cloned._status = 'WARNING'; cloned._alrtHtml = `<span class="badge bg-secondary">Đang mua</span>`; }
+            } else {
+                if (TODAY >= od) { cloned._status = 'WARNING'; cloned._alrtHtml = `<span class="badge bg-danger shadow px-3 py-2">Khẩn: Cần PR (${tq})</span>`; }
+                else if (dto <= 60) { cloned._status = 'WARNING'; cloned._alrtHtml = `<span class="badge bg-warning text-dark">Chuẩn bị mua (${dto}d)</span>`; }
+                else { cloned._status = 'SAFE'; cloned._alrtHtml = `<span class="badge bg-light text-dark border">Chưa cần mua (${dto}d)</span>`; }
+            }
+        }
+        return cloned;
+    });
+
+    if (statusFilter !== 'ALL') processedItems = processedItems.filter(i => i._status === statusFilter);
+
+    let s = { t: processedItems.length, sf: 0, w: 0, o: 0 };
+    
+    tbody.innerHTML = processedItems.length === 0 ? `<tr><td colspan="12" class="text-center py-4 text-muted">Không có dữ liệu</td></tr>` : processedItems.map(i => {
+        if(i._status === 'OVERDUE') s.o++; else if(i._status === 'WARNING') s.w++; else s.sf++;
+        const lDate = excelToDate(i.ngayThayTruocStr);
+        return `<tr><td><div class="fw-bold font-monospace text-primary">${i.ma}</div><div class="small text-muted text-truncate" style="max-width:200px;">${i.ten}</div></td><td class="small fw-bold text-secondary">${i.xuong || '-'}</td><td class="small">${i.viTri}</td><td class="text-center small">${lDate ? lDate.toLocaleDateString('vi-VN') : '-'}</td><td class="text-center">${i.tuoiThoThang}</td><td class="text-center fw-bold text-primary">${i._nDateStr}</td><td class="text-center text-secondary fw-bold">${formatNum(i.dinhMuc)}</td><td class="text-center fw-bold ${i.tonKho >= i.dinhMuc ? 'text-success' : (i.tonKho > 0 ? 'text-warning' : 'text-danger')}">${formatNum(i.tonKho)}</td><td class="text-center fw-bold text-info">${formatNum(i.dangMua)}</td><td class="text-center"><span class="badge bg-light text-dark border">${i.pr || '-'}</span></td><td class="text-center"><div class="fw-semibold small">${i.po || '-'}</div><div class="text-muted" style="font-size:0.7rem;">${i.ngayVeStr || ''}</div></td><td class="text-center">${i._alrtHtml}</td><td class="text-center"><button class="btn btn-sm btn-outline-warning py-0 px-1 fw-bold shadow-sm" onclick="openEditCbmModal('${i.ma}')"><i class="fas fa-edit"></i></button></td></tr>`;
+    }).join('');
+    document.getElementById('cbmTotal').innerText = s.t; document.getElementById('cbmSafe').innerText = s.sf; document.getElementById('cbmWarning').innerText = s.w; document.getElementById('cbmOverdue').innerText = s.o;
+};
+
+// TAB 3: THƯỜNG XUYÊN
+let globalRegData = []; let regEditModalInstance = null;
+document.addEventListener("DOMContentLoaded", function() { regEditModalInstance = new bootstrap.Modal(document.getElementById('regEditModal')); });
+function listenToRegData() { if (!isLocalMode && db) onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'regular_data'), (snap) => { globalRegData = []; snap.forEach((doc) => { globalRegData = globalRegData.concat(doc.data().items || []); }); renderRegTable(); }); }
+window.downloadRegTemplate = function() {
+    const ws = XLSX.utils.aoa_to_sheet([["DANH SÁCH VẬT TƯ THAY THẾ THƯỜNG XUYÊN", "", "", "", "", "", "", "", ""], ["Nhà Máy", "Phân Loại (Cơ/Điện)", "Mã Vật Tư", "Tên Vật Tư", "Vị Trí Lắp Đặt", "Định Biên Tối Thiểu (Min)", "Định Biên Tối Đa (Max)", "Tồn Kho Hiện Tại", "SL Xuất 6 Tháng Qua"], ["CĐ3", "Điện", "112233", "Bóng đèn 40W", "Xưởng Mạ", 10, 50, 15, 40]]);
+    ws['!cols'] = [{wch: 10}, {wch: 15}, {wch: 15}, {wch: 25}, {wch: 20}, {wch: 20}, {wch: 20}, {wch: 15}, {wch: 20}]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "TX"); XLSX.writeFile(wb, `Template_TX.xlsx`);
+};
+window.uploadRegFile = async function() {
+    if (!isAdmin) return; const file = document.getElementById('regFileInput').files[0]; if (!file) return;
+    document.body.classList.add('loading'); const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const rows = XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(e.target.result), {type: 'array'}).Sheets[XLSX.read(new Uint8Array(e.target.result), {type: 'array'}).SheetNames[0]], {header: 1, defval: ''});
+            let n = []; for (let i = 2; i < rows.length; i++) { if (rows[i][2]) n.push({ factory: safeStr(rows[i][0]), chungLoai: safeStr(rows[i][1]) || 'Khác', ma: safeStr(rows[i][2]), ten: safeStr(rows[i][3]), viTri: safeStr(rows[i][4]), min: parseNumber(rows[i][5]), max: parseNumber(rows[i][6]), tonKho: parseNumber(rows[i][7]), xuat6T: parseNumber(rows[i][8]) }); }
+            const fItems = n.filter(item => item.factory === currentFactory || item.factory === '');
+            if (!isLocalMode && currentUser) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'regular_data', currentFactory), { factory: currentFactory, items: fItems, updatedAt: new Date().toISOString() });
+            else { globalRegData = fItems; renderRegTable(); }
+            showToast('Tải thành công!', 'success');
+        } catch(err) { showToast('Lỗi: ' + err.message, 'danger'); } finally { document.body.classList.remove('loading'); document.getElementById('regFileInput').value = ''; }
+    }; reader.readAsArrayBuffer(file);
+};
+window.uploadSapReg = async function() {
+    if (!isAdmin) return; const file = document.getElementById('sapRegInput').files[0]; if (!file || globalRegData.length === 0) return;
+    document.body.classList.add('loading'); const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const sapRows = XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(e.target.result), {type: 'array'}).Sheets[XLSX.read(new Uint8Array(e.target.result), {type: 'array'}).SheetNames[0]], {header: 1, defval: ''});
+            const h = sapRows[0].map(h => h.toString().toLowerCase().trim());
+            let sm = {}; for(let i = 1; i < sapRows.length; i++) { const row = sapRows[i]; const m = safeStr(row[h.indexOf("material")]); if(m) { sm[m] = row; sm[m.replace(/^0+/, '')] = row; } }
+            let fItems = globalRegData.filter(i => i.factory === currentFactory);
+            fItems.forEach(item => { const sRow = sm[item.ma] || sm[item.ma.replace(/^0+/, '')]; if (sRow) item.tonKho = parseNumber(sRow[h.indexOf("unrestricted")]); });
+            if (!isLocalMode && currentUser) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'regular_data', currentFactory), { factory: currentFactory, items: fItems, updatedAt: new Date().toISOString() });
+            renderRegTable(); showToast(`Đồng bộ SAP TX thành công!`, 'success');
+        } catch (err) { showToast('Lỗi: ' + err.message, 'danger'); } finally { document.body.classList.remove('loading'); document.getElementById('sapRegInput').value = ''; }
+    }; reader.readAsArrayBuffer(file);
+};
+window.clearRegData = async function() { if(!isAdmin) return; window.customConfirm("Xóa dữ liệu?", async () => { if (!isLocalMode && currentUser) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'regular_data', currentFactory)); showToast('Xóa xong!', 'success'); } }); };
+window.exportRegExcel = function() {
+    const items = globalRegData.filter(i => i.factory === currentFactory); if (!items.length) return;
+    const ws = XLSX.utils.json_to_sheet(items.map(i => ({ 'Mã': i.ma, 'Tên': i.ten, 'Tồn': i.tonKho })));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, `TX`); XLSX.writeFile(wb, `TX_${currentFactory}.xlsx`);
+};
+window.openEditRegModal = function(ma) {
+    const item = globalRegData.find(x => x.ma === ma && x.factory === currentFactory); if (!item) return;
+    document.getElementById('regEditMa').value = item.ma; document.getElementById('regEditMaDisplay').innerText = item.ma; document.getElementById('regEditTenDisplay').innerText = item.ten;
+    document.getElementById('regEditChungLoai').value = item.chungLoai || 'Khác'; document.getElementById('regEditViTri').value = item.viTri; document.getElementById('regEditMin').value = item.min; document.getElementById('regEditMax').value = item.max; document.getElementById('regEditTonKho').value = item.tonKho; document.getElementById('regEditXuat').value = item.xuat6T;
+    regEditModalInstance.show();
+};
+window.saveRegCorrection = async function() {
+    const ma = document.getElementById('regEditMa').value; let fItems = globalRegData.filter(i => i.factory === currentFactory); let idx = fItems.findIndex(x => x.ma === ma);
+    if (idx > -1) {
+        fItems[idx] = { ...fItems[idx], chungLoai: document.getElementById('regEditChungLoai').value, viTri: document.getElementById('regEditViTri').value, min: parseNumber(document.getElementById('regEditMin').value), max: parseNumber(document.getElementById('regEditMax').value), tonKho: parseNumber(document.getElementById('regEditTonKho').value), xuat6T: parseNumber(document.getElementById('regEditXuat').value) };
+        if (!isLocalMode && currentUser) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'regular_data', currentFactory), { factory: currentFactory, items: fItems, updatedAt: new Date().toISOString() });
+        else { const gIdx = globalRegData.findIndex(x => x.ma === ma && x.factory === currentFactory); if(gIdx > -1) globalRegData[gIdx] = fItems[idx]; renderRegTable(); }
+    }
+    regEditModalInstance.hide();
+};
+window.renderRegTable = function() {
+    const tbody = document.getElementById('regTableBody'); 
+    const kw = document.getElementById('regSearch').value.toLowerCase(); 
+    const typeF = document.getElementById('regTypeFilter') ? document.getElementById('regTypeFilter').value : 'ALL';
+    const statusF = document.getElementById('regStatusFilter') ? document.getElementById('regStatusFilter').value : 'ALL';
+    const suggestF = document.getElementById('regSuggestFilter') ? document.getElementById('regSuggestFilter').value : 'ALL';
+    
+    let items = globalRegData.filter(i => i.factory === currentFactory || !i.factory);
+    if (typeF !== 'ALL') items = items.filter(i => i.chungLoai === typeF);
+    if (kw) items = items.filter(i => i.ma.toLowerCase().includes(kw) || i.ten.toLowerCase().includes(kw) || i.viTri.toLowerCase().includes(kw));
+    
+    let processedItems = items.map(i => {
+        let cloned = {...i};
+        cloned._canMua = 0; cloned._stHtml = ''; cloned._statusVal = 'SAFE';
+        
+        if (i.tonKho === 0 && i.min > 0) { cloned._canMua = i.max - i.tonKho; cloned._stHtml = `<span class="badge bg-danger shadow px-2 py-1">Hết hàng</span>`; cloned._statusVal = 'CRITICAL'; }
+        else if (i.tonKho < i.min) { cloned._canMua = i.max - i.tonKho; cloned._stHtml = `<span class="badge bg-warning text-dark">Cần mua bù</span>`; cloned._statusVal = 'WARNING'; }
+        else if (i.tonKho > i.max) { cloned._stHtml = `<span class="badge bg-info text-dark">Vượt mức</span>`; cloned._statusVal = 'SAFE'; }
+        else { cloned._stHtml = `<span class="badge bg-success">An toàn</span>`; cloned._statusVal = 'SAFE'; }
+        
+        let avg1M = i.xuat6T / 6; 
+        cloned._sugHtml = ''; cloned._suggestVal = 'HOPLY';
+        if (i.xuat6T === 0 && i.max > 0) { cloned._sugHtml = `<div class="text-danger fw-bold small"><i class="fas fa-arrow-down"></i> Giảm</div>`; cloned._suggestVal = 'GIAM'; }
+        else if (avg1M > i.max) { cloned._sugHtml = `<div class="text-primary fw-bold small"><i class="fas fa-arrow-up"></i> Tăng</div>`; cloned._suggestVal = 'TANG'; }
+        else if (i.max > i.xuat6T * 1.5) { cloned._sugHtml = `<div class="text-warning fw-bold small" style="color:#d39e00!important;"><i class="fas fa-arrow-down"></i> Xem xét giảm</div>`; cloned._suggestVal = 'GIAM'; }
+        else { cloned._sugHtml = `<div class="text-success small">Hợp lý</div>`; cloned._suggestVal = 'HOPLY'; }
+
+        return cloned;
+    });
+
+    if (statusF !== 'ALL') processedItems = processedItems.filter(i => i._statusVal === statusF);
+    if (suggestF !== 'ALL') processedItems = processedItems.filter(i => i._suggestVal === suggestF);
+
+    let s = { t: processedItems.length, sf: 0, w: 0, c: 0 };
+    
+    tbody.innerHTML = processedItems.length === 0 ? `<tr><td colspan="9" class="text-center py-4 text-muted">Không có dữ liệu</td></tr>` : processedItems.map(i => {
+        if(i._statusVal === 'CRITICAL') s.c++; else if(i._statusVal === 'WARNING') s.w++; else s.sf++;
+        return `<tr><td><div class="fw-bold font-monospace text-primary">${i.chungLoai === 'Cơ' ? '<span class="badge bg-secondary me-1" style="font-size:0.65rem;">CƠ</span>' : (i.chungLoai === 'Điện' ? '<span class="badge bg-info text-dark me-1" style="font-size:0.65rem;">ĐIỆN</span>' : '')}${i.ma}</div><div class="small text-muted text-truncate" style="max-width:200px;">${i.ten}</div></td><td class="small text-secondary">${i.viTri}</td><td><div class="fw-bold">${formatNum(i.min)} - <span class="text-primary">${formatNum(i.max)}</span></div></td><td class="text-center fw-bold ${i.tonKho >= i.min ? 'text-success' : 'text-danger'} fs-6">${formatNum(i.tonKho)}</td><td class="text-center fw-bold ${i._canMua > 0 ? 'text-danger' : 'text-muted'}">${i._canMua > 0 ? formatNum(i._canMua) : '-'}</td><td class="text-center">${i._stHtml}</td><td class="text-center border-start fw-bold text-secondary">${formatNum(i.xuat6T)}</td><td class="text-start ps-3">${i._sugHtml}</td><td class="text-center"><button class="btn btn-sm btn-outline-info py-0 px-2 fw-bold shadow-sm" onclick="openEditRegModal('${i.ma}')"><i class="fas fa-edit"></i></button></td></tr>`;
+    }).join('');
+    document.getElementById('regTotal').innerText = s.t; document.getElementById('regSafe').innerText = s.sf; document.getElementById('regWarning').innerText = s.w; document.getElementById('regCritical').innerText = s.c;
+};
+
+// =========================================================================================
+// PHẦN 4: LOGIC TAB PR DỊCH VỤ - ĐÃ ĐƯỢC CHỈNH SỬA THEO YÊU CẦU
+// =========================================================================================
+let globalPrData = [];
+let prModalInstance = null;
+let prHistoryModalInstance = null;
+let tempEditPrData = { files: {}, links: {} };
+
+document.addEventListener("DOMContentLoaded", function() {
+    prModalInstance = new bootstrap.Modal(document.getElementById('prModal'));
+    prHistoryModalInstance = new bootstrap.Modal(document.getElementById('prHistoryModal'));
+});
+
+function listenToPrData() {
+    if (isLocalMode || !db) return;
+    onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'service_prs'), (snapshot) => {
+        globalPrData = [];
+        snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            globalPrData.push({ id: docSnap.id, ...data });
+        });
+        renderPrTable();
+    });
+}
+
+function populateWorkshopDropdown(selectedVal = '') {
+    const wsSelect = document.getElementById('prWorkshop');
+    const list = currentFactory === 'CĐ3' ? listXuongCD3 : listXuongCD6;
+    let html = '<option value="">-- Chọn Xưởng / Đơn vị --</option>';
+    html += list.map(w => `<option value="${w}">${w}</option>`).join('');
+    wsSelect.innerHTML = html;
+    if(selectedVal) wsSelect.value = selectedVal;
+}
+
+window.renderExistingPrUploads = function(stageIdx) {
+    const container = document.getElementById(`existingData${stageIdx}`);
+    if (!container) return;
+
+    let html = '';
+    const files = tempEditPrData.files[`file${stageIdx}`] || [];
+    const links = tempEditPrData.links[`link${stageIdx}`] || [];
+
+    files.forEach((f, fIdx) => {
+        const delBtn = isAdmin ? `<i class="fas fa-times ms-1 text-danger" style="cursor:pointer" onclick="removeTempPrUpload('file', ${stageIdx}, ${fIdx})"></i>` : '';
+        let fName = f.name.replace('📎 ', '');
+        if (fName.length > 15) fName = fName.substring(0,15) + '...';
+        html += `<span class="badge bg-white text-dark border border-secondary shadow-sm" title="${f.name}"><i class="fas fa-file-pdf text-danger"></i> ${fName} ${delBtn}</span>`;
+    });
+
+    links.forEach((l, lIdx) => {
+        const delBtn = isAdmin ? `<i class="fas fa-times ms-1 text-danger" style="cursor:pointer" onclick="removeTempPrUpload('link', ${stageIdx}, ${lIdx})"></i>` : '';
+        html += `<span class="badge bg-white text-primary border border-primary shadow-sm" title="${l}"><i class="fas fa-link"></i> Link ${lIdx+1} ${delBtn}</span>`;
+    });
+
+    container.innerHTML = html;
+};
+
+window.removeTempPrUpload = function(type, stageIdx, itemIdx) {
+    if (!isAdmin) return;
+    if (type === 'file') tempEditPrData.files[`file${stageIdx}`].splice(itemIdx, 1);
+    if (type === 'link') tempEditPrData.links[`link${stageIdx}`].splice(itemIdx, 1);
+    renderExistingPrUploads(stageIdx);
+};
+
+window.openAddPrModal = function() {
+    document.getElementById('prDocId').value = '';
+    document.getElementById('prName').value = '';
+    document.getElementById('prStage').value = '1';
+    document.getElementById('prNumber').value = '';
+    document.getElementById('prNhaThau').value = '';
+    populateWorkshopDropdown('');
+    document.getElementById('prPIC').value = '';
+    document.getElementById('prNgayThucHien').value = '';
+    document.getElementById('prIssues').value = '';
+    document.getElementById('prDocLink').value = '';
+    document.getElementById('prDocLink').readOnly = false;
+
+    tempEditPrData = { files: {}, links: {} };
+
+    for(let i=1; i<=6; i++) {
+        tempEditPrData.files[`file${i}`] = [];
+        tempEditPrData.links[`link${i}`] = [];
+        renderExistingPrUploads(i);
+        
+        const fileInput = document.getElementById(`file${i}`);
+        const linkInput = document.getElementById(`link${i}`);
+        if(fileInput) fileInput.value = '';
+        if(linkInput) linkInput.value = '';
+    }
+    
+    document.getElementById('prModalTitle').innerHTML = '<i class="fas fa-plus-circle me-2"></i>Thêm Gói Thầu Mới';
+    prModalInstance.show();
+};
+
+window.openEditPrModal = function(id) {
+    const pr = globalPrData.find(p => p.id === id);
+    if(!pr) return;
+    
+    document.getElementById('prDocId').value = pr.id;
+    document.getElementById('prName').value = pr.name || '';
+    document.getElementById('prStage').value = pr.stage || '1';
+    document.getElementById('prNumber').value = pr.prNumber || '';
+    document.getElementById('prNhaThau').value = pr.nhaThau || '';
+    populateWorkshopDropdown(pr.workshop || '');
+    document.getElementById('prPIC').value = pr.pic || '';
+    document.getElementById('prNgayThucHien').value = pr.ngayThucHien || '';
+    document.getElementById('prIssues').value = ''; // Luôn để trống để user điền thông tin mới
+    
+    // Logic Protect Master Doc Link
+    const docLinkInput = document.getElementById('prDocLink');
+    docLinkInput.value = pr.docLink || '';
+    if (!isAdmin && pr.docLink) {
+        docLinkInput.readOnly = true;
+        docLinkInput.title = "Chỉ Admin mới có quyền xóa/sửa link chung đã cập nhật";
+    } else {
+        docLinkInput.readOnly = false;
+        docLinkInput.title = "";
+    }
+    
+    tempEditPrData = { files: {}, links: {} };
+
+    for(let i=1; i<=6; i++) {
+        // Nạp mảng files cũ
+        let existingFiles = pr.files && pr.files[`file${i}`] ? pr.files[`file${i}`] : [];
+        if (!Array.isArray(existingFiles)) existingFiles = existingFiles ? [existingFiles] : []; // Legacy
+        tempEditPrData.files[`file${i}`] = [...existingFiles.filter(x => x !== null)];
+
+        // Nạp mảng links cũ
+        let existingLinks = pr.links && pr.links[`link${i}`] ? pr.links[`link${i}`] : [];
+        if (!Array.isArray(existingLinks)) existingLinks = existingLinks ? [existingLinks] : []; // Legacy
+        tempEditPrData.links[`link${i}`] = [...existingLinks.filter(x => x !== '')];
+
+        renderExistingPrUploads(i);
+
+        // Reset ô nhập mới
+        const fileInput = document.getElementById(`file${i}`);
+        const linkInput = document.getElementById(`link${i}`);
+        if(fileInput) fileInput.value = '';
+        if(linkInput) linkInput.value = '';
+    }
+    
+    document.getElementById('prModalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Cập nhật Gói Thầu';
+    prModalInstance.show();
+};
+
+window.openPrHistoryModal = function(id) {
+    const pr = globalPrData.find(p => p.id === id);
+    if(!pr) return;
+
+    document.getElementById('prHistoryNameDisplay').innerText = pr.name;
+    const timeline = document.getElementById('prHistoryTimeline');
+    
+    if(!pr.history || pr.history.length === 0) {
+        timeline.innerHTML = `<li class="text-muted fst-italic border-0">Chưa có lịch sử cập nhật.</li>`;
+    } else {
+        const sortedHist = [...pr.history].sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+        let html = '';
+        sortedHist.forEach(h => {
+            const dateObj = new Date(h.timestamp);
+            const dateStr = dateObj.toLocaleDateString('vi-VN') + ' ' + dateObj.toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'});
+            const stageClass = h.stage === '6' ? 'stage-done' : '';
+            const userStr = h.user || 'Nhân viên';
+            
+            html += `
+                <li class="${stageClass}">
+                    <small class="text-muted d-block">${dateStr} - Cập nhật bởi: <b class="text-primary">${userStr}</b></small>
+                    <strong class="text-dark">${prStageNames[h.stage] || 'Không xác định'}</strong>
+                    <p class="mb-0 small text-secondary mt-1">Nội dung: <i>${h.note || 'Không có ghi chú thêm'}</i></p>
+                </li>
+            `;
+        });
+        timeline.innerHTML = html;
+    }
+
+    prHistoryModalInstance.show();
+};
+
+window.deletePrData = async function(id) {
+    if (!isAdmin) { showToast('Chỉ Admin mới có quyền xóa gói thầu!', 'warning'); return; }
+    window.customConfirm("Xóa gói thầu/PR này? Dữ liệu không thể khôi phục!", async () => {
+        if (!isLocalMode && currentUser) {
+            try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'service_prs', id));
+                showToast('Đã xóa gói thầu!', 'success');
+            } catch(e) {
+                if (e.message.includes('permission') || e.code === 'permission-denied') showToast('Lỗi phân quyền Database.', 'danger');
+            }
+        }
+    });
+};
+
+const readFileAsBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+};
+
+window.savePrData = async function() {
+    const id = document.getElementById('prDocId').value;
+    const name = document.getElementById('prName').value.trim();
+    if(!name) { showToast('Vui lòng nhập Tên gói thầu!', 'warning'); return; }
+    
+    const existingPr = id ? globalPrData.find(p => p.id === id) : null;
+    const newStage = document.getElementById('prStage').value;
+    const newIssues = document.getElementById('prIssues').value.trim();
+    const newSLA = document.getElementById('prNgayThucHien').value;
+    const newWorkshop = document.getElementById('prWorkshop').value;
+    const newNhaThau = document.getElementById('prNhaThau').value.trim();
+    
+    let prHistory = existingPr && existingPr.history ? [...existingPr.history] : [];
+    const isNew = !existingPr;
+    
+    prHistory.push({
+        timestamp: new Date().toISOString(),
+        stage: newStage,
+        note: newIssues || (isNew ? 'Khởi tạo PR mới' : 'Cập nhật thông tin/tài liệu'),
+        user: isAdmin ? 'Admin' : 'Kỹ thuật viên'
+    });
+
+    const docData = {
+        factory: currentFactory,
+        name: name,
+        stage: newStage,
+        prNumber: document.getElementById('prNumber').value,
+        workshop: newWorkshop,
+        nhaThau: newNhaThau,
+        pic: document.getElementById('prPIC').value,
+        ngayThucHien: newSLA,
+        issues: newIssues || (existingPr ? existingPr.issues : ''), 
+        history: prHistory,
+        files: {},
+        links: {},
+        updatedAt: new Date().toISOString()
+    };
+
+    // Link chung
+    const docLinkInput = document.getElementById('prDocLink');
+    if (!isAdmin && existingPr && existingPr.docLink) {
+        docData.docLink = existingPr.docLink;
+    } else {
+        docData.docLink = docLinkInput.value.trim();
+    }
+
+    // Check size file mới
+    let newFilesTotalSize = 0;
+    for(let i=1; i<=6; i++) {
+        const fileInput = document.getElementById(`file${i}`);
+        if(fileInput && fileInput.files.length > 0) {
+            for(let j=0; j<fileInput.files.length; j++) {
+                newFilesTotalSize += fileInput.files[j].size;
+            }
+        }
+    }
+    if (newFilesTotalSize > 900 * 1024) { 
+        showToast('Tổng dung lượng các file MỚI tải lên vượt quá 900KB. Vui lòng dùng ô "Link" thay vì upload trực tiếp!', 'danger');
+        return;
+    }
+
+    // Compile File & Link Arrays
+    for(let i=1; i<=6; i++) {
+        let finalFiles = [...(tempEditPrData.files[`file${i}`] || [])];
+        let finalLinks = [...(tempEditPrData.links[`link${i}`] || [])];
+
+        // Lấy link nhập mới từ textarea
+        const linkInput = document.getElementById(`link${i}`);
+        if (linkInput && linkInput.value.trim()) {
+            const addedLinks = linkInput.value.split(/[,;\n]+/).map(l => l.trim()).filter(l => l !== '');
+            finalLinks.push(...addedLinks);
+        }
+
+        // Lấy file chọn mới
+        const fileInput = document.getElementById(`file${i}`);
+        if (fileInput && fileInput.files.length > 0) {
+            for(let j=0; j<fileInput.files.length; j++) {
+                const file = fileInput.files[j];
+                const base64Url = await readFileAsBase64(file);
+                finalFiles.push({ name: "📎 " + file.name, url: base64Url });
+            }
+        }
+
+        docData.files[`file${i}`] = finalFiles;
+        docData.links[`link${i}`] = finalLinks;
+    }
+
+    try {
+        if (!isLocalMode && currentUser) {
+            const docId = id || `PR_${Date.now()}`;
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'service_prs', docId), docData, { merge: true });
+            showToast('Đã lưu thông tin PR thành công!', 'success');
+        } else {
+            showToast('Chế độ Local: Đã lưu trực tiếp', 'info');
+        }
+        prModalInstance.hide();
+    } catch(e) {
+        showToast('Lỗi lưu PR: ' + e.message, 'danger');
+    }
+};
+
+window.renderPrTable = function() {
+    const tbody = document.getElementById('prTableBody');
+    let items = globalPrData.filter(i => i.factory === currentFactory);
+    
+    const wsList = [...new Set(items.map(i => i.workshop).filter(x => x))].sort();
+    const wsFilterEl = document.getElementById('prFilterWorkshop');
+    if (wsFilterEl && (wsFilterEl.options.length <= 1 || wsFilterEl.options.length !== wsList.length + 1)) {
+        const currentWsVal = wsFilterEl.value;
+        let htmlWs = '<option value="ALL">Tất cả Xưởng / Đơn vị</option>';
+        wsList.forEach(w => htmlWs += `<option value="${w}">${w}</option>`);
+        wsFilterEl.innerHTML = htmlWs;
+        wsFilterEl.value = currentWsVal;
+    }
+
+    const filterWs = document.getElementById('prFilterWorkshop')?.value || 'ALL';
+    const filterStage = document.getElementById('prFilterStage')?.value || 'ALL';
+    const filterPic = (document.getElementById('prFilterPic')?.value || '').toLowerCase();
+
+    if (filterWs !== 'ALL') items = items.filter(i => i.workshop === filterWs);
+    if (filterStage !== 'ALL') items = items.filter(i => String(i.stage) === filterStage);
+    if (filterPic) items = items.filter(i => (i.pic || '').toLowerCase().includes(filterPic));
+
+    let counts = { total: items.length, s1:0, s2:0, s3:0, s4:0, s5:0, s6:0 };
+    let html = '';
+
+    try {
+        const docStageNames = ["Tờ trình/PR", "YCKT-PVCC", "SSKT", "ĐKKT-PLKT", "Biên bản TC", "HSNT"];
+
+        items.forEach(i => {
+            const stageKey = `s${i.stage}`;
+            if (counts[stageKey] !== undefined) counts[stageKey]++;
+            
+            let filesHtml = '';
+            const fList = [];
+            const stages = [
+                { key: 'file1', lKey: 'link1', class: 'text-primary' },
+                { key: 'file2', lKey: 'link2', class: 'text-info' },
+                { key: 'file3', lKey: 'link3', class: 'text-warning' },
+                { key: 'file4', lKey: 'link4', class: 'text-orange' },
+                { key: 'file5', lKey: 'link5', class: 'text-purple', color: '#6f42c1' },
+                { key: 'file6', lKey: 'link6', class: 'text-success' }
+            ];
+
+            stages.forEach((s, idx) => {
+                let fDataArray = i.files && i.files[s.key] ? i.files[s.key] : [];
+                if (!Array.isArray(fDataArray)) fDataArray = fDataArray ? [fDataArray] : [];
+                
+                let lDataArray = i.links && i.links[s.lKey] ? i.links[s.lKey] : [];
+                if (!Array.isArray(lDataArray)) lDataArray = lDataArray ? [lDataArray] : [];
+                
+                let stageContent = [];
+                
+                fDataArray.forEach(fData => {
+                    if (fData && typeof fData === 'object' && fData.url) {
+                        let rawName = fData.name || `File_${idx+1}.pdf`;
+                        let fName = rawName.replace('📎 ', '');
+                        if(fName.length > 20) fName = fName.substring(0, 20) + '...';
+                        stageContent.push(`<a href="${fData.url}" download="${rawName.replace('📎 ', '')}" class="text-decoration-none fw-bold" title="Tải file: ${rawName}"><i class="fas fa-file-pdf"></i> ${fName}</a>`);
+                    }
+                });
+
+                lDataArray.forEach((lData, lIdx) => {
+                    if(lData) {
+                        const linkStr = String(lData);
+                        const validLink = linkStr.startsWith('http') ? linkStr : 'https://' + linkStr;
+                        stageContent.push(`<a href="${validLink}" target="_blank" class="text-decoration-none fw-bold" title="${linkStr}"><i class="fas fa-external-link-alt"></i> Link ${lIdx+1}</a>`);
+                    }
+                });
+
+                if(stageContent.length > 0) {
+                    const styleAttr = s.color ? `style="color:${s.color}; font-size:0.75rem;"` : `style="font-size:0.75rem;"`;
+                    fList.push(`<div class="${s.class} mb-1 text-start" style="white-space: normal; word-break: break-word;" ${styleAttr}><strong>${docStageNames[idx]}:</strong> ${stageContent.join(' | ')}</div>`);
+                }
+            });
+
+            filesHtml = fList.join('');
+            
+            if (i.docLink) {
+                const linkStr = String(i.docLink);
+                const validLink = linkStr.startsWith('http') ? linkStr : 'https://' + linkStr;
+                filesHtml += `<div class="text-start mt-1"><a href="${validLink}" target="_blank" class="badge bg-primary text-decoration-none d-inline-block shadow-sm py-1"><i class="fas fa-folder-open me-1"></i>Thư mục chung</a></div>`;
+            }
+
+            let thucHienText = '-';
+            if(i.ngayThucHien) {
+                const sDate = new Date(i.ngayThucHien);
+                if (!isNaN(sDate.getTime())) { 
+                    thucHienText = sDate.toLocaleDateString('vi-VN');
+                    if(sDate < TODAY && String(i.stage) !== '6') thucHienText = `<span class="text-danger fw-bold">${thucHienText} (Trễ)</span>`;
+                }
+            }
+
+            const deleteBtn = isAdmin ? `<button class="btn btn-sm btn-outline-danger py-0 px-1 shadow-sm mt-1" onclick="deletePrData('${i.id}')" title="Xóa PR"><i class="fas fa-trash"></i></button>` : '';
+
+            const actionBtns = `
+                <div class="d-flex flex-column align-items-center justify-content-center">
+                    <div class="btn-group shadow-sm">
+                        <button class="btn btn-sm btn-outline-primary py-0 px-2 fw-bold" onclick="openEditPrModal('${i.id}')" title="Cập nhật Tiến Độ"><i class="fas fa-edit"></i> Sửa</button>
+                        <button class="btn btn-sm btn-outline-info py-0 px-2 fw-bold" onclick="openPrHistoryModal('${i.id}')" title="Lịch sử Thực Hiện"><i class="fas fa-history"></i></button>
+                    </div>
+                    ${deleteBtn}
+                </div>
+            `;
+
+            const stageLabel = prStageNames[i.stage] ? prStageNames[i.stage].split('.')[1] : 'Không rõ';
+
+            html += `
+                <tr>
+                    <td class="text-start fw-bold text-primary">${i.prNumber || '-'}</td>
+                    <td class="text-start fw-bold" style="max-width: 150px; overflow:hidden; text-overflow:ellipsis;">${i.name || 'Chưa có tên'}</td>
+                    <td><span class="badge bg-light text-dark border shadow-sm">${i.workshop || '-'}</span></td>
+                    <td class="text-info fw-bold">${i.nhaThau || '-'}</td>
+                    <td><i class="fas fa-user-circle text-secondary me-1"></i>${i.pic || '-'}</td>
+                    <td>${thucHienText}</td>
+                    <td><span class="badge badge-stage-${i.stage || 1} px-2 py-1 shadow-sm">${stageLabel}</span></td>
+                    <td class="text-start text-danger small fst-italic" style="max-width: 200px;">${i.issues || ''}</td>
+                    <td class="text-start">${filesHtml || '<span class="text-muted small fst-italic">Không đính kèm</span>'}</td>
+                    <td class="align-middle">${actionBtns}</td>
+                </tr>
+            `;
+        });
+    } catch (error) {
+        console.error("Lỗi Render Table PR: ", error);
+        showToast("Có lỗi khi hiển thị gói thầu.", "danger");
+    }
+
+    if(items.length === 0) html = `<tr><td colspan="10" class="text-center py-4 text-muted fst-italic">Không tìm thấy gói thầu / PR phù hợp.</td></tr>`;
+    tbody.innerHTML = html;
+
+    document.getElementById('prCountTotal').innerText = counts.total;
+    document.getElementById('prCount1').innerText = counts.s1;
+    document.getElementById('prCount2').innerText = counts.s2;
+    document.getElementById('prCount3').innerText = counts.s3;
+    document.getElementById('prCount4').innerText = counts.s4;
+    document.getElementById('prCount5').innerText = counts.s5;
+    document.getElementById('prCount6').innerText = counts.s6;
+};
+
+// EXCEL IMPORT & EXPORT CHO PR
+window.downloadPrTemplate = function() {
+    const wsData = [
+        ["DANH SÁCH NHẬP LIỆU GÓI THẦU / PR DỊCH VỤ HÀNG LOẠT", "", "", "", "", "", "", ""],
+        ["Nhà Máy", "Tên Gói Thầu", "Số PR", "Xưởng / Đơn Vị", "Nhà Thầu Thực Hiện", "Người Phụ Trách", "Giai Đoạn (Nhập số từ 1-6)", "Ngày Thực Hiện (MM/DD/YYYY)", "Tình Trạng / Vướng Mắc"],
+        ["CĐ3", "Bảo dưỡng máy nén khí 01", "PR-2026-001", "Xưởng cán thép HRC", "Công ty CP ABC", "Nguyễn Văn A", 2, "05/15/2026", "Đang đợi báo giá"],
+        ["CĐ6", "Thuê xe cẩu 50 tấn", "PR-2026-005", "Xưởng cán", "", "Trần Văn B", 5, "06/20/2026", "Nhà thầu đang tiến hành làm việc"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = [{wch: 10}, {wch: 35}, {wch: 15}, {wch: 25}, {wch: 25}, {wch: 20}, {wch: 15}, {wch: 20}, {wch: 30}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Import_PR");
+    XLSX.writeFile(wb, `Template_Import_PR.xlsx`);
+    showToast(`Đã tải Template nhập PR hàng loạt!`, 'success');
+};
+
+window.uploadPrExcel = async function(event) {
+    if (!isAdmin) { showToast('Bạn cần quyền Admin để Import Excel!', 'warning'); return; }
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    document.body.classList.add('loading');
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const rows = XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(e.target.result), {type: 'array'}).Sheets[XLSX.read(new Uint8Array(e.target.result), {type: 'array'}).SheetNames[0]], {header: 1, defval: ''});
+            
+            let importCount = 0;
+            for (let i = 2; i < rows.length; i++) {
+                const r = rows[i];
+                if (!r[1] || r[1] === '') continue; // Skip nếu không có Tên gói thầu
+                
+                const factory = safeStr(r[0]) || currentFactory;
+                const name = safeStr(r[1]);
+                const prNumber = safeStr(r[2]);
+                const workshop = safeStr(r[3]);
+                const nhaThau = safeStr(r[4]);
+                const pic = safeStr(r[5]);
+                let stageStr = safeStr(r[6]);
+                if (!['1','2','3','4','5','6'].includes(stageStr)) stageStr = '1';
+                
+                const ngayThucHienRaw = r[7];
+                let ngayThucHienStr = '';
+                const parsedDate = excelToDate(ngayThucHienRaw);
+                if (parsedDate) {
+                    const yyyy = parsedDate.getFullYear();
+                    const mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                    const dd = String(parsedDate.getDate()).padStart(2, '0');
+                    ngayThucHienStr = `${yyyy}-${mm}-${dd}`;
+                }
+                
+                const issues = safeStr(r[8]);
+
+                const docData = {
+                    factory: factory,
+                    name: name,
+                    prNumber: prNumber,
+                    workshop: workshop,
+                    nhaThau: nhaThau,
+                    pic: pic,
+                    stage: stageStr,
+                    ngayThucHien: ngayThucHienStr,
+                    issues: issues,
+                    docLink: '',
+                    history: [{
+                        timestamp: new Date().toISOString(),
+                        stage: stageStr,
+                        note: 'Import hàng loạt từ Excel',
+                        user: 'Admin'
+                    }],
+                    files: {}, links: {},
+                    updatedAt: new Date().toISOString()
+                };
+
+                const newId = `PR_Imp_${Date.now()}_${i}`;
+                if (!isLocalMode && currentUser) {
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'service_prs', newId), docData);
+                } else {
+                    globalPrData.push({ id: newId, ...docData });
+                }
+                importCount++;
+            }
+            if (isLocalMode) renderPrTable();
+            showToast(`Nhập thành công ${importCount} PR!`, 'success');
+        } catch(err) {
+            showToast('Lỗi Import: ' + err.message, 'danger');
+        } finally {
+            document.body.classList.remove('loading');
+            event.target.value = '';
+        }
+    };
+    reader.readAsArrayBuffer(file);
+};
+
+window.exportPrExcel = function() {
+    let items = globalPrData.filter(i => i.factory === currentFactory);
+    if (!items || items.length === 0) { showToast('Không có dữ liệu PR để xuất!', 'warning'); return; }
+    
+    const exportData = items.map(i => {
+        let filesList = [];
+        const stageNamesArr = ["Tờ trình", "YCKT", "SSKT", "ĐKKT", "Thi Công", "HSNT"];
+        for(let k=1; k<=6; k++) {
+            let parts = [];
+            let fDataArray = i.files && i.files[`file${k}`] ? i.files[`file${k}`] : [];
+            if (!Array.isArray(fDataArray)) fDataArray = fDataArray ? [fDataArray] : [];
+            let lDataArray = i.links && i.links[`link${k}`] ? i.links[`link${k}`] : [];
+            if (!Array.isArray(lDataArray)) lDataArray = lDataArray ? [lDataArray] : [];
+
+            fDataArray.forEach(fd => parts.push("File: " + (typeof fd === 'object' ? fd.name : fd)));
+            lDataArray.forEach(ld => parts.push("Link: " + ld));
+
+            if (parts.length > 0) {
+                filesList.push(`${stageNamesArr[k-1]} (${parts.join(', ')})`);
+            }
+        }
+        return {
+            'Nhà Máy': i.factory,
+            'Số PR': i.prNumber,
+            'Tên Gói Thầu': i.name,
+            'Xưởng / Đơn Vị': i.workshop || '',
+            'Nhà Thầu Thực Hiện': i.nhaThau || '',
+            'Người Phụ Trách': i.pic,
+            'Ngày Thực Hiện': i.ngayThucHien ? new Date(i.ngayThucHien).toLocaleDateString('vi-VN') : '',
+            'Giai Đoạn Hiện Tại': prStageNames[i.stage],
+            'Tình Trạng / Vướng Mắc': i.issues,
+            'Lịch Sử Cập Nhật Gần Nhất': i.history && i.history.length > 0 ? `[${new Date(i.history[i.history.length-1].timestamp).toLocaleDateString('vi-VN')}] ${i.history[i.history.length-1].note}` : '',
+            'Link Tài Liệu Chung': i.docLink || '',
+            'Tài Liệu Cụ Thể': filesList.join(" | ")
+        };
+    });
+    
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `PR_DichVu`);
+    XLSX.writeFile(wb, `BaoCao_PR_DichVu_${currentFactory}_${new Date().getTime()}.xlsx`);
+};
+
+</script>
+</body>
+</html>

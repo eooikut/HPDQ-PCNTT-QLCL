@@ -1,0 +1,1454 @@
+{% extends "base.html" %}
+
+{% block title %}CPK Dashboard - Hệ Thống QC Thông Minh{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.0.2"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.2.1/dist/chartjs-plugin-zoom.min.js"></script>
+<style>
+    /* Tổng thể */
+    body { background-color: #f8fafc; font-family: 'Segoe UI', system-ui, sans-serif; }
+    
+    /* Filter Bar */
+    .cpk-filter-bar {
+        background: white; padding: 15px 20px; border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 25px;
+        display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; border: 1px solid #e2e8f0;
+    }
+    .form-group { display: flex; flex-direction: column; }
+    .form-group label { font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase; }
+    .form-control { 
+        padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; 
+        font-size: 0.9rem; color: #334155; min-width: 100px; transition: border 0.2s;
+    }
+    .form-control:focus { border-color: #3b82f6; outline: none; }
+    
+    .btn-analyze { 
+        background: #2563eb; color: white; border: none; padding: 9px 24px; 
+        border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9rem;
+        box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+    }
+    .btn-analyze:hover { background: #1d4ed8; }
+
+    /* Layout & Charts */
+    .section-header { margin-top: 35px; margin-bottom: 20px; padding-left: 15px; border-left: 5px solid #ccc; }
+    .section-header h3 { margin: 0; font-size: 1.25rem; color: #1e293b; font-weight: 700; }
+    .border-geometry { border-color: #3b82f6; } 
+    .border-mechanical { border-color: #f59e0b; } 
+    .border-chemical { border-color: #10b981; } 
+
+    .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 25px; }
+    .chart-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; }
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; }
+    .card-title { font-size: 1.1rem; font-weight: 700; color: #0f172a; }
+
+    /* Metrics & Inputs */
+    .limit-inputs { display: flex; gap: 15px; margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #f1f5f9; }
+    .input-group label { font-size: 0.7rem; color: #64748b; font-weight: 700; margin-bottom: 4px; }
+    .input-group input { width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-family: monospace; font-weight: 600; text-align: center; }
+
+    .metrics-grid { 
+        display: grid; 
+        grid-template-columns: 1fr 1fr; 
+        gap: 12px; 
+        background: #fff; 
+        border: 1px solid #e2e8f0; 
+        border-radius: 8px; 
+        padding: 16px; 
+        margin-bottom: 15px;
+    }
+    .metric-item { 
+        display: flex; 
+        flex-direction: column; 
+        gap: 6px; 
+        padding: 12px; 
+        background: #f8fafc; 
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+        transition: all 0.3s ease;
+    }
+    
+    /* Status-specific backgrounds for Cp/Cpk */
+    .metric-item.status-good {
+        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+        border: 2px solid #059669;
+    }
+    .metric-item.status-good .metric-value {
+        color: #065f46;
+        font-weight: 800;
+    }
+    
+    .metric-item.status-warn {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        border: 2px solid #d97706;
+    }
+    .metric-item.status-warn .metric-value {
+        color: #92400e;
+        font-weight: 800;
+    }
+    
+    .metric-item.status-bad {
+        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+        border: 2px solid #dc2626;
+        animation: pulse-red 2s infinite;
+    }
+    .metric-item.status-bad .metric-value {
+        color: #991b1b;
+        font-weight: 800;
+    }
+    
+    @keyframes pulse-red {
+        0%, 100% { box-shadow: 0 0 10px rgba(220, 38, 38, 0.3); }
+        50% { box-shadow: 0 0 20px rgba(220, 38, 38, 0.5); }
+    }
+    
+    .metric-item .metric-label { 
+        font-size: 0.7rem; 
+        color: #64748b; 
+        font-weight: 700; 
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .metric-item .metric-value { 
+        font-size: 1.3rem; 
+        font-weight: 700; 
+        font-family: monospace; 
+        color: #0f172a;
+    }
+    
+    .status-bad { color: #dc2626; } .status-warn { color: #d97706; } .status-good { color: #059669; }
+    .normality-warning { 
+        grid-column: span 2; 
+        font-size: 0.75rem; 
+        color: #d97706; 
+        display: none; 
+        align-items: center; 
+        gap: 5px; 
+        background: #fffbeb; 
+        padding: 8px 12px; 
+        border-radius: 4px;
+        margin-top: -4px;
+    }
+
+    /* Distribution Info */
+    .distribution-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #f1f5f9;
+        padding: 10px 12px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+        font-size: 0.8rem;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+    }
+    .distribution-info .stat-item {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .distribution-info .stat-label {
+        font-size: 0.65rem;
+        color: #64748b;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .distribution-info .stat-value {
+        font-family: monospace;
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: #0f172a;
+    }
+    .defect-rate {
+        color: #dc2626;
+        font-weight: 700;
+    }
+    .defect-rate.good {
+        color: #059669;
+    }
+
+    /* Sample Size Warning */
+    .sample-warning {
+        font-size: 0.75rem;
+        color: #dc2626;
+        display: none;
+        align-items: center;
+        gap: 5px;
+        background: #fef2f2;
+        padding: 8px 12px;
+        border-radius: 4px;
+        margin-bottom: 10px;
+        border-left: 3px solid #dc2626;
+    }
+
+    /* Empty State Styles */
+    .empty-state {
+        text-align: center; padding: 60px 20px; background: white; 
+        border-radius: 12px; border: 2px dashed #e2e8f0; margin-top: 20px;
+    }
+    .empty-icon { font-size: 4rem; margin-bottom: 15px; opacity: 0.8; }
+    .empty-text h3 { color: #1e293b; font-size: 1.25rem; font-weight: 700; margin: 0 0 8px 0; }
+    .empty-text p { color: #64748b; margin: 0; font-size: 0.95rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <h1 style="font-size: 1.8rem; color: #0f172a; margin-bottom: 5px;">📈 Phân Tích Năng Lực Quy Trình (AIAG SPC)</h1>
+    <p style="color: #64748b; margin: 0;">Lọc theo chuẩn Target (Setting) - Level 2 Process Data</p>
+</div>
+
+<div class="cpk-filter-bar">
+    <div class="form-group">
+        <label>Nhà máy</label>
+        <select id="f_factory" class="form-control" style="width: 100px;">
+            {% for f in factories %} <option value="{{ f }}">{{ f }}</option> {% endfor %}
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label>Mác Thép (Coil)</label>
+        <select id="f_grade" class="form-control" style="width: 140px;" onchange="onGradeChange()">
+            <option value="">-- Chọn --</option>
+            </select>
+    </div>
+
+    <div class="form-group">
+        <label>Mác Phôi (Slab)</label>
+        <select id="f_slab_grade" class="form-control" style="width: 140px; font-weight:600; color:#2563eb;" onchange="onSlabChange()">
+            <option value="">-- Tất cả --</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>Target FT (°C)</label>
+        <select id="f_target_ft" class="form-control target-select" style="width: 110px;">
+            <option value="">-- All --</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label>Target CT (°C)</label>
+        <select id="f_target_ct" class="form-control target-select" style="width: 110px;">
+            <option value="">-- All --</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Độ dày (mm)</label>
+        <div style="display:flex; gap:5px;">
+            <input type="number" id="f_thick_min" class="form-control" placeholder="Min" style="width: 60px;">
+            <input type="number" id="f_thick_max" class="form-control" placeholder="Max" style="width: 60px;">
+        </div>
+    </div>
+    <div class="form-group">
+        <label>Ngày sản xuất</label>
+        <div style="display:flex; gap:5px;">
+            <input type="date" id="f_start_date" class="form-control" style="width: 130px;">
+            <input type="date" id="f_end_date" class="form-control" style="width: 130px;">
+        </div>
+    </div>
+    <div class="form-group">
+        <label>&nbsp;</label>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="exclude_outliers" style="width: 18px; height: 18px; cursor: pointer;">
+            <label for="exclude_outliers" style="margin: 0; font-weight: normal; font-size: 0.9rem; cursor: pointer;">
+                Loại bỏ Ngoại lai (IQR)
+            </label>
+        </div>
+    </div>
+    <div class="form-group">
+        <label>&nbsp;</label>
+        <button onclick="loadData()" class="btn-analyze">🔍 Phân tích</button>
+    </div>
+</div>
+
+<div id="loading" style="display:none; text-align:center; padding:50px; color:#64748b;">
+    <div style="font-size: 2rem; margin-bottom: 10px; animation: spin 1s infinite linear;">⚙️</div> 
+    <div>Đang xử lý dữ liệu chuẩn công nghiệp...</div>
+</div>
+
+<div id="no-data-alert" class="empty-state" style="display:none;">
+    <div class="empty-icon">📭</div>
+    <div class="empty-text"><h3>Không có dữ liệu</h3><p>Không tìm thấy cuộn nào khớp với Target đã chọn.</p></div>
+</div>
+
+<div id="main-data-container" style="display: none;">
+    <div class="section-header border-geometry"><h3>📏 Hình Học & Nhiệt Độ</h3></div>
+    <div id="container_geometry" class="charts-grid"></div>
+
+    <div class="section-header border-mechanical"><h3>⚙️ Cơ Lý Tính</h3></div>
+    <div id="container_mechanical" class="charts-grid"></div>
+
+    <div class="section-header border-chemical"><h3>🧪 Thành Phần Hóa Học</h3></div>
+    <div id="container_chemical" class="charts-grid"></div>
+</div>
+<div id="imrModal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(0,0,0,0.5); backdrop-filter: blur(2px);">
+    <div style="background-color:#fefefe; margin: 2% auto; padding:20px; border:1px solid #888; width:95%; max-width:1400px; border-radius:8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
+            <div>
+                <h2 style="margin:0; color:#1e293b;">📉 Biểu đồ Kiểm Soát (I-MR Control Chart)</h2>
+                <span id="imr_title_spec" style="color:#64748b; font-size:0.9rem;"></span>
+            </div>
+            <span onclick="closeImrModal()" style="color:#aaa; float:right; font-size:28px; font-weight:bold; cursor:pointer;">&times;</span>
+        </div>
+        
+        <div style="display:grid; grid-template-columns: 3fr 1fr; gap: 20px;">
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <div style="height: 320px; border:1px solid #e2e8f0; padding:10px; border-radius:6px; background:white; position: relative;">
+                    <canvas id="chart_individual"></canvas>
+                </div>
+                
+                <div style="height: 200px; border:1px solid #e2e8f0; padding:10px; border-radius:6px; background:white; position: relative;">
+                    <canvas id="chart_moving_range"></canvas>
+                </div>
+
+                <div style="background: #f1f5f9; padding: 10px 15px; border-radius: 6px; display: flex; align-items: center; gap: 15px;">
+                    <span style="font-size: 1.2rem;">⏪</span>
+                    <input type="range" id="imr_slider" min="0" max="100" value="100" style="width: 100%; cursor: pointer;" oninput="onImrSliderChange(this.value)">
+                    <span style="font-size: 1.2rem;">⏩</span>
+                    <span id="imr_slider_label" style="font-size: 0.8rem; font-weight: bold; white-space: nowrap; min-width: 120px; text-align: right; color: #475569;">
+                        Loading...
+                    </span>
+                </div>
+            </div>
+
+            <div style="background:#f8fafc; padding:15px; border-radius:6px; border:1px solid #e2e8f0; height:fit-content;">
+                <h4 style="margin-top:0; color:#334155; border-bottom:2px solid #cbd5e1; padding-bottom:5px;">📊 Control Statistics</h4>
+                <div class="metric-item" style="margin-bottom:10px; background:white;">
+                    <span class="metric-label">Mean (CL)</span>
+                    <span class="metric-value" id="imr_mean" style="color:#2563eb;">-</span>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                    <div class="metric-item" style="background:white;">
+                        <span class="metric-label">UCL (Upper)</span>
+                        <span class="metric-value" id="imr_ucl" style="color:#dc2626; font-size:1.1rem;">-</span>
+                    </div>
+                    <div class="metric-item" style="background:white;">
+                        <span class="metric-label">LCL (Lower)</span>
+                        <span class="metric-value" id="imr_lcl" style="color:#dc2626; font-size:1.1rem;">-</span>
+                    </div>
+                </div>
+                <h4 style="margin-top:20px; color:#334155; border-bottom:2px solid #cbd5e1; padding-bottom:5px;">📉 Moving Range (MR)</h4>
+                <div class="metric-item" style="margin-bottom:10px; background:white;">
+                    <span class="metric-label">Avg Range (R̄)</span>
+                    <span class="metric-value" id="imr_mr_bar" style="color:#059669;">-</span>
+                </div>
+                <div class="metric-item" style="background:white;">
+                    <span class="metric-label">UCL (Range)</span>
+                    <span class="metric-value" id="imr_mr_ucl" style="color:#d97706;">-</span>
+                </div>
+                <div style="margin-top:20px; padding:10px; background:#fffbeb; border:1px solid #fcd34d; border-radius:4px; font-size:0.8rem; color:#92400e;">
+                    <strong>Hướng dẫn:</strong><br>
+                    • Kéo thanh trượt bên dưới để xem lịch sử.<br>
+                    • <strong>Rà chuột trúng điểm tròn</strong> để xem thông số.<br>
+                    • Điểm đỏ là điểm vượt giới hạn kiểm soát.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    const DEFAULT_SPECS = {{ default_specs | tojson }};
+    const HIERARCHY = {{ hierarchy | tojson }};
+    const ALL_GRADES = Object.keys(HIERARCHY).sort();
+
+    const RENDER_ORDER = [
+        // 1. Nhóm Hình Học (Geometry)
+        'Flatness', 'Crown', 'Wedge', 'ThickDiff', 'WidthDiff',
+        // 2. Nhóm Quy Trình (Process) - Sẽ hiển thị ngay sau Hình học
+        'Temperature', 'Speed',
+        // 3. Nhóm Cơ Tính (Mechanical)
+        'YieldPoint', 'Tensile', 'Elongation', 'Hardness',
+        // 4. Nhóm Hóa Học (Chemical)
+        'C', 'Mn', 'Si', 'P', 'S'
+    ];
+
+    let GLOBAL_DATA = {}; 
+    let CHARTS_INSTANCES = {}; 
+
+    function initDropdowns() {
+        const gradeSel = document.getElementById('f_grade');
+        ALL_GRADES.forEach(g => {
+            const opt = document.createElement('option');
+            opt.value = g; opt.innerText = g;
+            gradeSel.appendChild(opt);
+        });
+    }
+
+    // --- LOGIC CASCADING DROPDOWN ---
+    // [FIXED]: Sửa lỗi 'ffunction' thành 'function'
+    function onGradeChange() {
+        const grade = document.getElementById('f_grade').value;
+        const slabSel = document.getElementById('f_slab_grade');
+        const ftSel = document.getElementById('f_target_ft');
+        const ctSel = document.getElementById('f_target_ct');
+        
+        // Reset Slabs & Targets
+        slabSel.innerHTML = '<option value="">-- Tất cả --</option>';
+        ftSel.innerHTML = '<option value="">-- All --</option>';
+        ctSel.innerHTML = '<option value="">-- All --</option>';
+
+        if (grade && HIERARCHY[grade]) {
+            const slabs = Object.keys(HIERARCHY[grade]).sort();
+            slabs.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s; opt.innerText = s;
+                slabSel.appendChild(opt);
+            });
+        }
+    }
+
+    function onSlabChange() {
+        const grade = document.getElementById('f_grade').value;
+        const slab = document.getElementById('f_slab_grade').value;
+        const ftSel = document.getElementById('f_target_ft');
+        const ctSel = document.getElementById('f_target_ct');
+
+        // Reset Targets
+        ftSel.innerHTML = '<option value="">-- All --</option>';
+        ctSel.innerHTML = '<option value="">-- All --</option>';
+
+        if (grade && slab && HIERARCHY[grade] && HIERARCHY[grade][slab]) {
+            const targets = HIERARCHY[grade][slab];
+            
+            // Fill FT
+            targets.ft.forEach(val => {
+                const opt = document.createElement('option');
+                opt.value = val; opt.innerText = val + " °C";
+                ftSel.appendChild(opt);
+            });
+
+            // Fill CT
+            targets.ct.forEach(val => {
+                const opt = document.createElement('option');
+                opt.value = val; opt.innerText = val + " °C";
+                ctSel.appendChild(opt);
+            });
+        }
+    }
+
+    // --- UTILS: LocalStorage ---
+    function saveFilters() {
+        const filters = {
+            factory: document.getElementById('f_factory').value,
+            grade: document.getElementById('f_grade').value,
+            slab_grade: document.getElementById('f_slab_grade').value,
+            target_ft: document.getElementById('f_target_ft').value, 
+            target_ct: document.getElementById('f_target_ct').value,
+            start_date: document.getElementById('f_start_date').value,
+            end_date: document.getElementById('f_end_date').value,
+            thick_min: document.getElementById('f_thick_min').value,
+            thick_max: document.getElementById('f_thick_max').value
+        };
+        localStorage.setItem('cpk_filters_v5', JSON.stringify(filters));
+    }
+
+    function loadFilters() {
+        const saved = localStorage.getItem('cpk_filters_v5');
+        if (saved) {
+            try {
+                const f = JSON.parse(saved);
+                document.getElementById('f_factory').value = f.factory || 'HRC1';
+                
+                // Cascade restore
+                if(f.grade) { 
+                    document.getElementById('f_grade').value = f.grade; 
+                    onGradeChange(); // Trigger load slab
+                    
+                    if(f.slab_grade) {
+                        document.getElementById('f_slab_grade').value = f.slab_grade;
+                        onSlabChange(); // Trigger load targets
+                        
+                        if(f.target_ft) document.getElementById('f_target_ft').value = f.target_ft;
+                        if(f.target_ct) document.getElementById('f_target_ct').value = f.target_ct;
+                    }
+                }
+                
+                if(f.start_date) document.getElementById('f_start_date').value = f.start_date;
+                if(f.end_date) document.getElementById('f_end_date').value = f.end_date;
+                if(f.thick_min) document.getElementById('f_thick_min').value = f.thick_min;
+                if(f.thick_max) document.getElementById('f_thick_max').value = f.thick_max;
+                return true;
+            } catch (e) { console.error(e); }
+        }
+        return false;
+    }
+
+    function saveCustomLimit(key, usl, lsl) {
+        let limits = JSON.parse(localStorage.getItem('cpk_limits_v2') || '{}');
+        limits[key] = { usl: usl, lsl: lsl };
+        localStorage.setItem('cpk_limits_v2', JSON.stringify(limits));
+    }
+
+    function getCustomLimit(key) {
+        let limits = JSON.parse(localStorage.getItem('cpk_limits_v2') || '{}');
+        return limits[key] || null;
+    }
+
+    // --- CORE STATS (AIAG) ---
+    function normalPDF(x, mean, stdDev) {
+        if (stdDev === 0) return 0;
+        return (1 / (stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((x - mean) / stdDev, 2));
+    }
+
+    function calculateAdvancedStats(data, usl, lsl) {
+    if (!data || data.length < 5) return null;
+    const n = data.length;
+    
+    // 1. Tính Mean (Giống ảnh)
+    const mean = data.reduce((a, b) => a + b, 0) / n;
+    
+    // 2. Tính Sigma (Độ lệch chuẩn mẫu n-1 - Giống ảnh)
+    // Code cũ gọi là sigmaOverall, giờ ta dùng nó làm sigma chính thức cho Cp/Cpk
+    const variance = data.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n - 1);
+    const sigma = Math.sqrt(variance); 
+
+    // (Đã xóa phần tính sigmaWithin/Moving Range vì không có trong ảnh của bạn)
+
+    // 3. Tính Skewness (Giữ nguyên để tham khảo)
+    let sumCubedDiff = 0;
+    for (let x of data) sumCubedDiff += Math.pow(x - mean, 3);
+    const skewness = (n * sumCubedDiff) / ((n - 1) * (n - 2) * Math.pow(sigma, 3));
+
+    // Khởi tạo object kết quả chỉ chứa cp, cpk
+    const res = { mean, sigma, skewness, cp: null, cpk: null, count: n };
+
+    const calcIndices = (s) => {
+        if (s === 0) return { p: null, pk: null };
+        let cpu = null, cpl = null, idx_p = null, idx_pk = null;
+        
+        // Công thức Cpk = Min((USL-Mean)/3sigma, (Mean-LSL)/3sigma) -> Giống ảnh
+        if (usl !== null) cpu = (usl - mean) / (3 * s);
+        if (lsl !== null) cpl = (mean - lsl) / (3 * s);
+        
+        // Công thức Cp = (USL - LSL) / 6sigma -> Giống ảnh
+        if (usl !== null && lsl !== null) idx_p = (usl - lsl) / (6 * s);
+        
+        if (cpu !== null && cpl !== null) idx_pk = Math.min(cpu, cpl);
+        else if (cpu !== null) idx_pk = cpu;
+        else if (cpl !== null) idx_pk = cpl;
+        
+        return { p: idx_p, pk: idx_pk };
+    };
+
+    // 4. Tính toán và gán kết quả
+    // QUAN TRỌNG: Truyền sigma (tính theo n-1) vào hàm tính Cp/Cpk
+    const indices = calcIndices(sigma);
+    res.cp = indices.p; 
+    res.cpk = indices.pk;
+    
+    // (Đã xóa phần tính Pp, Ppk)
+
+    return res;
+}
+
+    // --- APP LOGIC ---
+    
+    // Global state for tracking current filter selection
+    let CURRENT_FILTERS = {
+        factory: null,
+        grade: null,
+        slab_grade: null,
+        thickness: null,
+        thickness_max: null,
+        target_temp_finish: null,
+        target_temp_coil: null
+    };
+    
+    let CUSTOM_LIMITS = {};  // Loaded custom limits from server
+    
+    // Update current filters from form values
+    function updateCurrentFilters() {
+        CURRENT_FILTERS.factory = document.getElementById('f_factory').value;
+        CURRENT_FILTERS.grade = document.getElementById('f_grade').value;
+        CURRENT_FILTERS.slab_grade = document.getElementById('f_slab_grade').value;
+        
+        const thickMinInput = document.getElementById('f_thick_min').value;
+        const thickMaxInput = document.getElementById('f_thick_max').value;
+        
+        // Use actual values, or sensible defaults if empty
+        CURRENT_FILTERS.thickness = thickMinInput ? parseFloat(thickMinInput) : 0;
+        CURRENT_FILTERS.thickness_max = thickMaxInput ? parseFloat(thickMaxInput) : (thickMinInput ? parseFloat(thickMinInput) : 999);
+        
+        CURRENT_FILTERS.target_temp_finish = parseInt(document.getElementById('f_target_ft').value || 0);
+        CURRENT_FILTERS.target_temp_coil = parseInt(document.getElementById('f_target_ct').value || 0);
+        
+        // DEBUG: Log current filters
+        console.log('🔍 CURRENT_FILTERS updated:', {
+            thickness: CURRENT_FILTERS.thickness,
+            thickness_max: CURRENT_FILTERS.thickness_max,
+            thick_min_input: thickMinInput,
+            thick_max_input: thickMaxInput
+        });
+    }
+    
+    // Load custom limits from server
+    async function loadCustomLimits() {
+        updateCurrentFilters();
+        
+        const params = new URLSearchParams({
+            factory: CURRENT_FILTERS.factory,
+            grade: CURRENT_FILTERS.grade,
+            slab_grade_name: CURRENT_FILTERS.slab_grade,
+            thickness: CURRENT_FILTERS.thickness,
+            thickness_max: CURRENT_FILTERS.thickness_max,
+            target_temp_finish: CURRENT_FILTERS.target_temp_finish,
+            target_temp_coil: CURRENT_FILTERS.target_temp_coil
+        });
+        
+        try {
+            const response = await fetch(`/api/cpk/custom_limits?${params}`);
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                CUSTOM_LIMITS = result.data || {};
+                console.log('Custom limits loaded:', CUSTOM_LIMITS);
+            }
+        } catch (error) {
+            console.error('Failed to load custom limits:', error);
+            CUSTOM_LIMITS = {};
+        }
+    }
+    
+    // Get custom limit for a spec key
+    function getCustomLimit(key) {
+        return CUSTOM_LIMITS[key] || null;
+    }
+    
+    // Save custom limit to server
+    async function saveCustomLimit(key, usl, lsl) {
+        // Check if values differ from defaults
+        const defaultSpec = DEFAULT_SPECS[key];
+        const isCustom = (usl !== defaultSpec.usl) || (lsl !== defaultSpec.lsl);
+        
+        if (!isCustom) {
+            // Revert to default - delete custom limit
+            await deleteCustomLimit(key);
+            return;
+        }
+        
+        updateCurrentFilters();
+        
+        const payload = {
+            factory: CURRENT_FILTERS.factory,
+            grade: CURRENT_FILTERS.grade,
+            slab_grade_name: CURRENT_FILTERS.slab_grade,
+            thickness: CURRENT_FILTERS.thickness,
+            thickness_max: CURRENT_FILTERS.thickness_max,
+            target_temp_finish: CURRENT_FILTERS.target_temp_finish,
+            target_temp_coil: CURRENT_FILTERS.target_temp_coil,
+            spec_key: key,
+            usl: usl,
+            lsl: lsl,
+            updated_by: 'user'
+        };
+        try {
+            const response = await fetch('/api/cpk/custom_limits', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            
+            const data = await response.json();
+            if (data.status === 'success') {
+                CUSTOM_LIMITS[key] = {usl, lsl};
+            }
+        } catch (err) {
+            console.error('❌ Failed to save custom limit:', err);
+        }
+    }
+    
+    // Delete custom limit from server
+    async function deleteCustomLimit(key) {
+        updateCurrentFilters();
+        
+        const payload = {
+            factory: CURRENT_FILTERS.factory,
+            grade: CURRENT_FILTERS.grade,
+            slab_grade_name: CURRENT_FILTERS.slab_grade,
+            thickness: CURRENT_FILTERS.thickness,
+            thickness_max: CURRENT_FILTERS.thickness_max,
+            target_temp_finish: CURRENT_FILTERS.target_temp_finish,
+            target_temp_coil: CURRENT_FILTERS.target_temp_coil,
+            spec_key: key
+        };
+        
+        try {
+            const response = await fetch('/api/cpk/custom_limits', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            
+            const data = await response.json();
+            if (data.status === 'success') {
+                console.log(`Custom limit deleted for ${key}`);
+                // Remove from local cache
+                delete CUSTOM_LIMITS[key];
+            }
+        } catch (error) {
+            console.error('Failed to delete custom limit:', error);
+        }
+    }
+    
+    function handleLimitChange(key) {
+        const uslInput = document.getElementById(`usl_${key}`).value;
+        const lslInput = document.getElementById(`lsl_${key}`).value;
+        const usl = uslInput === '' ? null : parseFloat(uslInput);
+        const lsl = lslInput === '' ? null : parseFloat(lslInput);
+        saveCustomLimit(key, usl, lsl);
+    }
+    
+    function toggleDataView(hasData) {
+        const noDataEl = document.getElementById('no-data-alert');
+        const mainDataEl = document.getElementById('main-data-container');
+        if (hasData) { noDataEl.style.display = 'none'; mainDataEl.style.display = 'block'; } 
+        else { noDataEl.style.display = 'block'; mainDataEl.style.display = 'none'; }
+    }
+
+   async function loadData() {
+        saveFilters();
+        const payload = {
+            factory: document.getElementById('f_factory').value,
+            grade: document.getElementById('f_grade').value,
+            slab_grade: document.getElementById('f_slab_grade').value,
+            target_ft: document.getElementById('f_target_ft').value,
+            target_ct: document.getElementById('f_target_ct').value,
+            start_date: document.getElementById('f_start_date').value,
+            end_date: document.getElementById('f_end_date').value,
+            thick_min: document.getElementById('f_thick_min').value,
+            thick_max: document.getElementById('f_thick_max').value
+        };
+        
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('no-data-alert').style.display = 'none';
+        document.getElementById('main-data-container').style.display = 'none';
+        
+        clearCharts();
+
+        try {
+            const res = await fetch('/api/cpk/data', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const resp = await res.json();
+            
+            if (resp.status === 'success') {
+                if (resp.count === 0) toggleDataView(false);
+                else {
+                    toggleDataView(true);
+                    GLOBAL_DATA = resp.data;
+                    
+                    // Load custom limits for this filter combination
+                    await loadCustomLimits();
+                    
+                    // Then render charts with custom limits applied
+                    renderAllCharts();
+                }
+            } else { alert('Lỗi: ' + resp.message); }
+        } catch (err) { console.error(err); alert('Lỗi kết nối!'); } 
+        finally { document.getElementById('loading').style.display = 'none'; }
+    }
+
+    function clearCharts() {
+        ['geometry', 'mechanical', 'chemical'].forEach(id => {
+            document.getElementById(`container_${id}`).innerHTML = '';
+        });
+    }
+
+    function renderAllCharts() {
+        clearCharts();
+        for (const key of RENDER_ORDER) {
+            const spec = DEFAULT_SPECS[key];
+            if (!spec) continue;
+            
+            // [FIX] CHUẨN HÓA DỮ LIỆU ĐẦU VÀO
+            // Kiểm tra xem data là Array cũ hay Object mới ({values, ids, dates})
+            let rawData = GLOBAL_DATA[key];
+            let dataArr = [];
+            
+            if (Array.isArray(rawData)) {
+                dataArr = rawData;
+            } else if (rawData && rawData.values) {
+                dataArr = rawData.values;
+            }
+            
+            // Nếu không có dữ liệu sau khi chuẩn hóa thì bỏ qua
+            if (!dataArr || dataArr.length === 0) continue;
+
+            let containerId = 'container_geometry';
+            if (spec.type === 'mechanical') containerId = 'container_mechanical';
+            else if (spec.type === 'chemical') containerId = 'container_chemical';
+
+            const savedLimits = getCustomLimit(key);
+            let currentUSL = savedLimits ? savedLimits.usl : spec.usl;
+            let currentLSL = savedLimits ? savedLimits.lsl : spec.lsl;
+
+            // [FIX] Sử dụng dataArr.length thay vì rawData.length để hiển thị đúng số N
+            const html = `
+            <div class="chart-card">
+                <div class="card-header">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <div class="card-title">${spec.label}</div>
+                        <button class="btn-mini-refresh" onclick="updateChart('${key}')" title="Tính lại">↻</button>
+                        <button class="btn-mini-refresh" style="background:#475569;" onclick="openImrModal('${key}')" title="Xem biểu đồ kiểm soát">📉 I-MR</button>
+                    </div>
+                    <div id="skew_warn_${key}" style="display:none; color:#d97706; font-weight:bold; font-size:0.7rem; margin-bottom:2px; background:#fffbeb; padding:2px 6px; border-radius:4px; border:1px solid #fcd34d;">
+                        ⚠️ Dữ liệu lệch
+                    </div>
+                    <div>
+                        <span>N = <b id="n_count_${key}">${dataArr.length}</b></span>
+                        <span id="outlier_info_${key}" style="color:#dc2626; font-size:0.75rem;"></span>
+                    </div>
+                </div>
+
+                <div class="limit-inputs">
+                    <div class="input-group"><label>LSL</label><input type="number" id="lsl_${key}" value="${currentLSL !== null ? currentLSL : ''}" step="any" oninput="handleLimitChange('${key}')" onkeydown="if(event.key==='Enter') updateChart('${key}')"></div>
+                    <div class="input-group"><label>USL</label><input type="number" id="usl_${key}" value="${currentUSL !== null ? currentUSL : ''}" step="any" oninput="handleLimitChange('${key}')" onkeydown="if(event.key==='Enter') updateChart('${key}')"></div>
+                </div>
+                
+                <div id="sample_warn_${key}" class="sample-warning">
+                    🚨 Cảnh báo: Mẫu quá nhỏ - Kết quả không đáng tin cậy
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <span class="metric-label">Cp</span>
+                        <span class="metric-value" id="cp_${key}">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Cpk</span>
+                        <span class="metric-value" id="cpk_${key}">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Mean (μ)</span>
+                        <span class="metric-value" id="mean_${key}">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Std Dev (σ)</span>
+                        <span class="metric-value" id="sigma_${key}">-</span>
+                    </div>
+                    
+                    </div>
+                
+                <div class="distribution-info">
+                    <div class="stat-item">
+                        <span class="stat-label">Min</span>
+                        <span class="stat-value" id="min_${key}">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Median</span>
+                        <span class="stat-value" id="median_${key}">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Max</span>
+                        <span class="stat-value" id="max_${key}">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">% Out of Spec</span>
+                        <span class="stat-value defect-rate" id="defect_rate_${key}">-</span>
+                    </div>
+                </div>
+                <div style="height: 200px; position: relative;"><canvas id="chart_${key}"></canvas></div>
+            </div>`;
+            document.getElementById(containerId).insertAdjacentHTML('beforeend', html);
+            updateChart(key);
+        }
+    }
+    
+    function detectOutliers(dataArr) {
+        if (dataArr.length < 4) return { clean: dataArr, outliers: [], info: null };
+        
+        const sorted = [...dataArr].sort((a, b) => a - b);
+        const n = sorted.length;
+        
+        const q1 = sorted[Math.floor(n * 0.25)];
+        const q3 = sorted[Math.floor(n * 0.75)];
+        const iqr = q3 - q1;
+        
+        if (iqr === 0) return { clean: dataArr, outliers: [], info: null };
+        
+        const lowerBound = q1 - 1.5 * iqr;
+        const upperBound = q3 + 1.5 * iqr;
+        
+        const clean = [];
+        const outliers = [];
+        
+        for (const val of dataArr) {
+            if (val >= lowerBound && val <= upperBound) {
+                clean.push(val);
+            } else {
+                outliers.push(val);
+            }
+        }
+        
+        return {
+            clean,
+            outliers,
+            info: {
+                lowerBound,
+                upperBound,
+                q1,
+                q3,
+                iqr,
+                count: outliers.length,
+                percent: (outliers.length / dataArr.length * 100).toFixed(1)
+            }
+        };
+    }
+    
+    // --- HÀM VẼ BIỂU ĐỒ FINAL (Đã fix lỗi lệch trục & dính số 0) ---
+    function updateChart(key) {
+        let rawData = GLOBAL_DATA[key];
+        let dataArr = [];
+        
+        if (Array.isArray(rawData)) {
+            // Hỗ trợ code cũ (nếu backend chưa update kịp)
+            dataArr = rawData;
+        } else if (rawData && rawData.values) {
+            // Code mới: Lấy mảng values từ object
+            dataArr = rawData.values;
+        }
+        const spec = DEFAULT_SPECS[key];
+        
+        // 1. Lấy Limits
+        const uslInput = document.getElementById(`usl_${key}`).value;
+        const lslInput = document.getElementById(`lsl_${key}`).value;
+        const usl = uslInput === '' ? null : parseFloat(uslInput);
+        const lsl = lslInput === '' ? null : parseFloat(lslInput);
+        
+        // 2. Xử lý Outlier
+        const excludeOutliers = document.getElementById('exclude_outliers')?.checked || false;
+        let outlierResult = null;
+        if (excludeOutliers) {
+            outlierResult = detectOutliers(dataArr);
+            dataArr = outlierResult.clean;
+        }
+
+        // 3. Tính thống kê (Dùng TOÀN BỘ dữ liệu để tính chính xác)
+        const stats = calculateAdvancedStats(dataArr, usl, lsl);
+        if(!stats) return;
+
+        // 4. Cập nhật Text UI
+        const colorClass = (val) => val >= 1.33 ? 'status-good' : (val >= 1.0 ? 'status-warn' : 'status-bad');
+        const fmt = (v) => v !== null ? v.toFixed(2) : '-';
+        
+        document.getElementById(`cp_${key}`).innerText = fmt(stats.cp);
+        document.getElementById(`cpk_${key}`).innerText = fmt(stats.cpk);
+        document.getElementById(`mean_${key}`).innerText = stats.mean.toFixed(4);
+        document.getElementById(`sigma_${key}`).innerText = stats.sigma.toFixed(4);
+        
+        if (stats.cp !== null) document.getElementById(`cp_${key}`).closest('.metric-item').className = `metric-item ${colorClass(stats.cp)}`;
+        if (stats.cpk !== null) document.getElementById(`cpk_${key}`).closest('.metric-item').className = `metric-item ${colorClass(stats.cpk)}`;
+        
+        const sorted = [...dataArr].sort((a, b) => a - b);
+        let outOfSpec = 0;
+        dataArr.forEach(v => { if ((usl !== null && v > usl) || (lsl !== null && v < lsl)) outOfSpec++; });
+        
+        document.getElementById(`n_count_${key}`).innerText = dataArr.length;
+        document.getElementById(`min_${key}`).innerText = sorted[0].toFixed(3);
+        document.getElementById(`max_${key}`).innerText = sorted[sorted.length-1].toFixed(3);
+        document.getElementById(`median_${key}`).innerText = (sorted.length % 2 === 0 ? (sorted[sorted.length/2-1] + sorted[sorted.length/2])/2 : sorted[Math.floor(sorted.length/2)]).toFixed(3);
+        
+        const defectRate = ((outOfSpec / dataArr.length) * 100).toFixed(2);
+        const defectEl = document.getElementById(`defect_rate_${key}`);
+        defectEl.innerText = defectRate + '%';
+        defectEl.className = parseFloat(defectRate) === 0 ? 'stat-value defect-rate good' : 'stat-value defect-rate';
+        
+        const outlierInfoEl = document.getElementById(`outlier_info_${key}`);
+        if (outlierResult && outlierResult.info && outlierResult.info.count > 0) {
+             outlierInfoEl.innerHTML = `<br>⚠️ Đã loại ${outlierResult.info.count} ngoại lai (${outlierResult.info.percent}%)`;
+        } else {
+             outlierInfoEl.innerHTML = '';
+        }
+
+        const sampleWarnEl = document.getElementById(`sample_warn_${key}`);
+        sampleWarnEl.style.display = dataArr.length < 30 ? 'flex' : 'none';
+        if(dataArr.length < 30) sampleWarnEl.innerHTML = `🚨 Cảnh báo: Chỉ có ${dataArr.length} mẫu (Khuyên dùng >30)`;
+        
+        const skewEl = document.getElementById(`skew_warn_${key}`);
+        skewEl.style.display = Math.abs(stats.skewness) > 1.0 ? 'flex' : 'none';
+
+        // --- 5. VẼ BIỂU ĐỒ (LOGIC ĐÃ FIX VISUALIZATION) ---
+        const ctx = document.getElementById(`chart_${key}`).getContext('2d');
+        if (CHARTS_INSTANCES[key]) CHARTS_INSTANCES[key].destroy();
+
+        // [QUAN TRỌNG] Lọc dữ liệu để VẼ (Visual Data)
+        // Với Nhiệt độ/Cơ tính/Hóa học: Loại bỏ số <= 0.1 để tránh làm hỏng biểu đồ
+        let plotData = dataArr;
+        const isPhysical = spec.type === 'mechanical' || spec.type === 'chemical' || spec.label.includes('Nhiệt độ') || spec.label.includes('Speed');
+        
+        if (isPhysical) {
+            // Chỉ lấy các giá trị thực tế > 0.1 để vẽ Histogram
+            plotData = dataArr.filter(x => x > 0.1);
+        }
+        if (plotData.length === 0) plotData = dataArr; // Fallback nếu lọc hết sạch
+
+        const plotSorted = [...plotData].sort((a,b) => a-b);
+
+        // A. Tính Range hiển thị (Zoom chặt hơn)
+        function calculateVisualRange() {
+            // Lấy vùng tập trung dữ liệu (bỏ 0.5% đầu đuôi)
+            let pMin = plotSorted[0];
+            let pMax = plotSorted[plotSorted.length-1];
+            
+            if (plotSorted.length > 20) {
+                pMin = plotSorted[Math.floor(plotSorted.length * 0.005)];
+                pMax = plotSorted[Math.floor(plotSorted.length * 0.995)];
+            }
+
+            let viewMin = pMin;
+            let viewMax = pMax;
+            const dataSpan = pMax - pMin;
+            
+            if (lsl !== null && (viewMin - lsl < dataSpan * 1.0)) viewMin = Math.min(viewMin, lsl);
+            if (usl !== null && (usl - viewMax < dataSpan * 1.0)) viewMax = Math.max(viewMax, usl);
+            
+            if (viewMin === viewMax) { viewMin -= 0.5; viewMax += 0.5; }
+
+            // Padding 5%
+            const span = viewMax - viewMin;
+            let niceMin = viewMin - span * 0.05;
+            let niceMax = viewMax + span * 0.05;
+
+            // Chặn số âm tuyệt đối cho các thông số vật lý
+            if ((spec.is_abs || isPhysical) && niceMin < 0) {
+                niceMin = 0;
+            }
+
+            if (niceMax <= niceMin) niceMax = niceMin + 1;
+            return { min: niceMin, max: niceMax, span: niceMax - niceMin }; 
+        }
+
+        // B. Tính Bin (trên dữ liệu đã lọc)
+        function getBinCount(n, minVal, maxVal) {
+            if (n < 5) return 5;
+
+            // 1. Công thức gốc: Rice Rule (Tốt hơn Sqrt cho dữ liệu lớn > 1000 mẫu)
+            let baseCount = Math.ceil(2 * Math.pow(n, 1/3)); 
+            
+            // 2. Điều chỉnh "Độ chi tiết" (Detail Factor)
+            if (n > 1000) baseCount = Math.ceil(baseCount * 1.5);
+
+            // 3. Logic linh hoạt theo biên độ (Range)
+            const span = maxVal - minVal;
+            if (span < 0.1) { 
+                // Với dữ liệu vi lượng (Hóa học, độ phẳng...), giới hạn max thấp hơn
+                if (baseCount > 40) baseCount = 40; 
+            } else {
+                if (baseCount > 120) baseCount = 120; // Tăng Max lên 120
+            }
+            // 4. Chốt Min/Max cứng
+            if (baseCount < 20) baseCount = 20; // Tăng Min lên 20 cho đẹp
+            
+            return baseCount;
+        }
+
+        const { min: chartMin, max: chartMax, span } = calculateVisualRange();
+        const binCount = getBinCount(plotData.length, chartMin, chartMax);
+        const binWidth = span / binCount;
+
+        // C. Tạo dữ liệu vẽ
+        const histogramData = [];
+        const bellCurveData = [];
+        const bgColors = [];
+
+        for (let i = 0; i < binCount; i++) {
+            const binStart = chartMin + i * binWidth;
+            const binEnd = binStart + binWidth;
+            const binCenter = binStart + binWidth / 2;
+            
+            // Đếm tần suất trên dữ liệu đã lọc (plotData)
+            const count = plotData.filter(v => v >= binStart && v < binEnd).length;
+            histogramData.push({ x: binCenter, y: count });
+
+            let isBad = false;
+            if (usl !== null && binCenter > usl) isBad = true;
+            if (lsl !== null && binCenter < lsl) isBad = true;
+            bgColors.push(isBad ? 'rgba(220, 38, 38, 0.7)' : 'rgba(59, 130, 246, 0.6)');
+            
+            // Vẽ đường chuẩn dựa trên Stats gốc (Mean/Sigma của toàn bộ data)
+            // Scale theo số lượng mẫu đã lọc để khớp chiều cao
+            const pdf = normalPDF(binCenter, stats.mean, stats.sigma);
+            bellCurveData.push({ x: binCenter, y: pdf * plotData.length * binWidth });
+        }
+
+        const gradientBg = ctx.createLinearGradient(0, 0, 0, 300);
+        gradientBg.addColorStop(0, 'rgba(37, 99, 235, 0.3)');
+        gradientBg.addColorStop(1, 'rgba(37, 99, 235, 0.0)');
+
+        // D. Annotations
+        const annotations = {};
+        // Chỉ vẽ đường Mean nếu nó nằm trong vùng nhìn thấy
+        if (stats.mean >= chartMin && stats.mean <= chartMax) {
+            annotations.lineMean = {
+                type: 'line', scaleID: 'x', value: stats.mean,
+                borderColor: '#10b981', borderWidth: 2, borderDash: [6, 4],
+                label: {
+                    content: `Mean: ${stats.mean.toFixed(4)}`,
+                    enabled: true, position: 'start', backgroundColor: 'rgba(16, 185, 129, 0.9)',
+                    color: 'white', font: { size: 10, weight: 'bold' }, yAdjust: -20
+                }
+            };
+        }
+
+        if (usl !== null && usl >= chartMin && usl <= chartMax) {
+             annotations.lineUSL = { 
+                type: 'line', scaleID: 'x', value: usl, 
+                borderColor: '#dc2626', borderWidth: 2, 
+                label: {content:`USL: ${usl}`, enabled:true, position:'end', backgroundColor:'#dc2626', color:'white', font:{size:10}} 
+            };
+        }
+        if (lsl !== null && lsl >= chartMin && lsl <= chartMax) {
+             annotations.lineLSL = { 
+                type: 'line', scaleID: 'x', value: lsl, 
+                borderColor: '#dc2626', borderWidth: 2, 
+                label: {content:`LSL: ${lsl}`, enabled:true, position:'end', backgroundColor:'#dc2626', color:'white', font:{size:10}} 
+            };
+        }
+
+        CHARTS_INSTANCES[key] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                datasets: [
+                    {
+                        label: 'Phân phối chuẩn', data: bellCurveData, type: 'line',
+                        borderColor: '#2563eb', backgroundColor: gradientBg, borderWidth: 2,
+                        pointRadius: 0, tension: 0.4, fill: true, order: 0
+                    },
+                    {
+                        label: 'Thực tế', data: histogramData, backgroundColor: bgColors,
+                        barPercentage: 1.0, categoryPercentage: 1.0, order: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'nearest', intersect: false, axis: 'x' },
+                plugins: {
+                    legend: { display: true, position: 'top', labels: { boxWidth: 12, usePointStyle: false } },
+                    annotation: { annotations },
+                    tooltip: {
+                        mode: 'index', intersect: false,
+                        callbacks: {
+                            title: (items) => {
+                                const c = items[0].parsed.x;
+                                let start = c - binWidth/2;
+                                let end = c + binWidth/2;
+                                if ((spec.is_abs || isPhysical) && start < 0) start = 0;
+                                return `${start.toFixed(4)} - ${end.toFixed(4)}`;
+                            },
+                            label: function(context) {
+                                if (context.datasetIndex === 0) return null;
+                                return `Số mẫu: ${context.parsed.y}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'linear', min: chartMin, max: chartMax,
+                        title: { display: true, text: spec.label + (spec.unit ? ` (${spec.unit})` : ''), font: {size: 11, weight:'bold'} },
+                        ticks: { maxTicksLimit: 7 }
+                    },
+                    y: { beginAtZero: true, title: { display: true, text: 'Tần suất' } }
+                }
+            }
+        });
+    }
+   // --- QUẢN LÝ TRẠNG THÁI I-MR ---
+let IMR_STATE = {
+    chartI: null,
+    chartMR: null,
+    totalPoints: 0,
+    viewSize: 200, // Số điểm hiển thị trên màn hình (để dày đặc)
+    dates: []
+};
+
+function calculateIMR(data) {
+    if (!data || data.length < 2) return null;
+    
+    // 1. Calculate Moving Ranges (MR)
+    let mrValues = [null]; // Phần tử đầu tiên của MR luôn là null
+    for (let i = 1; i < data.length; i++) {
+        // Tính chênh lệch tuyệt đối
+        mrValues.push(Math.abs(data[i] - data[i-1]));
+    }
+    
+    // 2. Calculate Statistics
+    // Mean (X-bar): Trung bình cộng dữ liệu đo
+    const mean = data.reduce((a, b) => a + b, 0) / data.length;
+    
+    // Average Moving Range (MR-bar): Trung bình độ biến động
+    const validMRs = mrValues.filter(v => v !== null);
+    const mrBar = validMRs.reduce((a, b) => a + b, 0) / validMRs.length;
+    
+    // 3. Calculate Limits (Standard Constants for I-MR with n=2)
+    // E2 = 2.66, D3 = 0, D4 = 3.267
+    
+    const ucl_i = mean + (2.66 * mrBar);
+    
+    // [FIX QUAN TRỌNG]: Nếu LCL tính ra âm -> Gán bằng 0
+    let lcl_i_calc = mean - (2.66 * mrBar);
+    const lcl_i = lcl_i_calc < 0 ? 0 : lcl_i_calc;
+    
+    const ucl_mr = 3.267 * mrBar;
+    const lcl_mr = 0; // D3 * mrBar (với n=2 thì D3=0)
+
+    return {
+        mrValues, 
+        mean, 
+        mrBar,
+        ucl_i, 
+        lcl_i, // Giá trị này giờ đã đảm bảo >= 0
+        ucl_mr, 
+        lcl_mr
+    };
+}
+function openImrModal(key) {
+    const spec = DEFAULT_SPECS[key];
+    const rawData = GLOBAL_DATA[key];
+    
+    let values = [], labels = [], dates = [];
+    if (Array.isArray(rawData)) { values = rawData; labels = rawData.map((_, i) => i + 1); } 
+    else { values = rawData.values; labels = rawData.ids; dates = rawData.dates; }
+
+    const stats = calculateIMR(values);
+    if (!stats) { alert('Không đủ dữ liệu!'); return; }
+
+    // Setup State
+    IMR_STATE.totalPoints = values.length;
+    IMR_STATE.dates = dates;
+
+    document.getElementById('imrModal').style.display = 'block';
+    document.getElementById('imr_title_spec').innerText = `${spec.label} - ${values.length} mẫu`;
+    
+    // Update Slider UI
+    const slider = document.getElementById('imr_slider');
+    slider.max = Math.max(0, values.length - IMR_STATE.viewSize);
+    slider.value = slider.max; 
+    updateSliderLabel(slider.value);
+
+    // Update Stats Text
+    document.getElementById('imr_mean').innerText = stats.mean.toFixed(3);
+    document.getElementById('imr_ucl').innerText = stats.ucl_i.toFixed(3);
+    document.getElementById('imr_lcl').innerText = stats.lcl_i.toFixed(3);
+    document.getElementById('imr_mr_bar').innerText = stats.mrBar.toFixed(3);
+    document.getElementById('imr_mr_ucl').innerText = stats.ucl_mr.toFixed(3);
+
+    // [FIX]: Truyền thêm 'key' vào để hàm vẽ lấy đúng Custom Limits
+    renderIndividualChart(key, values, labels, dates, stats, spec);
+    renderMovingRangeChart(values, labels, dates, stats, spec);
+}
+
+function closeImrModal() {
+    document.getElementById('imrModal').style.display = 'none';
+}
+
+// Xử lý sự kiện kéo Slider
+function onImrSliderChange(val) {
+    const startIndex = parseInt(val);
+    updateSliderLabel(startIndex);
+
+    if (IMR_STATE.chartI) {
+        IMR_STATE.chartI.options.scales.x.min = startIndex;
+        IMR_STATE.chartI.options.scales.x.max = startIndex + IMR_STATE.viewSize;
+        IMR_STATE.chartI.update('none'); // Update cực nhanh không cần animation
+    }
+    if (IMR_STATE.chartMR) {
+        IMR_STATE.chartMR.options.scales.x.min = startIndex;
+        IMR_STATE.chartMR.options.scales.x.max = startIndex + IMR_STATE.viewSize;
+        IMR_STATE.chartMR.update('none');
+    }
+}
+
+function updateSliderLabel(startIndex) {
+    const startIdx = parseInt(startIndex);
+    const endIdx = Math.min(startIdx + IMR_STATE.viewSize, IMR_STATE.totalPoints);
+    const dateStr = IMR_STATE.dates[endIdx-1] ? IMR_STATE.dates[endIdx-1].substring(0, 16).replace('T', ' ') : '';
+    document.getElementById('imr_slider_label').innerText = `View: ${startIdx} - ${endIdx} (${dateStr})`;
+}
+
+// --- VẼ BIỂU ĐỒ VỚI TƯƠNG TÁC MỚI ---
+// --- VẼ BIỂU ĐỒ I-CHART (ĐÃ FIX LỖI NÚT ĐỎ) ---
+function renderIndividualChart(key, values, labels, dates, stats, spec) {
+    const ctx = document.getElementById('chart_individual').getContext('2d');
+    if (IMR_STATE.chartI) IMR_STATE.chartI.destroy();
+
+    const displayLabels = dates.map((d, i) => d ? d.substring(11, 16) : '');
+
+    // [FIX LOGIC LẤY GIỚI HẠN]
+    // Ưu tiên lấy Custom Limit người dùng nhập, nếu không có mới lấy Default
+    const custom = getCustomLimit(key) || {};
+    const usl = custom.usl !== undefined ? custom.usl : spec.usl;
+    const lsl = custom.lsl !== undefined ? custom.lsl : spec.lsl;
+
+    // [FIX LOGIC MÀU SẮC]
+    const pointConfig = values.map(v => {
+        // 1. Kiểm tra Lỗi Kiểm Soát (Process Control)
+        // Dùng số thập phân có thể gây sai số nhỏ, nên so sánh chặt chẽ
+        const isOOC = (v > stats.ucl_i || v < stats.lcl_i);
+
+        // 2. Kiểm tra Lỗi Quy Cách (Specification)
+        let isOOS = false;
+        if (usl !== null && v > usl) isOOS = true;
+        if (lsl !== null && v < lsl) isOOS = true;
+
+        // Điểm Đỏ nếu vi phạm 1 trong 2 điều kiện
+        const isErr = isOOC || isOOS;
+        
+        return isErr ? { r: 5, c: '#dc2626', b: '#fff' } : { r: 2, c: '#3b82f6', b: '#3b82f6' };
+    });
+
+    // Annotations (Cập nhật theo giới hạn mới)
+    const annotations = {
+        mean: { type: 'line', yMin: stats.mean, yMax: stats.mean, borderColor: '#2563eb', borderWidth: 2, label: { enabled: false } },
+        ucl: { type: 'line', yMin: stats.ucl_i, yMax: stats.ucl_i, borderColor: '#dc2626', borderWidth: 2, borderDash: [5,5], label: { enabled: false } },
+        lcl: { type: 'line', yMin: stats.lcl_i, yMax: stats.lcl_i, borderColor: '#dc2626', borderWidth: 2, borderDash: [5,5], label: { enabled: false } }
+    };
+
+    if (usl !== null) {
+        annotations.usl = { type: 'line', yMin: usl, yMax: usl, borderColor: '#059669', borderWidth: 1.5, borderDash:[2,2], label: { enabled: false } };
+    }
+    if (lsl !== null) {
+        annotations.lsl = { type: 'line', yMin: lsl, yMax: lsl, borderColor: '#059669', borderWidth: 1.5, borderDash:[2,2], label: { enabled: false } };
+    }
+
+    const minInit = Math.max(0, values.length - IMR_STATE.viewSize);
+
+    IMR_STATE.chartI = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: displayLabels,
+            datasets: [{
+                label: 'Giá trị',
+                data: values,
+                borderColor: '#64748b', borderWidth: 1,
+                pointBackgroundColor: pointConfig.map(p => p.c),
+                pointBorderColor: pointConfig.map(p => p.b),
+                pointRadius: pointConfig.map(p => p.r),
+                pointHoverRadius: 8,
+                tension: 0, spanGaps: true
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, animation: false,
+            interaction: { mode: 'nearest', axis: 'x', intersect: true },
+            plugins: {
+                legend: { display: false },
+                annotation: { annotations },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    titleFont: { size: 13 }, bodyFont: { size: 13 },
+                    callbacks: {
+                        title: (items) => `Coil ID: ${labels[items[0].dataIndex]}`,
+                        label: (ctx) => `Giá trị: ${ctx.parsed.y.toFixed(3)}`,
+                        footer: (items) => {
+                            const v = items[0].parsed.y;
+                            let status = "OK";
+                            if (v > stats.ucl_i || v < stats.lcl_i) status = "Out of Control (UCL/LCL)";
+                            else if ((usl!==null && v > usl) || (lsl!==null && v < lsl)) status = "Out of Spec (USL/LSL)";
+                            return `Thời gian: ${dates[items[0].dataIndex]}\nTrạng thái: ${status}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    min: minInit,
+                    max: minInit + IMR_STATE.viewSize,
+                    ticks: { maxTicksLimit: 12, maxRotation: 0, autoSkip: true, font: {size: 11} },
+                    grid: { display: false },
+                    title: { display: true, text: 'Thời gian' }
+                },
+                y: { title: { display: true, text: spec.unit || 'Val' } }
+            }
+        }
+    });
+}
+
+// --- VẼ BIỂU ĐỒ MR-CHART (FINAL CLEAN UI) ---
+function renderMovingRangeChart(values, labels, dates, stats, spec) {
+    const ctx = document.getElementById('chart_moving_range').getContext('2d');
+    if (IMR_STATE.chartMR) IMR_STATE.chartMR.destroy();
+
+    const displayLabels = dates.map(d => d ? d.substring(11, 16) : '');
+    const minInit = Math.max(0, values.length - IMR_STATE.viewSize);
+
+    // Annotations MR (Bỏ chữ)
+    const annotations = {
+        // Mean MR (R-Bar) - Xanh lá đậm, nét liền
+        mrBar: { 
+            type: 'line', yMin: stats.mrBar, yMax: stats.mrBar, 
+            borderColor: '#059669', borderWidth: 1.5, 
+            label: { enabled: false } 
+        },
+        // UCL MR - Cam/Nâu, nét đứt
+        ucl: { 
+            type: 'line', yMin: stats.ucl_mr, yMax: stats.ucl_mr, 
+            borderColor: '#d97706', borderWidth: 2, borderDash: [5,5], 
+            label: { enabled: false } 
+        }
+    };
+
+    // Màu điểm MR: Vượt UCL thì đỏ, còn lại xám nhạt cho đỡ rối
+    const pointConfig = values.map(v => (v > stats.ucl_mr) ? {r: 4, c: '#d97706'} : {r: 2, c: '#64748b'});
+
+    IMR_STATE.chartMR = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: displayLabels,
+            datasets: [{
+                label: 'Range',
+                data: values,
+                borderColor: '#94a3b8', borderWidth: 1,
+                pointBackgroundColor: pointConfig.map(p => p.c),
+                pointBorderColor: pointConfig.map(p => p.c),
+                pointRadius: pointConfig.map(p => p.r),
+                pointHoverRadius: 8,
+                tension: 0, spanGaps: true
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, animation: false,
+            interaction: { mode: 'nearest', axis: 'x', intersect: true },
+            plugins: {
+                legend: { display: false },
+                annotation: { annotations },
+                tooltip: {
+                    callbacks: {
+                        title: (items) => `Coil: ${labels[items[0].dataIndex]}`,
+                        label: (ctx) => `Biến động (Range): ${ctx.parsed.y.toFixed(3)}`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    min: minInit,
+                    max: minInit + IMR_STATE.viewSize,
+                    ticks: { maxTicksLimit: 12 }, grid: { display: false }
+                },
+                y: { beginAtZero: true, title: { display: true, text: 'R' } }
+            }
+        }
+    });
+}
+    window.addEventListener('DOMContentLoaded', () => { 
+        initDropdowns(); 
+        if(loadFilters()) loadData();
+        
+        const outlierCheckbox = document.getElementById('exclude_outliers');
+        if (outlierCheckbox) {
+            outlierCheckbox.addEventListener('change', () => {
+                if (GLOBAL_DATA && Object.keys(GLOBAL_DATA).length > 0) {
+                    renderAllCharts();
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

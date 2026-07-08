@@ -1,0 +1,661 @@
+{% extends "base.html" %}
+
+{% block title %}Quản lý Order - TDC{% endblock %}
+
+{% block head %}
+<style>
+    .header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;}
+    .filter-group { display: flex; gap: 10px; align-items: center; }
+    
+    .search-box {
+        padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;
+        min-width: 250px; font-size: 0.95em; outline: none; transition: border-color 0.2s;
+    }
+    .search-box:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+
+    .btn-filter { padding: 8px 16px; border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 6px; cursor: pointer; font-weight: 600; color: #475569; }
+    .btn-filter.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+    .btn-filter.warning-filter.active { background: #ef4444; border-color: #ef4444; }
+
+    /* --- STICKY HEADER --- */
+    .table-wrappe-order-rules{
+        max-height: calc(100vh - 220px); /* Giới hạn chiều cao để xuất hiện thanh cuộn */
+        overflow-y: auto;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e2e8f0;
+    }
+    .qc-table { width: 100%; border-collapse: collapse; background: white; }
+    .qc-table th, .qc-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+    .qc-table th { 
+        background: #f1f5f9; color: #334155; font-weight: 700; 
+        position: sticky; top: 0; z-index: 10; /* Giữ cố định header */
+        box-shadow: inset 0 -1px 0 #cbd5e1; /* Khắc phục lỗi border bị mất khi sticky */
+    }
+
+    .row-conflict { background-color: #fef08a !important; border-left: 4px solid #eab308; }
+    .badge-status { padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; }
+    .badge-manual { background: #dbeafe; color: #1e3a8a; }
+    .badge-conflict { background: #fee2e2; color: #991b1b; animation: pulse-red 2s infinite; }
+    .badge-auto { background: #f1f5f9; color: #475569; }
+
+    /* Pagination */
+    .pagination { display: flex; justify-content: flex-end; align-items: center; margin-top: 15px; gap: 15px; font-size: 0.9em; }
+    .page-btn { padding: 5px 10px; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; background: white;}
+    .page-btn:disabled { background: #f1f5f9; cursor: not-allowed; color: #94a3b8; }
+    
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: 600; color: #334155; }
+    .form-group select, .form-group input { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box; }
+    .btn { padding: 8px 16px; border-radius: 6px; cursor: pointer; border: none; font-weight: bold; color: white; }
+    .btn-primary { background: #3b82f6; }
+    .btn-success { background: #10b981; }
+    .btn-danger { background: #ef4444; }
+    .btn-secondary { background: #64748b; }
+
+    .modal-body-split { display: flex; gap: 20px; padding: 20px; background: #f8fafc; }
+    .split-pane { flex: 1; background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding: 20px;">
+    <div class="header-actions" style="display: flex; flex-direction: column; align-items: stretch; gap: 15px; margin-bottom: 20px;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <div class="filter-group" style="flex: 1; max-width: 400px;">
+                <input type="text" id="searchInput" class="search-box" style="width: 100%;" 
+                       placeholder="🔍 Tìm Mã Order, Mác thép, SO..." onkeyup="applyFilters()">
+            </div>
+            
+            <div class="filter-group">
+                <button class="btn-filter active" id="btnFilterAll" onclick="setStatusFilter('all')">Tất cả Kế hoạch</button>
+                <button class="btn-filter" id="btnFilterManual" onclick="setStatusFilter('manual')">🔒 Đã chốt tay</button>
+                <button class="btn-filter" id="btnFilterAuto" onclick="setStatusFilter('auto')">⚡ Nguồn Auto</button>
+            </div>
+            <div class="filter-group">
+            <button onclick="downloadTemplate()" class="btn-filter" style="background:#10b981; color:white; border:none;">📥 Tải Template</button>
+            
+            <input type="file" id="excelUploadInput" accept=".xlsx, .xls" style="display:none;" onchange="handleUploadOrders()">
+            <button onclick="document.getElementById('excelUploadInput').click()" class="btn-filter" style="background:#8b5cf6; color:white; border:none;">📤 Upload Order Ngoài KH</button>
+        </div>
+        </div>
+
+        <div style="display: flex; gap: 15px; background: #f8fafc; padding: 12px 15px; border-radius: 8px; border: 1px solid #e2e8f0; flex-wrap: wrap;">
+            
+            <div style="display: flex; flex-direction: column; flex: 1; min-width: 140px;">
+                <label style="font-size: 0.8em; font-weight: bold; color: #64748b; margin-bottom: 4px;">Kỳ Sản Xuất</label>
+                <select id="fltKySanXuat" class="search-box" style="min-width: 0; padding: 6px 10px;" onchange="applyFilters()">
+                    <option value="">-- Tất cả --</option>
+                </select>
+            </div>
+
+            <div style="display: flex; flex-direction: column; flex: 1; min-width: 140px;">
+                <label style="font-size: 0.8em; font-weight: bold; color: #64748b; margin-bottom: 4px;">Khách Hàng</label>
+                <select id="fltCustomer" class="search-box" style="min-width: 0; padding: 6px 10px;" onchange="applyFilters()">
+                    <option value="">-- Tất cả --</option>
+                </select>
+            </div>
+
+            <div style="display: flex; flex-direction: column; flex: 1; min-width: 140px;">
+                <label style="font-size: 0.8em; font-weight: bold; color: #64748b; margin-bottom: 4px;">Phân Bổ (SO)</label>
+                <select id="fltSO" class="search-box" style="min-width: 0; padding: 6px 10px;" onchange="applyFilters()">
+                    <option value="">-- Tất cả --</option>
+                </select>
+            </div>
+
+            <div style="display: flex; flex-direction: column; flex: 1; min-width: 140px;">
+                <label style="font-size: 0.8em; font-weight: bold; color: #64748b; margin-bottom: 4px;">Loại Kế Hoạch</label>
+                <select id="fltProdStatus" class="search-box" style="min-width: 0; padding: 6px 10px;" onchange="applyFilters()">
+                    <option value="">-- Tất cả --</option>
+                    <option value="MTO">MTO (Theo đơn)</option>
+                    <option value="MTS">MTS (Tồn kho)</option>
+                </select>
+            </div>
+
+            <div style="display: flex; flex-direction: column; flex: 1; min-width: 140px;">
+                <label style="font-size: 0.8em; font-weight: bold; color: #64748b; margin-bottom: 4px;">Yêu Cầu SKIN</label>
+                <select id="fltSkin" class="search-box" style="min-width: 0; padding: 6px 10px;" onchange="applyFilters()">
+                    <option value="">-- Tất cả --</option>
+                    <option value="1">⚡ Bắt buộc SKIN</option>
+                    <option value="0">Không yêu cầu</option>
+                </select>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="table-wrappe-order-rules">
+        <table class="qc-table">
+            <thead>
+                <tr>
+                    <th style="width: 150px;">Order / Phân bổ</th>
+                    <th style="width: 250px;">Sản phẩm (Material)</th>
+                    <th style="width: 250px;">Tiêu chuẩn (Khách - Mác - Cấp)</th>
+                    <th style="width: 150px; text-align: center;">Thông số Cuộn</th>
+                    <th style="width: 180px;">Tiến độ Kế hoạch</th>
+                    <th style="width: 100px; text-align: center;">Trạng thái</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="editModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15, 23, 42, 0.6); z-index:1000; justify-content:center; align-items:center; backdrop-filter: blur(2px);">
+    <div style="background:white; width:650px; border-radius:12px; padding: 25px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
+        <h3 style="margin-top:0; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; color: #0f172a;" id="modalTitle">Chỉnh sửa Order</h3>
+        
+        <div id="conflictAlertBox" style="display:none; background: #fef2f2; border: 1px solid #fca5a5; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+            <div style="color: #b91c1c; font-weight: bold; margin-bottom: 5px;">🔴 Cảnh báo Xung đột từ File Excel (SAP):</div>
+            <ul id="conflictDetails" style="margin: 0; padding-left: 20px; color: #7f1d1d; font-size: 0.9em;"></ul>
+        </div>
+
+        <div style="display: flex; gap: 20px;">
+            <div style="flex: 1;">
+                <div class="form-group" id="groupOrderInput" style="display:none;">
+                    <label>Mã Order <span style="color:red">*</span></label>
+                    <input type="text" id="inpOrderNo" placeholder="Nhập mã Order mới..." style="background: #f8fafc; font-weight: bold;">
+                </div>
+                <div class="form-group">
+                    <label>Loại Kế hoạch</label>
+                    <select id="selProdStatus">
+                        <option value="MTO">MTO (Sản xuất theo Đơn)</option>
+                        <option value="MTS">MTS (Sản xuất Tồn kho)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Mã Đơn hàng (SO Mapping)</label>
+                    <input type="text" id="inpSoMapping" placeholder="Ví dụ: SO-12345...">
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Min Weight (kg)</label>
+                        <input type="number" id="inpMinW">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Max Weight (kg)</label>
+                        <input type="number" id="inpMaxW">
+                    </div>
+                </div>
+            </div>
+
+            <div style="flex: 1; border-left: 1px dashed #cbd5e1; padding-left: 20px;">
+                <div style="font-size: 0.8em; color: #ef4444; font-weight: 600; margin-bottom: 10px;">⚠️ LƯU Ý: Nếu thay đổi Version, các cuộn thép hiện tại sẽ bị xóa trạng thái và chấm điểm lại.</div>
+                <div class="form-group">
+                    <label>Khách hàng <span style="color:red">*</span></label>
+                    <select id="selCustomer" onchange="loadGrades()"><option value="">-- Chọn Khách hàng --</option></select>
+                </div>
+                <div class="form-group">
+                    <label>Mác thép <span style="color:red">*</span></label>
+                    <select id="selGrade" onchange="loadPurposes()" disabled><option value="">-- Chọn Mác thép --</option></select>
+                </div>
+                <div class="form-group">
+                    <label>Mục đích</label>
+                    <select id="selPurpose" onchange="loadTDCVersions()" disabled><option value="">-- Chọn Mục đích --</option></select>
+                </div>
+                <div class="form-group">
+                    <label>TDC Version <span style="color:red">*</span></label>
+                    <select id="selTDC" disabled><option value="">-- Chọn Version --</option></select>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+            <button class="btn" style="background:#eab308; color:white; margin-right:auto; border:none; display:none;" id="btnUnlockOrder" onclick="unlockOrder()">🔓 Mở khóa & Trả về Auto</button>
+            <button class="btn btn-secondary" onclick="closeModal('editModal')">Hủy bỏ</button>
+            <button class="btn btn-primary" id="btnSaveOrder" onclick="saveOrder()">💾 Chốt lưu tay (Override)</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let globalOrders = []; 
+    let filteredOrders = []; // Dữ liệu sau khi tìm kiếm
+    let activeStatusFilter = 'all';
+    // Config Phân trang
+    let CURRENT_PAGE = 1;
+    const PAGE_LIMIT = 50;
+    let SEARCH_TIMEOUT = null;
+    const rowsPerPage = 50; 
+    let currentMode = 'edit'; // 'edit' hoặc 'add'
+
+    document.addEventListener("DOMContentLoaded", () => { loadOrders('all'); });
+async function loadFilterOptions() {
+    try {
+        const res = await fetch('/api/orders/options');
+        const json = await res.json();
+        if(json.status === 'success') {
+            const fill = (id, arr) => {
+                const sel = document.getElementById(id);
+                const currentVal = sel.value; // Giữ lại giá trị user đang chọn
+                sel.innerHTML = '<option value="">-- Tất cả --</option>' + arr.map(x => `<option value="${x}">${x}</option>`).join('');
+                sel.value = currentVal;
+            };
+            fill('fltKySanXuat', json.ky_sx);
+            fill('fltCustomer', json.customers);
+            fill('fltSO', json.sos);
+        }
+    } catch(e) {}
+}
+
+// 2. KHỞI CHẠY LÚC LOAD TRANG
+document.addEventListener("DOMContentLoaded", () => { 
+    loadFilterOptions(); // Load menu xổ xuống
+    loadOrders();        // Load bảng
+});
+async function loadOrders() {
+    const status = activeStatusFilter;
+    const search = document.getElementById('searchInput').value.trim();
+    
+    // Lấy giá trị từ các Dropdown
+    const ky_sx = document.getElementById('fltKySanXuat').value;
+    const customer = document.getElementById('fltCustomer').value;
+    const so_mapping = document.getElementById('fltSO').value;
+    const prod_status = document.getElementById('fltProdStatus').value;
+    const skin = document.getElementById('fltSkin').value;
+
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">⏳ Đang tải dữ liệu...</td></tr>';
+    
+    try {
+        // Gắn tất cả biến lọc vào URL API
+        let url = `/api/orders?status=${status}&search=${encodeURIComponent(search)}&page=${CURRENT_PAGE}&limit=${PAGE_LIMIT}`;
+        url += `&ky_sx=${encodeURIComponent(ky_sx)}&customer=${encodeURIComponent(customer)}&so_mapping=${encodeURIComponent(so_mapping)}&prod_status=${encodeURIComponent(prod_status)}&skin=${encodeURIComponent(skin)}`;
+        
+        const res = await fetch(url);
+        const json = await res.json();
+        
+        if (json.status === 'success') {
+            const data = json.data;
+            if(data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#94a3b8; padding:20px;">Không tìm thấy dữ liệu</td></tr>';
+                renderPagination(1, 1, 0); // Reset phân trang
+                return;
+            }
+            
+            // 🌟 TRUYỀN DATA TỪ BACKEND VÀO HÀM VẼ BẢNG
+            renderTable(data);
+            
+            // Vẽ nút chuyển trang
+            renderPagination(json.pagination.page, json.pagination.total_pages, json.pagination.total_records);
+        } else {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">${json.msg}</td></tr>`;
+        }
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Lỗi kết nối: ${e}</td></tr>`;
+    }
+}
+function renderPagination(currentPage, totalPages, totalRecords) {
+    let pagDiv = document.getElementById('pagination');
+    
+
+    if (!pagDiv) {
+        pagDiv = document.createElement('div');
+        pagDiv.id = 'pagination';
+        pagDiv.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding: 15px; background: #fff; border: 1px solid #cbd5e1; border-top: none; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;';
+        
+        const tableWrapper = document.querySelector('.table-wrappe-order-rules');
+        if (tableWrapper) {
+            tableWrapper.parentNode.insertBefore(pagDiv, tableWrapper.nextSibling);
+        } else {
+            return; // Tránh lỗi nếu giao diện chưa load kịp
+        }
+    }
+
+    let html = `<div style="font-size:0.9em; color:#64748b; font-weight:bold;">Tổng cộng: <span style="color:#2563eb;">${totalRecords}</span> Đơn hàng</div>`;
+    html += `<div style="display:flex; gap:5px;">`;
+    html += `<button onclick="goToPage(${currentPage - 1})" ${currentPage <= 1 ? 'disabled style="opacity:0.5"' : ''} class="btn-filter">« Trước</button>`;
+    html += `<span style="padding: 8px 15px; background:#f1f5f9; border-radius:6px; font-weight:bold; color:#334155;">Trang ${currentPage} / ${totalPages}</span>`;
+    html += `<button onclick="goToPage(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled style="opacity:0.5"' : ''} class="btn-filter">Sau »</button>`;
+    html += `</div>`;
+    
+    pagDiv.innerHTML = html;
+}
+
+function goToPage(page) {
+    CURRENT_PAGE = page;
+    loadOrders();
+}
+    function populateDynamicDropdowns() {
+        const kySanXuatSet = new Set();
+        const customerSet = new Set();
+        const soSet = new Set();
+
+        globalOrders.forEach(row => {
+            if (row.KySanXuat) kySanXuatSet.add(row.KySanXuat);
+            if (row.customer_name) customerSet.add(row.customer_name);
+            if (row.SO_mapping) soSet.add(row.SO_mapping);
+        });
+
+        const fillSelect = (id, dataSet) => {
+            const sel = document.getElementById(id);
+            sel.innerHTML = '<option value="">-- Tất cả --</option>'; // Reset
+            Array.from(dataSet).sort().forEach(val => {
+                sel.innerHTML += `<option value="${val}">${val}</option>`;
+            });
+        };
+
+        fillSelect('fltKySanXuat', kySanXuatSet);
+        fillSelect('fltCustomer', customerSet);
+        fillSelect('fltSO', soSet);
+    }
+    function setStatusFilter(status) {
+        activeStatusFilter = status;
+        document.getElementById('btnFilterAll').classList.remove('active');
+        document.getElementById('btnFilterManual').classList.remove('active');
+        document.getElementById('btnFilterAuto').classList.remove('active');
+        
+        if(status === 'all') document.getElementById('btnFilterAll').classList.add('active');
+        if(status === 'manual') document.getElementById('btnFilterManual').classList.add('active');
+        if(status === 'auto') document.getElementById('btnFilterAuto').classList.add('active');
+        
+        applyFilters();
+    }
+    function applyFilters() {
+    clearTimeout(SEARCH_TIMEOUT);
+    // Chờ 500ms sau khi ngừng gõ mới gọi API để tránh Spam DB
+    SEARCH_TIMEOUT = setTimeout(() => {
+        CURRENT_PAGE = 1; // Khi lọc thì luôn quay về trang 1
+        loadOrders();
+    }, 500);
+}
+
+    // Tự động gọi API tải dữ liệu ngay khi mở trang
+    window.addEventListener('DOMContentLoaded', () => {
+        loadOrders();
+    });
+    function renderTable(data) {
+    const tbody = document.getElementById('tableBody');
+    let html = '';
+    
+    // 🌟 ĐÃ SỬA: Lặp trực tiếp qua data từ Backend gửi về, không dùng slice() nữa
+    data.forEach(row => {
+        let poBadge = row.production_status === 'MTO' 
+            ? `<span style="background:#dbeafe; color:#1e3a8a; padding:2px 6px; border-radius:4px; font-size:0.85em; font-weight:bold;">MTO: ${row.SO_mapping || 'Chờ SO'}</span>` 
+            : `<span style="background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; font-size:0.85em; font-weight:bold;">MTS (Tồn kho)</span>`;
+        
+        let skinBadge = row.is_skin_required 
+            ? `<span style="background:#fef08a; color:#854d0e; padding:2px 6px; border-radius:4px; font-size:0.85em; font-weight:bold; margin-top:5px; display:inline-block;">⚡ Bắt buộc SKIN</span>` 
+            : ``;
+
+        let total = row.total_weight || 0;
+        let fulfilled = row.fulfilled_weight || 0;
+        let percent = total > 0 ? Math.min(100, Math.round((fulfilled / total) * 100)) : 0;
+        let barColor = percent >= 100 ? '#16a34a' : '#3b82f6';
+        
+        let statusBadge = row.is_manual_override 
+            ? '<span class="badge-status badge-manual">🔒 Chốt tay</span>' 
+            : '<span class="badge-status badge-auto">⚡ Auto Excel</span>';
+
+        html += `
+        <tr>
+            <td>
+                <div style="font-size: 1.1em; font-weight: bold; color: #0f172a;">${row.Order}</div>
+                <div style="margin-top: 5px;">${poBadge}</div>
+            </td>
+            <td>
+                <div style="font-weight: 600; color: #334155;">${row.material_desc || '---'}</div>
+                <div style="font-size: 0.85em; color: #64748b; margin-top: 3px;">Kỳ SX: ${row.KySanXuat || '---'}</div>
+                ${skinBadge}
+            </td>
+            <td>
+                <div style="font-weight: 600; color: #0284c7;">${row.customer_name || 'Khách lẻ'} - ${row.grade || '---'}</div>
+                <div style="font-size: 0.9em; color: #475569; margin-top: 3px;">Mục đích: ${row.usage_purpose || '-'}</div>
+                <div style="font-size: 0.85em; color: #8b5cf6; margin-top: 3px; font-weight: bold;">TDC Version: V${row.target_version_no || '?'}</div>
+            </td>
+            <td style="text-align: center;">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 5px;">
+                    <div style="font-size: 0.85em; color: #64748b;">Min - Max (Tấn)</div>
+                    <div style="font-weight: bold; color: #0f172a;">${(row.req_min_w/1000).toFixed(1)} - ${(row.req_max_w/1000).toFixed(1)}</div>
+                </div>
+            </td>
+            <td>
+                <div style="display: flex; justify-content: space-between; font-size: 0.85em; font-weight: bold; margin-bottom: 3px;">
+                    <span style="color: ${barColor}">${percent}%</span>
+                    <span style="color: #64748b;">${(fulfilled/1000).toFixed(1)} / ${(total/1000).toFixed(1)} T</span>
+                </div>
+                <div style="width: 100%; background: #e2e8f0; border-radius: 4px; height: 8px; overflow: hidden;">
+                    <div style="height: 100%; background: ${barColor}; width: ${percent}%;"></div>
+                </div>
+            </td>
+            <td style="text-align: center;">${statusBadge}</td>
+        </tr>`;
+    });
+    
+    tbody.innerHTML = html;
+}
+    function changePage(step) {
+        currentPage += step;
+        renderTable();
+    }
+
+    // function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    // // --- 3. CASCADING DROPDOWNS (NÂNG CẤP ASYNC/AWAIT) ---
+    // async function fetchOptions(url, selectId, defaultText) {
+    //     const select = document.getElementById(selectId);
+    //     select.innerHTML = `<option value="">-- Đang tải... --</option>`;
+    //     select.disabled = true;
+    //     try {
+    //         const res = await fetch(url);
+    //         const data = await res.json();
+    //         select.innerHTML = `<option value="">-- ${defaultText} --</option>`;
+    //         data.forEach(item => {
+    //             const val = typeof item === 'object' ? item.id : item;
+    //             const txt = typeof item === 'object' ? item.name : item;
+    //             select.innerHTML += `<option value="${val}">${txt}</option>`;
+    //         });
+    //         select.disabled = false;
+    //     } catch (e) { select.innerHTML = `<option value="">Lỗi tải dữ liệu</option>`; }
+    // }
+
+    // // Phải thêm 'async' vào đầu các hàm và 'await' trước fetchOptions
+    // async function loadCustomers() { 
+    //     await fetchOptions('/api/options/customers', 'selCustomer', 'Chọn Khách hàng'); 
+    // }
+    
+    // async function loadGrades() {
+    //     const cust = document.getElementById('selCustomer').value;
+    //     document.getElementById('selPurpose').innerHTML = '<option value="">-- Chọn Mục đích --</option>'; document.getElementById('selPurpose').disabled = true;
+    //     document.getElementById('selTDC').innerHTML = '<option value="">-- Chọn Version --</option>'; document.getElementById('selTDC').disabled = true;
+    //     if (cust) await fetchOptions(`/api/options/grades/${encodeURIComponent(cust)}`, 'selGrade', 'Chọn Mác thép');
+    // }
+    
+    // async function loadPurposes() {
+    //     const cust = document.getElementById('selCustomer').value; 
+    //     const grade = document.getElementById('selGrade').value;
+    //     document.getElementById('selTDC').innerHTML = '<option value="">-- Chọn Version --</option>'; document.getElementById('selTDC').disabled = true;
+    //     if (grade) await fetchOptions(`/api/options/purposes?customer=${encodeURIComponent(cust)}&grade=${encodeURIComponent(grade)}`, 'selPurpose', 'Chọn Mục đích');
+    // }
+    
+    // async function loadTDCVersions() {
+    //     const cust = document.getElementById('selCustomer').value; 
+    //     const grade = document.getElementById('selGrade').value; 
+    //     const purpose = document.getElementById('selPurpose').value;
+    //     if (purpose) await fetchOptions(`/api/options/versions?customer=${encodeURIComponent(cust)}&grade=${encodeURIComponent(grade)}&purpose=${encodeURIComponent(purpose)}`, 'selTDC', 'Chọn Version');
+    // }
+
+    // // Hàm hỗ trợ gán giá trị an toàn cho thẻ select
+    // function setSelectValue(selectId, value) {
+    //     if(!value) return;
+    //     const select = document.getElementById(selectId);
+    //     for (let i = 0; i < select.options.length; i++) {
+    //         // So sánh cả value (cho ID) hoặc text (cho Tên)
+    //         if (select.options[i].value == value || select.options[i].text === value) {
+    //             select.selectedIndex = i;
+    //             break;
+    //         }
+    //     }
+    // }
+
+    
+
+    // async function openEditModal(orderData) {
+    // currentMode = 'edit';
+    // if (!orderData) return;
+
+    // document.getElementById('modalTitle').innerText = `Cấu hình Order: ${orderData.Order}`;
+    //     document.getElementById('inpOrderNo').value = orderData.Order;
+    //     document.getElementById('inpOrderNo').disabled = true; 
+
+    //     // Đổ dữ liệu mới
+    //     document.getElementById('selProdStatus').value = orderData.production_status || 'MTS';
+    //     document.getElementById('inpSoMapping').value = orderData.SO_mapping || '';
+    //     document.getElementById('inpMinW').value = orderData.req_min_w || 0;
+    //     document.getElementById('inpMaxW').value = orderData.req_max_w || 0;
+
+    //     // ... (Đoạn code hiển thị Conflict Alert và nạp Khách/Mác/Mục Đích/TDC bạn giữ nguyên như cũ) ...
+    //     // HIỂN THỊ XUNG ĐỘT & ẨN/HIỆN NÚT UNLOCK
+    //     const conflictBox = document.getElementById('conflictAlertBox');
+    //     const btnUnlock = document.getElementById('btnUnlockOrder');
+        
+    //     if (orderData.is_manual_override) {
+    //         btnUnlock.style.display = 'inline-block'; // Có chốt tay thì cho mở khóa
+    //     } else {
+    //         btnUnlock.style.display = 'none';
+    //     }
+
+    //     if (orderData.is_conflict) {
+    //         conflictBox.style.display = 'block';
+    //         document.getElementById('conflictDetails').innerHTML = `
+    //             <li>Tiêu chuẩn kỹ thuật chuyển sang: <b>Phiên bản V${orderData.prop_version_name || 'Khác'}</b></li>
+    //             <li>Dung sai khối lượng (Min - Max): <b>${orderData.proposed_min_w || 0} kg  -  ${orderData.proposed_max_w || 0} kg</b></li>
+    //             <li><i>Ghi chú: ${orderData.conflict_note || ''}</i></li>
+    //         `;
+    //     } else {
+    //         conflictBox.style.display = 'none';
+    //     }
+        
+    //     // --- LOGIC ĐỔ DỮ LIỆU TUẦN TỰ ---
+    //     await loadCustomers();
+    //     if (orderData.customer_name) {
+    //         setSelectValue('selCustomer', orderData.customer_name);
+    //         await loadGrades();
+    //         if (orderData.grade) {
+    //             setSelectValue('selGrade', orderData.grade);
+    //             await loadPurposes();
+    //             if (orderData.usage_purpose) {
+    //                 setSelectValue('selPurpose', orderData.usage_purpose);
+    //                 await loadTDCVersions();
+    //                 if (orderData.target_tdc_version_id) {
+    //                     setSelectValue('selTDC', orderData.target_tdc_version_id);
+    //                 }
+    //             }
+    //         }
+    //     }
+
+    //     document.getElementById('editModal').style.display = 'flex';
+    // }
+    // async function unlockOrder() {
+    //     const orderId = document.getElementById('inpOrderNo').value.trim();
+    //     if(!confirm(`Bạn có chắc chắn muốn MỞ KHÓA cho Order ${orderId} không? \nHệ thống ETL (Excel) sẽ tự động tiếp quản và làm mới tiêu chuẩn cho Order này ở lần quét tiếp theo.`)) return;
+        
+    //     try {
+    //         const res = await fetch(`/api/orders/${orderId}/unlock`, { method: 'POST' });
+    //         const result = await res.json();
+    //         if (result.status === 'success') {
+    //             alert("🔓 Mở khóa thành công! Hệ thống Auto đã tiếp quản lại Order này.");
+    //             closeModal('editModal');
+    //             loadOrders(document.querySelector('.btn-filter.active').dataset.status); 
+    //         } else {
+    //             alert("Lỗi: " + result.error);
+    //         }
+    //     } catch (e) { alert("Lỗi kết nối server!"); }
+    // }
+    // --- 5. VALIDATE VÀ LƯU DỮ LIỆU ---
+    // async function saveOrder() {
+    //     const orderId = document.getElementById('inpOrderNo').value.trim();
+    //     const tdcId = document.getElementById('selTDC').value;
+    //     const minW = document.getElementById('inpMinW').value;
+    //     const maxW = document.getElementById('inpMaxW').value;
+    //     const prodStatus = document.getElementById('selProdStatus').value;
+    //     const soMapping = document.getElementById('inpSoMapping').value.trim();
+
+    //     // Validation
+    //     if (!orderId) { alert("Vui lòng nhập Mã Order!"); return; }
+    //     if (!tdcId) { alert("Vui lòng cấu hình đầy đủ Khách hàng/Mác/TDC Version!"); return; }
+    //     if (maxW <= 0 || maxW < minW) { alert("❌ Khối lượng Max phải lớn hơn 0 và không nhỏ hơn Min!"); return; }
+
+    //     const btnSave = document.getElementById('btnSaveOrder');
+    //     btnSave.innerText = "⏳ Đang lưu..."; btnSave.disabled = true;
+
+    //     try {
+    //         const res = await fetch(`/api/orders/${orderId}`, {
+    //             method: 'POST',
+    //             headers: { 'Content-Type': 'application/json' },
+    //             body: JSON.stringify({ 
+    //                 tdc_version_id: tdcId, 
+    //                 req_min_w: minW, 
+    //                 req_max_w: maxW,
+    //                 so_mapping: soMapping,
+    //                 production_status: prodStatus
+    //             })
+    //         });
+    //         const result = await res.json();
+    //         if (result.status === 'success') {
+    //             alert("✅ Đã chốt lưu tay thành công!");
+    //             closeModal('editModal');
+    //             if (result.status === 'success') {
+    //             alert("✅ Đã chốt lưu tay thành công!");
+    //             closeModal('editModal');
+    //             // 🌟 CLEAN CODE: Gọi lại loadOrders(), hàm này sẽ tự quét data mới và chạy hàm applyFilters() để giữ nguyên trạng thái Lọc hiện tại.
+    //             loadOrders(); 
+    //             }
+    //         } else { alert("Lỗi server: " + result.error); }
+    //     } catch (e) { alert("Lỗi kết nối server!"); } 
+    //     finally { btnSave.innerText = "💾 Chốt lưu tay (Override)"; btnSave.disabled = false; }
+    // }
+function downloadTemplate() {
+    window.location.href = '/api/orders/template';
+}
+
+async function handleUploadOrders() {
+    const fileInput = document.getElementById('excelUploadInput');
+    if (!fileInput.files.length) return;
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    // 🌟 ĐÃ SỬA LỖI: Tạo hiệu ứng Loading trực tiếp trên Nút bấm (thay vì gọi showLoading)
+    const btnUpload = document.querySelector('button[onclick="document.getElementById(\'excelUploadInput\').click()"]');
+    const oldText = btnUpload.innerText;
+    btnUpload.innerText = "⏳ Đang xử lý..."; 
+    btnUpload.disabled = true;
+    btnUpload.style.opacity = "0.7";
+
+    try {
+        const res = await fetch('/api/orders/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const json = await res.json();
+        
+        if (json.status === 'success') {
+            alert(json.msg);
+            loadOrders(); // Quét lại bảng dữ liệu mới nhất
+        } else {
+            // Nếu lỗi trùng lặp, hiện chi tiết các mã bị trùng
+            let errorMsg = json.msg;
+            if (json.duplicate_orders && json.duplicate_orders.length > 0) {
+                errorMsg += "\n\nCác mã bị trùng:\n" + json.duplicate_orders.slice(0, 10).join(', ');
+                if (json.duplicate_orders.length > 10) errorMsg += " ...";
+            }
+            alert(errorMsg);
+        }
+    } catch (e) {
+        alert("Lỗi kết nối khi upload: " + e);
+    } finally {
+        fileInput.value = ''; // Reset input
+
+        btnUpload.innerText = oldText; 
+        btnUpload.disabled = false;
+        btnUpload.style.opacity = "1";
+    }
+}
+</script>
+{% endblock %}

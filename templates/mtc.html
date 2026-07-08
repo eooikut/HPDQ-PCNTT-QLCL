@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ thống Xác thực MTC - Thép Hòa Phát Dung Quất</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* CSS Variables cho màu sắc thương hiệu */
+        :root {
+            --primary-blue: #003399; /* Xanh dương đậm Hòa Phát */
+            --accent-orange: #FF6600; /* Cam nổi bật */
+            --bg-light: #F4F6F9; /* Xám nhạt nền */
+            --text-dark: #333333;
+            --white: #FFFFFF;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+        /* --- A. HEADER --- */
+        header {
+            background-color: var(--white);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary-blue);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 25px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-dark);
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            color: var(--primary-blue);
+        }
+
+        .nav-links a.active {
+            font-weight: 700;
+            border-bottom: 2px solid var(--accent-orange);
+            padding-bottom: 5px;
+        }
+
+        .user-area {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .btn-login {
+            background-color: transparent;
+            color: var(--primary-blue);
+            border: 1px solid var(--primary-blue);
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-login:hover {
+            background-color: var(--primary-blue);
+            color: var(--white);
+        }
+
+        .lang-switch {
+            color: var(--text-dark);
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        /* --- B. HERO SECTION --- */
+        .hero {
+            position: relative;
+            height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background-image: url('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=2000&auto=format&fit=crop'); /* Ảnh minh họa công nghiệp luyện kim */
+            background-size: cover;
+            background-position: center;
+        }
+
+        .hero-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 51, 153, 0.75); /* Lớp phủ xanh dương mờ */
+            z-index: 1;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 800px;
+            padding: 0 20px;
+        }
+
+        .hero h1 {
+            color: var(--white);
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .search-bar {
+            display: flex;
+            width: 100%;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .search-bar input {
+            flex: 1;
+            padding: 20px 25px;
+            font-size: 16px;
+            border: none;
+            outline: none;
+        }
+
+        .search-bar button {
+            background-color: var(--accent-orange);
+            color: var(--white);
+            border: none;
+            padding: 0 30px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .search-bar button:hover {
+            background-color: #E65C00;
+        }
+
+        /* --- C. DASHBOARD CARDS --- */
+        .container {
+            max-width: 1200px;
+            margin: -40px auto 40px; /* Kéo lên đè một chút vào Hero section */
+            position: relative;
+            z-index: 3;
+            padding: 0 20px;
+        }
+
+        .dashboard-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .card {
+            background-color: var(--white);
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            border-left: 4px solid var(--primary-blue);
+        }
+
+        .card:nth-child(2) { border-left-color: #28a745; }
+        .card:nth-child(3) { border-left-color: var(--accent-orange); }
+
+        .card-icon {
+            font-size: 36px;
+            color: var(--primary-blue);
+        }
+
+        .card-info h3 {
+            font-size: 24px;
+            margin-bottom: 5px;
+            color: var(--text-dark);
+        }
+
+        .card-info p {
+            color: #666;
+            font-size: 14px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        /* --- D. BẢNG MTC GẦN ĐÂY --- */
+        .recent-section {
+            background-color: var(--white);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 40px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            color: var(--primary-blue);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--bg-light);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 15px;
+            border-bottom: 1px solid var(--bg-light);
+        }
+
+        th {
+            background-color: var(--bg-light);
+            color: #555;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background-color: #f9fbff;
+        }
+
+        .badge {
+            background-color: #e6f0ff;
+            color: var(--primary-blue);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-icon {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+            transition: color 0.2s;
+        }
+
+        .btn-icon:hover {
+            color: var(--accent-orange);
+        }
+
+        /* --- E. FOOTER --- */
+        footer {
+            background-color: var(--primary-blue);
+            color: var(--white);
+            padding: 40px 20px 20px;
+        }
+
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 40px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding-bottom: 30px;
+            margin-bottom: 20px;
+        }
+
+        .footer-col h4 {
+            margin-bottom: 20px;
+            font-size: 18px;
+            color: var(--accent-orange);
+        }
+
+        .footer-col p {
+            margin-bottom: 10px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .footer-links {
+            list-style: none;
+        }
+
+        .footer-links li {
+            margin-bottom: 10px;
+        }
+
+        .footer-links a {
+            color: var(--white);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.3s;
+        }
+
+        .footer-links a:hover {
+            color: var(--accent-orange);
+        }
+
+        .copyright {
+            text-align: center;
+            font-size: 12px;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-container">
+            <a href="#" class="logo">
+                <i class="fa-solid fa-industry"></i> HÒA PHÁT DUNG QUẤT
+            </a>
+            <nav>
+                <ul class="nav-links">
+                    <li><a href="#">Trang Chủ</a></li>
+                    <li><a href="#" class="active">Tra Cứu MTC</a></li>
+                    <li><a href="#">Hỗ Trợ Kỹ Thuật</a></li>
+                    <li><a href="#">Về Chúng Tôi</a></li>
+                </ul>
+            </nav>
+            <div class="user-area">
+                <div class="lang-switch"><i class="fa-solid fa-globe"></i> VI / EN</div>
+                <button class="btn-login"><i class="fa-solid fa-user"></i> Đăng Nhập</button>
+            </div>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <h1>Hệ thống xác thực chứng chỉ chất lượng (MTC)</h1>
+            <form class="search-bar" action="#" method="GET">
+                <input type="text" placeholder="Nhập Số Mẻ (Heat No.) hoặc Số Lô sản xuất..." required>
+                <button type="submit"><i class="fa-solid fa-magnifying-glass"></i> Tra Cứu</button>
+            </form>
+        </div>
+    </section>
+
+    <div class="container">
+        <div class="dashboard-cards">
+            <div class="card">
+                <div class="card-icon"><i class="fa-solid fa-file-circle-check"></i></div>
+                <div class="card-info">
+                    <h3>1,245</h3>
+                    <p>MTC Mới Cập Nhật Hôm Nay</p>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-icon" style="color: #28a745;"><i class="fa-solid fa-scale-balanced"></i></div>
+                <div class="card-info">
+                    <h3>ASTM, JIS, TCVN</h3>
+                    <p>Tiêu Chuẩn Áp Dụng</p>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-icon" style="color: var(--accent-orange);"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                <div class="card-info">
+                    <h3>12</h3>
+                    <p>Yêu Cầu Chờ Xử Lý</p>
+                </div>
+            </div>
+        </div>
+
+        <br>
+
+        <div class="recent-section">
+            <h2 class="section-title"><i class="fa-solid fa-list"></i> Danh sách MTC phát hành gần đây</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Mã MTC</th>
+                        <th>Loại Thép</th>
+                        <th>Số Mẻ (Heat No.)</th>
+                        <th>Tiêu Chuẩn</th>
+                        <th>Ngày Cấp</th>
+                        <th>Thao Tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>MTC-2026-8801</strong></td>
+                        <td>Thép Cuộn D6</td>
+                        <td>H120345</td>
+                        <td><span class="badge">TCVN 1651-1</span></td>
+                        <td>25/03/2026</td>
+                        <td class="action-btns">
+                            <button class="btn-icon" title="Xem chi tiết"><i class="fa-solid fa-eye"></i></button>
+                            <button class="btn-icon" title="Tải PDF"><i class="fa-solid fa-file-pdf"></i></button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>MTC-2026-8802</strong></td>
+                        <td>Thép Thanh Vằn D10</td>
+                        <td>H120346</td>
+                        <td><span class="badge">ASTM A615</span></td>
+                        <td>25/03/2026</td>
+                        <td class="action-btns">
+                            <button class="btn-icon" title="Xem chi tiết"><i class="fa-solid fa-eye"></i></button>
+                            <button class="btn-icon" title="Tải PDF"><i class="fa-solid fa-file-pdf"></i></button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>MTC-2026-8803</strong></td>
+                        <td>Thép Thanh Vằn D20</td>
+                        <td>H120347</td>
+                        <td><span class="badge">JIS G3112</span></td>
+                        <td>24/03/2026</td>
+                        <td class="action-btns">
+                            <button class="btn-icon" title="Xem chi tiết"><i class="fa-solid fa-eye"></i></button>
+                            <button class="btn-icon" title="Tải PDF"><i class="fa-solid fa-file-pdf"></i></button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-container">
+            <div class="footer-col">
+                <h4>CÔNG TY CỔ PHẦN THÉP HÒA PHÁT DUNG QUẤT</h4>
+                <p><i class="fa-solid fa-location-dot"></i> Địa chỉ: Khu Kinh tế Dung Quất, Huyện Bình Sơn, Tỉnh Quảng Ngãi</p>
+                <p><i class="fa-solid fa-phone"></i> Hotline HTKT: 1900 xxxx</p>
+                <p><i class="fa-solid fa-envelope"></i> Email: mtc.support@hoaphat.com.vn</p>
+            </div>
+            <div class="footer-col">
+                <h4>LIÊN KẾT</h4>
+                <ul class="footer-links">
+                    <li><a href="#">Hướng dẫn tra cứu</a></li>
+                    <li><a href="#">Chính sách bảo mật</a></li>
+                    <li><a href="#">Điều khoản sử dụng hệ thống</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="copyright">
+            &copy; 2026 Công ty cổ phần thép Hòa Phát Dung Quất. All rights reserved.
+        </div>
+    </footer>
+
+</body>
+</html>

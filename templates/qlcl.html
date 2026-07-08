@@ -10,65 +10,133 @@
         <div class="app-info" style="display:flex; align-items:center; gap:15px;">
             <div>
                 <h1>DASHBOARD QC</h1>
-                <span class="time-badge">Dữ liệu: {{ data['time_range'] if data['has_data'] else '---' }}</span>
+                <div style="display:flex; gap:10px; margin-top:5px;">
+                    <span class="time-badge">🏭 {{ current_factory }}</span>
+                    <span class="time-badge">Dữ liệu: {{ data['time_range'] if data['has_data'] else '---' }}</span>
+                </div>
             </div>
             
-            <div style="margin-left: 20px;">
-                <label style="font-size:0.8em; font-weight:bold; color:#64748b;">Mác thép hiện tại:</label>
-                <select id="globalGradeSelect" 
-                        data-current="{{ current_grade }}"  onchange="changeGlobalGrade()" 
-                        style="...">
-                    <option value="{{ current_grade }}">{{ current_grade }}</option>
-                </select>
+            <div style="display:flex; gap: 15px; margin-left: 30px; background: #f8fafc; padding: 5px 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                
+                <div style="display:flex; flex-direction:column;">
+                    <label style="font-size:0.7em; font-weight:bold; color:#64748b; margin-bottom:2px;">NHÀ MÁY</label>
+                    <select id="globalFactorySelect" onchange="changeGlobalContext()" 
+                            style="padding: 5px; border-radius: 4px; border: 1px solid #cbd5e1; font-weight:bold; color:#0f172a;">
+                        <option value="HRC1" {% if current_factory == 'HRC1' %}selected{% endif %}>HRC 1</option>
+                        <option value="HRC2" {% if current_factory == 'HRC2' %}selected{% endif %}>HRC 2</option>
+                    </select>
+                </div>
+
+                <div style="width:1px; background:#e2e8f0; margin: 5px 0;"></div>
+
+                <div style="display:flex; flex-direction:column;">
+                    <label style="font-size:0.7em; font-weight:bold; color:#64748b; margin-bottom:2px;">MÁC THÉP</label>
+                    <select id="globalGradeSelect" 
+                            data-current="{{ current_grade }}" onchange="changeGlobalContext()" 
+                            style="padding: 5px; border-radius: 4px; border: 1px solid #cbd5e1; font-weight:bold; color:#0f172a; min-width: 120px;">
+                        <option value="{{ current_grade }}">{{ current_grade }}</option>
+                    </select>
+                </div>
+                <div style="display:flex; flex-direction:column;">
+                    <label style="font-size:0.7em; font-weight:bold; color:#64748b; margin-bottom:2px;">CA</label>
+                    <select id="globalCaSelect" onchange="changeGlobalContext()" 
+                            style="padding: 5px; border-radius: 4px; border: 1px solid #cbd5e1; font-weight:bold; color:#0f172a;">
+                        <option value="ALL" {% if current_ca == 'ALL' %}selected{% endif %}>Tất cả</option>
+                        <option value="1A" {% if current_ca == '1A' %}selected{% endif %}>1A</option>
+                        <option value="1B" {% if current_ca == '1B' %}selected{% endif %}>1B</option>
+                        <option value="1C" {% if current_ca == '1C' %}selected{% endif %}>1C</option>
+                        <option value="2A" {% if current_ca == '2A' %}selected{% endif %}>2A</option>
+                        <option value="2B" {% if current_ca == '2B' %}selected{% endif %}>2B</option>
+                        <option value="2C" {% if current_ca == '2C' %}selected{% endif %}>2C</option>
+                    </select>
+                </div>
+                <div style="width:1px; background:#e2e8f0; margin: 5px 0;"></div>
+
+                <div style="display:flex; flex-direction:column;">
+                    <label style="font-size:0.7em; font-weight:bold; color:#64748b; margin-bottom:2px;">TỪ NGÀY</label>
+                    <input type="datetime-local" id="globalDateStart" value="{{ start_date }}" 
+                        style="padding: 4px; border-radius: 4px; border: 1px solid #cbd5e1; color:#334155; font-family:inherit; font-size:0.9em; font-weight:600;">
+                </div>
+
+                <div style="display:flex; flex-direction:column;">
+                    <label style="font-size:0.7em; font-weight:bold; color:#64748b; margin-bottom:2px;">ĐẾN NGÀY</label>
+                    <input type="datetime-local" id="globalDateEnd" value="{{ end_date }}" 
+                        style="padding: 4px; border-radius: 4px; border: 1px solid #cbd5e1; color:#334155; font-family:inherit; font-size:0.9em; font-weight:600;">
+                </div>
+                
+				<div style="width:1px; background:#e2e8f0; margin: 5px 0;"></div>
+                
+                <div style="display:flex; flex-direction:column;">
+                    <label style="font-size:0.7em; font-weight:bold; color:#64748b; margin-bottom:2px;">TÌM NHANH ORDER</label>
+                    <input type="text" id="globalOrderIds" value="{{ order_ids }}" 
+                        placeholder="Nhập Order (cách nhau phẩy/khoảng trắng)..." 
+                        onkeydown="if(event.key === 'Enter') changeGlobalContext()"
+                        style="padding: 4px; border-radius: 4px; border: 1px solid #cbd5e1; color:#334155; font-family:inherit; font-size:0.9em; font-weight:600; width: 150px;">
+                </div>
+
+                <div style="display:flex; flex-direction:column;">
+                    <label style="font-size:0.7em; font-weight:bold; color:#64748b; margin-bottom:2px;">TÌM NHANH ID CUỘN</label>
+                    <input type="text" id="globalCoilIds" value="{{ coil_ids }}" 
+                        placeholder="Nhập ID (cách nhau phẩy/khoảng trắng)..." 
+                        onkeydown="if(event.key === 'Enter') changeGlobalContext()"
+                        style="padding: 4px; border-radius: 4px; border: 1px solid #cbd5e1; color:#334155; font-family:inherit; font-size:0.9em; font-weight:600; width: 150px;">
+                </div>
+                <div style="display:flex; flex-direction:column; justify-content:flex-end;">
+                    <div style="display:flex; gap: 5px;">
+                        <button onclick="changeGlobalContext()" class="btn-upload" 
+                                style="padding: 5px 15px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.9em; height: 28px; line-height: 1;">
+                            🔍 Lọc
+                        </button>
+
+                        <button onclick="resetGlobalDate()" title="Xóa chọn ngày"
+                                style="padding: 5px 10px; background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.9em; height: 28px; line-height: 1;">
+                            ✕
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="header-actions" style="display:none;"></div>
     </div>
 
-    <div class="upload-container">
-        <div class="upload-box" style="border: 2px dashed #f59e0b; background: #fffbeb;">
+    <div class="upload-container" style="display: flex; gap: 15px; margin-bottom: 15px;">
+        <div class="upload-box" style="border: 2px dashed #f59e0b; background: #fffbeb; flex: 1;">
             <div class="upload-label" style="color: #b45309; display:flex; justify-content:space-between;">
-                <span>🚀 Quét Batch (Nhiều ID)</span>
+                <span>🚀 QUÉT ID CUỘN THIẾU KHI ĐỒNG BỘ TỰ ĐỘNG LỖI</span>
             </div>
             <div style="display:flex; flex-direction:column; gap:5px; margin-top:5px;">
                 <textarea id="txtBatchCoils" rows="3" placeholder="Nhập ID" 
-                        style="width:100%; padding:8px; border:1px solid #fcd34d; border-radius:4px; font-weight:bold; outline:none; resize:vertical; font-family:monospace;"></textarea>
-                
+                        style="width:100%; padding:8px; border:1px solid #fcd34d; border-radius:4px; outline:none; font-family:monospace;"></textarea>
                 <div style="display:flex; justify-content:flex-end;">
-                    <button class="btn-upload" onclick="triggerBatchSync()" style="background:#f59e0b; width:auto; padding:5px 20px;">
-                        ⚡ Quét Ngay
-                    </button>
+                    <button class="btn-upload" onclick="triggerBatchSync()" style="background:#f59e0b; padding:5px 20px;">⚡ Quét Ngay</button>
                 </div>
             </div>
         </div>
-        <div class="upload-box">
-            <div class="upload-label">1. Bề mặt</div>
-            <div style="display:flex; gap:5px;">
-                <div class="upload-btn-wrapper" style="flex:1; position: relative; overflow: hidden;">
-                    <button class="btn-upload btn-surf">📄 Upload Excel</button>
-                    <input type="file" id="fSurf" onchange="upAjax('/upload_surface','fSurf')" style="position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;">
-                </div>
-                <button class="btn-delete" onclick="deleteData('geo')" title="Xóa">🗑️</button>
+        <div class="upload-box" style="border: 2px solid #3b82f6; background: #eff6ff; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+            <div class="upload-label" style="color: #1d4ed8; display:flex; justify-content:space-between;">
+                <span>📝 Import Ghi chú (Excel)</span>
+            </div>
+            <div style="color: #2563eb; font-size: 0.85em; margin-top: 5px;">
+                File Excel cần <b>2 cột đầu tiên</b> (Cột 1: ID cuộn/ID xử lý, Cột 2: Ghi chú). Tự động lấy Note của ID ở dòng cuối cùng nếu trùng lặp.
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 10px;">
+                <input type="file" id="fileImportNotes" accept=".xlsx, .xls" style="font-size: 0.8em; max-width: 180px;">
+                <button class="btn-upload" onclick="importNotesExcel()" style="background:#3b82f6; padding:5px 15px; color: white; font-weight: bold; border: none; border-radius: 4px; cursor: pointer;">
+                    📤 Upload File
+                </button>
             </div>
         </div>
-        <div class="upload-box">
-            <div class="upload-label">2. Hình Học</div>
-            <div style="display:flex; gap:5px;">
-                <div class="upload-btn-wrapper" style="flex:1; position: relative; overflow: hidden;">
-                    <button class="btn-upload btn-geo">📐 Upload Excel</button>
-                    <input type="file" id="fGeo" onchange="upAjax('/upload_geometry','fGeo')" style="position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;">
-                </div>
-                <button class="btn-delete" onclick="deleteData('geo')" title="Xóa">🗑️</button>
+        <div class="upload-box" style="border: 2px solid #10b981; background: #ecfdf5; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+            <div class="upload-label" style="color: #047857; display:flex; justify-content:space-between;">
+                <span>📊 Xuất Báo Cáo QC (Excel)</span>
             </div>
-        </div>
-        <div class="upload-box">
-            <div class="upload-label">3. Cơ/Lý/Hóa</div>
-            <div style="display:flex; gap:5px;">
-                <div class="upload-btn-wrapper" style="flex:1; position: relative; overflow: hidden;">
-                    <button class="btn-upload btn-prop">🧪 Upload Excel</button>
-                    <input type="file" id="fProp" onchange="upAjax('/upload_properties','fProp')" style="position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;">
-                </div>
-                <button class="btn-delete" onclick="deleteData('prop')" title="Xóa">🗑️</button>
+            <div style="color: #059669; font-size: 0.85em; margin-top: 5px;">
+                Xuất file Excel báo cáo cấp chất lượng chi tiết với định dạng chuẩn, bao gồm điểm đánh giá bề mặt, kích thước, cơ lý hóa.
+            </div>
+            <div style="display:flex; justify-content:flex-end; margin-top: 10px;">
+                <button class="btn-upload" onclick="openExportModal()" style="background:#10b981; padding:5px 20px; color: white; font-weight: bold; border: none; border-radius: 4px; cursor: pointer;">
+                    📥 Xuất Báo Cáo Excel
+                </button>
             </div>
         </div>
     </div>
@@ -83,7 +151,9 @@
 <div class="nav-container">
     <div class="group-nav">
         <button class="group-btn g-sum active" onclick="switchGroup('SUMMARY')">📊 Tổng Hợp</button>
+        {% if 'qlcl_input' in session.get('permissions', []) or session.get('role') == 'admin' %}
         <button class="group-btn g-input" onclick="switchGroup('INPUT')" style="color:#7c3aed;">📝 Nhập Liệu</button>
+        {% endif %}
         <button class="group-btn g-surf" onclick="switchGroup('SURFACE')">🔍 Bề Mặt <span class="badge">{{ menu['surface']|length }}</span></button>
         <button class="group-btn g-geo" onclick="switchGroup('GEOMETRY')">📐 Hình Học <span class="badge">{{ menu['geometry']|length }}</span></button>
         <button class="group-btn g-prop" onclick="switchGroup('PROP')">🧪 Cơ/Lý/Hóa <span class="badge">{{ menu['prop']|length }}</span></button>
@@ -146,26 +216,70 @@
     <div class="card-panel">
         <h3 id="tableTitle" style="text-transform: uppercase; color:#334155; border-bottom:2px solid #f1f5f9; padding-bottom:10px;">DANH SÁCH CUỘN</h3>
         <div class="filter-tools" style="margin-bottom:15px; background:#f8fafc; padding:10px; border-radius:6px; border:1px solid #e2e8f0; display:flex; gap:15px; align-items:center; flex-wrap:wrap;">
-            <select id="f_surf" onchange="applyFilters()" class="filter-select-sm" style="background:#fef2f2;color:#dc2626;border-color:#fca5a5"><option value="ALL">Bề Mặt: Tất cả</option><option value="YES">✅ Có Bề Mặt</option><option value="NO">❌ Thiếu Bề Mặt</option></select>
-            <select id="f_geo" onchange="applyFilters()" class="filter-select-sm" style="background:#f0f9ff;color:#0284c7;border-color:#bae6fd"><option value="ALL">Hình Học: Tất cả</option><option value="YES">✅ Có Hình Học</option><option value="NO">❌ Thiếu Hình Học</option></select>
-            <select id="f_prop" onchange="applyFilters()" class="filter-select-sm" style="background:#f0fdf4;color:#16a34a;border-color:#bbf7d0"><option value="ALL">Cơ/Lý: Tất cả</option><option value="YES">✅ Có Cơ/Lý</option><option value="NO">❌ Thiếu Cơ/Lý</option></select>
-            <select id="f_app" onchange="applyFilters()" class="filter-select-sm" style="background:#f3e8ff;color:#7e22ce;border-color:#d8b4fe"><option value="ALL">Ngoại quan: Tất cả</option><option value="YES">✅ Có Ngoại quan</option><option value="NO">❌ Thiếu Ngoại quan</option></select>
+            <select id="f_qclass" onchange="applyFilters()" class="filter-select-sm" style="background:#f0fdf4;color:#16a34a;border-color:#bbf7d0">
+                <option value="ALL">Thương Mại: Tất cả</option>
+                <option value="LOAI_1">Loại 1 (Thương phẩm)</option>
+                <option value="LOAI_2">Loại 2 (Thứ phẩm/Phế)</option>
+                <option value="NULL">Chưa phân loại</option>
+            </select>
+            <select id="f_pstatus" onchange="applyFilters()" class="filter-select-sm" style="background:#fffbeb;color:#d97706;border-color:#fcd34d">
+                <option value="ALL">Hạng: Tất cả</option>
+                <option value="PRIME">PRIME (Xịn)</option>
+                <option value="NON_PRIME">NON-PRIME (Hạ cấp)</option>
+                <option value="SCRAP">THỨ PHẨM</option>
+                <option value="NULL">Chờ xử lý (Rớt)</option>
+            </select>
+            <select id="f_qcstatus" onchange="applyFilters()" class="filter-select-sm" style="background:#fee2e2;color:#b91c1c;border-color:#fecaca; font-weight:bold;">
+                <option value="ALL">Trạng thái QC: Tất cả</option>
+                <option value="PASS" style="color:#15803d; font-weight:bold;">PASS</option>
+                <option value="FAIL" style="color:#b91c1c; font-weight:bold;">FAIL</option>
+                <option value="PASSNOCHEM" style="color:#0369a1; font-weight:bold;">PASSNOCHEM</option>
+                <option value="FAILNOCHEM" style="color:#ea580c; font-weight:bold;">FAILNOCHEM</option>
+                <option value="PENDING" style="color:#475569; font-weight:bold;">PENDING</option>
+            </select>
+            <select id="f_rework" onchange="applyFilters()" class="filter-select-sm" style="background:#f3e8ff;color:#7e22ce;border-color:#d8b4fe">
+                <option value="ALL">Gia công: Tất cả</option>
+                <option value="FINAL">Đã chốt (FINAL)</option>
+                <option value="LAY_MAU">Lấy Mẫu</option>
+                <option value="SKIN_CUST">Chờ SKIN Khách đặt</option>
+                <option value="SKIN">Chờ SKIN </option>
+                <option value="RCL">Chờ RCL</option>
+                <option value="CXL">Chờ CXL (Xử lý tay)</option>
+                <option value="NULL">Chưa có lệnh</option>
+            </select>
+            
             <div style="flex:1; display:flex; justify-content:flex-end; gap:5px;">
-                <input type="text" id="s_full" onkeyup="applyFilters()" placeholder="🔍 Tìm ID cuộn..." style="padding:8px; border:1px solid #ccc; border-radius:4px; width: 200px;">
+                <input type="text" id="s_order_sum" onkeyup="applyFilters()" placeholder="🔍 Tìm Order (VD: SO-123...)" style="padding:8px; border:1px solid #ccc; border-radius:4px; width: 180px;">
+                <input type="text" id="s_full" onkeyup="applyFilters()" placeholder="🔍 Tìm ID cuộn..." style="padding:8px; border:1px solid #ccc; border-radius:4px; width: 450px;">
+                <button onclick="copyFilteredData()" class="btn-reset" title="Copy dữ liệu đang lọc ra Excel" style="padding:8px 12px; font-weight:bold; background:#e0f2fe; color:#0284c7; border-color:#bae6fd;">📋</button>
                 <button onclick="resetFilters()" class="btn-reset" title="Xóa bộ lọc" style="padding:8px 12px; font-weight:bold;">↺</button>
             </div>
         </div>
         <div class="table-wrapper">
             <table class="table-standard">
-                <thead>
-                    <tr>
-                        <th>STT</th>
-                        <th>Cuộn</th>
-                        <th>Mác thép</th> 
-                        <th>Loại</th>
-                        <th>Chi tiết</th>
-                    </tr>
-                </thead>
+               <thead>
+                        <tr>
+                            <th style="width: 40px; text-align: center;">STT</th>
+                            <th style="width: 140px;">Cuộn</th>
+                            <th style="width: 60px; text-align: center;">Time</th>
+                            <th style="width: 90px; text-align: center;">Mác</th> 
+                            <th style="width: 90px; text-align: center;">TxW</th>
+                            <th style="width: 60px; text-align: right;">KL (kg)</th> 
+                            <th style="text-align: center; width: 60px;">Nhóm</th>
+                            
+                            <th style="text-align: center; width: 90px;">Thương Mại</th>
+                            <th style="text-align: center; width: 90px;">Hạng</th>
+                            <th style="text-align: center; width: 90px;">Gia Công</th>
+                            
+                            <th style="text-align: center; width: 110px;">Trạng thái QC</th>
+                            <th style="text-align: center; width: 120px;">Order</th>
+                            <th style="text-align: center; width: 120px;">Mapped PO</th>
+                            <th style="text-align: center; width: 180px;">TDC Code</th>
+                            <th style="text-align: left; width: 80px;">Lỗi</th>
+                            <th style="text-align: center; width: 70px;">Radar</th>
+                            <th style="text-align: left;">Ghi chú</th>
+                        </tr>
+                    </thead>
                 <tbody id="tbody_full"></tbody>
             </table>
         </div>
@@ -174,12 +288,41 @@
         </div>
     </div>
 </div>
-
+{% if 'qlcl_input' in session.get('permissions', []) or session.get('role') == 'admin' %}
 <div id="INPUT_TAB" class="tab-content" style="display:none">
     <div class="input-layout">
         <div class="input-sidebar">
-            <div class="input-search">
-                <input type="text" id="inputSearch" onkeyup="INPUT_PAGE=1; renderInputList()" placeholder="🔍 Quét mã cuộn..." style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+            <div class="input-search" style="display: flex; flex-direction: column; gap: 10px;">
+                <select id="inputFilterQCStatus" onchange="INPUT_PAGE=1; renderInputList()" 
+                        style="padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: 600; color: #334155; cursor: pointer; background: #f8fafc;">
+                    <option value="ALL">📌 Trạng thái QC: Tất cả</option>
+                    <option value="PASS" style="color:#15803d;">PASS</option>
+                    <option value="FAIL" style="color:#b91c1c;">FAIL</option>
+                    <option value="PASSNOCHEM" style="color:#0369a1;">PASSNOCHEM</option>
+                    <option value="FAILNOCHEM" style="color:#ea580c;">FAILNOCHEM</option>
+                    <option value="PENDING" style="color:#475569;">PENDING</option>
+                </select>
+                <select id="inputFilterRework" onchange="INPUT_PAGE=1; renderInputList()" 
+                        style="padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: 600; color: #334155; cursor: pointer; background: #f8fafc;">
+                    <option value="ALL">📂 Gia công: Tất cả</option>
+                    <option value="FINAL" style="color:#0369a1;">Đã chốt (FINAL)</option>
+                    <option value="LAY_MAU" style="color:#16a34a;">Lấy Mẫu</option>
+                    <option value="SKIN_CUST" style="color:#c2410c;">Chờ SKIN Khách đặt</option>
+                    <option value="SKIN" style="color:#b45309;">Chờ SKIN </option>
+                    <option value="RCL" style="color:#7e22ce;">Chờ RCL</option>
+                    <option value="CXL" style="color:#059669;">Chờ CXL (Xử lý tay)</option>
+                    <option value="NULL" style="color:#475569;">Chưa có lệnh</option>
+                </select>
+				
+                <input type="text" id="inputSearch" onkeyup="INPUT_PAGE=1; renderInputList()"
+					onpaste="setTimeout(() => { INPUT_PAGE=1; renderInputList(); }, 100)"				
+                    placeholder="🔍 Quét mã cuộn..." 
+                    style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                
+                <input type="text" id="inputSearchOrder" onkeyup="INPUT_PAGE=1; renderInputList()"
+					onpaste="setTimeout(() => { INPUT_PAGE=1; renderInputList(); }, 100)"				
+					placeholder="🔍 Tìm mã Order (VD: SO-123...)" 
+					style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; background:#f8fafc;">
             </div>
             <div id="inputListContainer" class="input-list"></div>
             <div class="sidebar-pagination" style="padding:10px; border-top:1px solid #eee; text-align:center;">
@@ -189,24 +332,200 @@
             </div>
         </div>
         <div class="input-preview">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
-                <div><h2 id="lblInputCoil" style="margin:0; color:#0f172a; font-size:1.5rem;">---</h2><small style="color:#64748b;">💡 Click trực tiếp lên trục biểu đồ để chấm điểm.</small></div>
-                <div style="display:flex; gap:10px;">
-                    <button onclick="resetCurrentInput()" class="btn-reset" style="padding:10px 15px;">↺ Reset</button>
-                    <button onclick="saveManualData()" style="background:#16a34a; color:white; border:none; padding:10px 30px; border-radius:6px; font-weight:bold; cursor:pointer;">💾 LƯU</button>
-                </div>
+    <div style="margin-bottom: 5px;">
+        <h2 id="lblInputCoil" style="margin:0; color:#0f172a; font-size:1.6rem; letter-spacing: -0.5px;">---</h2>
+    </div>
+    <div id="qcActionCenter" class="card" style="margin-top: 15px; margin-bottom: 15px; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: none;">
+    
+    <div style="padding: 10px 15px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; gap: 25px; font-weight: 600; font-size: 0.95rem; color: #334155;">
+            <div>📦 Order: <span id="lblUiOrder" style="color:#0f172a;">---</span></div>
+            <div>📑 TDC: 
+                <a id="lblUiTdc" href="#" target="tdc_manager_window" 
+                style="color:#0284c7; text-decoration: underline; font-weight: bold; cursor: pointer; transition: color 0.2s;"
+                onmouseover="this.style.color='#0369a1'" onmouseout="this.style.color='#0284c7'">---</a>
             </div>
-            <div id="inputEmpty" style="text-align:center; color:#999; margin-top:100px;"><h2>👈 Chọn cuộn để nhập liệu</h2></div>
-            <div id="radarInputArea" class="radar-live-grid" style="display:none;">
-                <div class="mini-radar-box"><div class="radar-title">1. BỀ MẶT</div><div class="radar-canvas-wrap"><canvas id="chartInSurf"></canvas></div></div>
-                <div class="mini-radar-box"><div class="radar-title">2. KÍCH THƯỚC</div><div class="radar-canvas-wrap"><canvas id="chartInGeo"></canvas></div></div>
-                <div class="mini-radar-box"><div class="radar-title">3. CƠ/LÝ/HÓA</div><div class="radar-canvas-wrap"><canvas id="chartInProp"></canvas></div></div>
-                <div class="mini-radar-box"><div class="radar-title">4. NGOẠI QUAN</div><div class="radar-canvas-wrap"><canvas id="chartInApp"></canvas></div></div>
+            <div id="divUiQualityBadge" style="display: none; align-items: center; background: #f3f4f6; border: 1px solid #cbd5e1; padding: 3px 10px; border-radius: 4px; font-size: 0.85rem;">
+                🏷️ Phân loại: <b id="lblUiQuality" style="margin-left: 5px; color: #0f172a;">---</b>
+            </div>
+            <div id="divUiQcMsgBox" style="display: none; align-items: center; gap: 6px; background: #fff1f2; border: 1px solid #fecdd3; padding: 3px 10px; border-radius: 4px; font-size: 0.85rem; color: #e11d48; font-weight: 500;">
+                🚨 <span id="lblUiQcMsg">---</span>
             </div>
         </div>
+        <div>
+            <span id="lblUiWeight" style="padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.85rem; background: #e2e8f0; color: #334155;">-- Tấn</span>
+            <span id="lblUiSkinCust" style="display: none; background:#fefce8; color:#c2410c; border:1px solid #fde047; padding:4px 10px; border-radius:6px; font-size:0.85rem; font-weight:bold;">🛡️ SKIN_CUST</span>
+            <span id="lblUiStatus" style="padding: 4px 12px; border-radius: 6px; font-weight: bold; font-size: 0.9rem;">---</span>
+        </div>
+    </div>
+
+    <div id="acMainControls" style="padding: 12px 15px; background: #ffffff; border-radius: 0 0 8px 8px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <select id="ddlPhysicalProcess" onchange="onReworkDropdownChange()" style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; font-size: 0.9rem; min-width: 160px; outline: none; cursor: pointer; background: #fff;">
+                <option value="NULL">-- 1. Chọn xử lý --</option>
+                <option value="RCL">RCL (Sửa biên)</option>
+                <option value="SKIN">SKIN (Cán nắn)</option>
+                <option value="SKIN_CUST" id="optSkinCust" style="display: none;">SKIN Khách đặt</option>
+                <option value="CANNOT_REWORK">❌ Không thể xử lý</option>
+            </select>
+            <button id="btnConfirmRework" onclick="executePhysicalRework()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">
+                Gửi lệnh
+            </button>
+        </div>
+
+        <div id="pnlStep2_PO" style="display: none; align-items: center; gap: 10px; border-left: 2px dashed #cbd5e1; padding-left: 12px;">
+            <div id="acOrderSuggestionBox" style="display: flex; align-items: center; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 12px; font-size: 0.9rem;">
+                <span style="color: #64748b; margin-right: 5px;">Gợi ý:</span>
+                <b id="lblSuggestedOrder" style="color: #0f172a;">---</b>
+            </div>
+            <button id="btnTriggerRecommend" onclick="openOrderRecommendationModal()" style="padding: 8px 16px; background: #8b5cf6; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">
+                🔍 2. Gợi ý Order
+            </button>
+        </div>
+
+        <div id="pnlStep3_Downgrade" style="display: none; align-items: center; gap: 10px; border-left: 2px dashed #cbd5e1; padding-left: 12px;">
+            <button id="btnDowngradeNonPrime" onclick="openDowngradeModal('NON_PRIME')" style="padding: 8px 16px; background: #f59e0b; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">
+                ⚠️ 3. NON-PRIME
+            </button>
+            <button id="btnDowngradeScrap" onclick="openDowngradeModal('SCRAP')" style="padding: 8px 16px; background: #475569; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">
+                🗑️ 3. THỨ PHẨM 
+            </button>
+        </div>
+    </div>
+    
+    <div id="acWaitMsg" style="padding: 12px 15px; background: #f8fafc; color: #475569; font-weight: 600; font-size: 0.95rem; display: none; border-radius: 0 0 8px 8px;">
     </div>
 </div>
 
+<div id="mdlDowngradeConfirm" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 9999; backdrop-filter: blur(2px);">
+    <div style="background: #ffffff; width: 440px; margin: 12% auto; padding: 25px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+            <span style="font-size: 1.5rem;" id="mdlDgIcon">⚠️</span>
+            <h3 id="mdlDgTitle" style="font-size: 1.2rem; font-weight: bold; color: #1e293b; margin: 0;">Xác nhận hạ cấp</h3>
+        </div>
+        <input type="hidden" id="hdnDgActionType">
+        <p style="font-size: 0.9rem; color: #64748b; line-height: 1.5; margin-bottom: 12px;">Yêu cầu nhập lý do chi tiết để ghi nhận vào lịch sử Audit Log hệ thống.</p>
+        <textarea id="txtDgReason" rows="4" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; resize: none; outline: none;" placeholder="Nhập lý do hạ cấp bắt buộc tại đây..."></textarea>
+        <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+            <button onclick="closeDowngradeModal()" style="padding: 8px 16px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; color: #475569; cursor: pointer;">Hủy bỏ</button>
+            <button onclick="submitCommercialDowngrade()" id="btnSubmitDg" style="padding: 8px 18px; border: none; border-radius: 6px; color: white; cursor: pointer; font-weight: bold; background: #ef4444;">Xác nhận hạ cấp</button>
+        </div>
+    </div>
+</div>
+    <div style="display: flex; width: 100%; gap: 10px; align-items: flex-end; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
+
+        <div style="display: flex; flex-direction: column; gap: 4px; justify-content: center; padding-right: 15px; border-right: 1px solid #e2e8f0;">
+            <label style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Chiều dày</label>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.85rem; font-weight: bold; color: #16a34a; cursor: pointer;">
+                    <input type="radio" name="thick_pass_radio" id="radioThickPass" onchange="updateThickPass()" style="width: 16px; height: 16px; cursor: pointer; accent-color: #16a34a;">
+                    ĐẠT
+                </label>
+                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.85rem; font-weight: bold; color: #dc2626; cursor: pointer;">
+                    <input type="radio" name="thick_pass_radio" id="radioThickFail" onchange="updateThickPass()" style="width: 16px; height: 16px; cursor: pointer; accent-color: #dc2626;">
+                    KHÔNG ĐẠT
+                </label>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
+            <label style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Ghi chú QC</label>
+            <input type="text" id="txtInputNote" placeholder="Dữ liệu lấy từ Excel..." readonly onmouseover="this.title=this.value"
+       style="height: 36px; width: 100%; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; outline: none; background-color: #f1f5f9; cursor: not-allowed;">
+        </div>
+
+        <div style="height: 36px; display: flex; align-items: center; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 4px; padding: 0 12px; max-width: 380px;">
+            <span id="lblInputInfo" style="font-size: 0.85rem; font-weight: 600; color: #b45309; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ---
+            </span>
+        </div>
+
+        <div style="width: 1px; height: 26px; background: #e2e8f0; margin-bottom: 5px;"></div>
+
+        <div style="display: flex; gap: 15px; padding-bottom: 1px;">
+            <div style="text-align: right;">
+                <div style="font-size: 0.65rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; line-height: 1;">Sau Cán</div>
+                <div style="font-size: 1rem; font-weight: 700; color: #dc2626; line-height: 1.2;">
+                    <span id="lblInputTemp">--</span><small style="font-size:0.7em">°</small>
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 0.65rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; line-height: 1;">Tạo Cuộn</div>
+                <div style="font-size: 1rem; font-weight: 700; color: #0f172a; line-height: 1.2;">
+                    <span id="lblInputSpeed">--</span><small style="font-size:0.7em">°</small>
+                </div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 0.65rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; line-height: 1;">Time</div>
+                <div id="lblInputTime" style="font-size: 1rem; font-weight: 700; color: #475569; line-height: 1.2;">--:--</div>
+            </div>
+        </div>
+
+        <div style="width: 1px; height: 26px; background: #e2e8f0; margin-bottom: 5px;"></div>
+
+        <div style="display: flex; gap: 8px;">
+            <!-- <button onclick="resetCurrentInput()" title="Reset"
+                style="height: 36px; width: 36px; display: flex; align-items: center; justify-content: center; background: white; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; color: #64748b; font-size: 1.1rem;">
+                ↺
+            </button> -->
+            <button onclick="saveManualData()" 
+                style="height: 36px; padding: 0 20px; background: #16a34a; color: white; border: none; border-radius: 4px; font-weight: 700; font-size: 0.85rem; cursor: pointer; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.2);">
+                LƯU
+            </button>
+        </div>
+    </div>
+    
+    <div id="inputEmpty" style="text-align:center; color:#999; margin-top:80px;"><h2>👈 Chọn cuộn để nhập liệu</h2></div>
+    
+    <div id="radarInputArea" class="radar-live-grid" style="display:none; margin-top: 15px;">
+        <div class="mini-radar-box">
+            <div class="radar-title" style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="white-space: nowrap;">1. BỀ MẶT</span>
+                <input type="text" id="txtNoteSurf" onkeyup="updateCombinedNote()" onmouseover="this.title=this.value" placeholder="Ghi chú bề mặt..." 
+                    style="flex: 1; margin: 0 10px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85em; font-weight: normal; outline: none; background-color: #f8fafc;">
+                <button onclick="quickSetGroupC1('SURFACE')" title="Gán tất cả lỗi bề mặt thành C1"
+                        style="padding: 2px 8px; font-size: 0.75em; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                    ⚡ Tất cả C1
+                </button>
+            </div>
+            <div class="radar-canvas-wrap"><canvas id="chartInSurf"></canvas></div>
+        </div>        
+
+        <div class="mini-radar-box">
+            <div class="radar-title" style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="white-space: nowrap;">2. KÍCH THƯỚC</span>
+                <input type="text" id="txtNoteGeo" onkeyup="updateCombinedNote()" onmouseover="this.title=this.value" placeholder="Ghi chú kích thước..."
+                    style="flex: 1; margin: 0 10px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85em; font-weight: normal; outline: none; background-color: #f8fafc; ">
+            </div>
+            <div class="radar-canvas-wrap"><canvas id="chartInGeo"></canvas></div>
+        </div>
+
+        <div class="mini-radar-box">
+            <div class="radar-title" style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="white-space: nowrap;">3. CƠ/LÝ/HÓA</span>
+                <input type="text" id="txtNoteProp" onkeyup="updateCombinedNote()" onmouseover="this.title=this.value" placeholder="Ghi chú cơ/lý/hóa..."
+                    style="flex: 1; margin: 0 10px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85em; font-weight: normal; outline: none; background-color: #f8fafc; ">
+            </div>
+            <div class="radar-canvas-wrap"><canvas id="chartInProp"></canvas></div>
+        </div>
+
+        <div class="mini-radar-box">
+            <div class="radar-title" style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="white-space: nowrap;">4. NGOẠI QUAN</span>
+                <input type="text" id="txtNoteApp" onkeyup="updateCombinedNote()" onmouseover="this.title=this.value" placeholder="Ghi chú ngoại quan..."
+                    style="flex: 1; margin: 0 10px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85em; font-weight: normal; outline: none; background-color: #f8fafc; ">
+                <button onclick="quickSetGroupC1('APP')" style="padding: 2px 8px; font-size: 0.75em; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                    ⚡ Tất cả C1
+                </button>
+            </div>
+            <div class="radar-canvas-wrap"><canvas id="chartInApp"></canvas></div>
+        </div>
+    </div>
+</div>
+    </div>
+</div>
+{% endif %}
 {% for name, tab in data['tabs'].items() %}
 <div id="{{name}}" class="tab-content">
     <div class="card-panel">
@@ -296,7 +615,32 @@
 
 <div id="detailModal" class="modal-overlay">
     <div class="modal-box">
-        <div class="modal-header"><span class="modal-title" id="modalTitle">Chi tiết cuộn</span><span class="close-btn" onclick="closeModal()">✕</span></div>
+        <div class="modal-header">
+            <div style="display:flex; align-items:center; gap:20px; flex-wrap: wrap;">
+                <span class="modal-title" id="modalTitle">Chi tiết cuộn</span>
+                
+                <div id="modalStats" style="display:none; font-size:0.95em; gap:15px; align-items:center; background: rgba(255,255,255,0.1); padding: 2px 10px; border-radius: 6px;">
+                    <span style="background:#f1f5f9; padding:2px 8px; border-radius:4px; border:1px solid #e2e8f0; color:#475569;">
+                        Cấp: <b id="valModalQual" style="color:#0f172a; font-size:1.1em;">---</b>
+                    </span>
+                    <span id="valModalInfo" style="background:#fff7ed; color:#c2410c; padding:2px 8px; border-radius:4px; border:1px solid #ffedd5; font-weight:600;">
+                        ---
+                    </span>
+                    <span title="Nhiệt độ sau cán" style="color:#dc2626; font-weight:500;">
+                        Nhiệt độ sau cán: <b id="valModalTemp">--</b> <small>°C</small>
+                    </span>
+                    
+                    <span title="Nhiệt độ tạo cuộn" style="color:#2563eb; font-weight:500;">
+                        Nhiệt độ tạo cuộn: <b id="valModalSpeed">--</b> <small>°C</small>
+                    </span>
+                    <span title="Thời gian sản xuất" style="color:#475569; font-weight:500; border-left:1px solid #cbd5e1; padding-left:10px; margin-left:5px;">
+                        Time: <b id="valModalTime">--</b>
+                    </span>
+                </div>
+            </div>
+            
+            <span class="close-btn" onclick="closeModal()">✕</span>
+        </div>
         <div class="modal-body">
             <div class="modal-left">
                 <input type="text" id="modalSearch" onkeyup="filterModalList()" placeholder="🔍 Tìm mã cuộn..." style="width:100%; padding:8px; margin-bottom:10px; border:1px solid #ccc; border-radius:4px;">
@@ -327,7 +671,6 @@
     <div class="popup-body">
         <label>Chọn điểm:</label>
         <div class="score-buttons">
-            <button onclick="setPopupScore(0)" class="btn-score s0">0</button>
             <button onclick="setPopupScore(1)" class="btn-score s1">C1</button>
             <button onclick="setPopupScore(2)" class="btn-score s2">C2</button>
             <button onclick="setPopupScore(3)" class="btn-score s3">C3</button>
@@ -341,10 +684,131 @@
         </div>
     </div>
 </div>
+<div id="exportExcelModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(3px);">
+    
+    <div style="background: white; width: 100%; max-width: 500px; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; overflow: hidden; margin: 20px; animation: popIn 0.2s ease-out;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
+            <h3 style="margin: 0; color: #0f172a; font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                📊 Cấu hình Xuất Excel
+            </h3>
+            <button onclick="closeExportModal()" style="background: transparent; border: none; font-size: 1.2rem; color: #64748b; cursor: pointer; padding: 4px; border-radius: 4px; transition: color 0.2s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#64748b'">
+                ✕
+            </button>
+        </div>
+        
+        <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+            
+            <div>
+                <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 6px;">Nhà máy xuất dữ liệu</label>
+                <select id="expFactory" style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; color: #0f172a; outline: none; background: #fff; cursor: pointer;">
+                    <option value="HRC1">Nhà máy HRC 1</option>
+                    <option value="HRC2">Nhà máy HRC 2</option>
+                    <option value="ALL">Tất cả nhà máy</option>
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 16px;">
+                <div style="flex: 1;">
+                    <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 6px;">Từ ngày</label>
+                    <input type="datetime-local" id="expStartDate" style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; color: #0f172a; outline: none; font-family: inherit;">
+                </div>
+                <div style="flex: 1;">
+                    <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 6px;">Đến ngày</label>
+                    <input type="datetime-local" id="expEndDate" style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; color: #0f172a; outline: none; font-family: inherit;">
+                </div>
+            </div>
+
+            <div style="display: flex; align-items: center; text-align: center; color: #94a3b8; font-size: 0.75rem; font-weight: 700; margin: 4px 0;">
+                <div style="flex: 1; height: 1px; background: #e2e8f0;"></div>
+                <span style="padding: 0 10px; letter-spacing: 0.5px;">HOẶC CHỈ ĐỊNH BẰNG ID</span>
+                <div style="flex: 1; height: 1px; background: #e2e8f0;"></div>
+            </div>
+
+            <div>
+                <label style="display: flex; justify-content: space-between; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 6px;">
+                    Danh sách Coil ID
+                    <span style="font-weight: normal; color: #64748b; font-style: italic;">(cách nhau bằng phẩy hoặc Enter)</span>
+                </label>
+                <textarea id="expCoilIds" rows="3" placeholder="Ví dụ: 71260302771, 71260302770..." 
+                          style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; color: #0f172a; outline: none; font-family: monospace; resize: vertical; line-height: 1.5; box-sizing: border-box;"></textarea>
+                
+                <div style="margin-top: 6px; font-size: 0.8rem; color: #d97706; display: flex; align-items: flex-start; gap: 6px; background: #fffbeb; padding: 8px; border-radius: 4px; border: 1px solid #fef3c7;">
+                    <span style="font-size: 1rem; line-height: 1;">💡</span>
+                    <span>Hệ thống sẽ <b>ưu tiên xuất theo ID</b> này và bỏ qua bộ lọc ngày tháng ở trên.</span>
+                </div>
+            </div>
+        </div>
+
+        <div style="padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px;">
+            <button onclick="closeExportModal()" style="padding: 10px 20px; background: white; border: 1px solid #cbd5e1; border-radius: 6px; color: #475569; font-weight: 600; font-size: 0.95rem; cursor: pointer;">
+                Hủy bỏ
+            </button>
+            <button onclick="executeExportExcel()" style="padding: 10px 20px; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600; font-size: 0.95rem; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2); display: flex; align-items: center; gap: 6px;">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                Tải xuống Excel
+            </button>
+        </div>
+        
+    </div>
+</div>
+<div id="mdlOrderRecommend" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 9999; backdrop-filter: blur(2px);">
+    <div style="background: #ffffff; width: 800px; margin: 5% auto; padding: 25px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; display: flex; flex-direction: column; max-height: 85vh;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+            <div>
+                <h3 style="font-size: 1.3rem; font-weight: bold; color: #1e293b; margin: 0; display: flex; align-items: center; gap: 10px;">
+                    🔍 Gợi ý Đơn Hàng Phù Hợp
+                </h3>
+                <span style="font-size: 0.85rem; color: #64748b;">Hệ thống đã giả lập chạy cuộn qua các tiêu chuẩn kỹ thuật.</span>
+            </div>
+            <button onclick="document.getElementById('mdlOrderRecommend').style.display='none'" style="background: transparent; border: none; font-size: 1.2rem; cursor: pointer; color: #64748b;">✕</button>
+        </div>
+
+        <div style="flex: 1; overflow-y: auto;">
+            <table class="table-standard" style="width: 100%;">
+                <thead>
+                    <tr style="background: #f8fafc;">
+                        <th>Order</th>
+                        <th>SO Mapping</th>
+                        <th style="text-align: right;">Chuẩn Khối Lượng</th>
+                        <th style="text-align: right;">Tiến Độ (Tấn)</th>
+                        <th style="text-align: center;">Trạng Thái</th>
+                        <th style="text-align: center;">Thao Tác</th>
+                    </tr>
+                </thead>
+                <tbody id="tblRecommendBody">
+                    </tbody>
+            </table>
+        </div>
+        <div style="margin-top: 10px; text-align: center;">
+            <button onclick="confirmNoOrderSelected()" 
+                    style="padding: 10px 20px; background: #64748b; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                ❌ Không chọn đơn hàng nào (Tiếp tục hạ cấp)
+            </button>
+        </div>
+    </div>
+</div>
+<!-- MODAL ƯỚM THỬ TDC ORDER -->
+<div id="mdlPreviewTdc" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 9999; backdrop-filter: blur(2px);">
+    <div style="background: #ffffff; width: 440px; margin: 12% auto; padding: 25px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+            <span style="font-size: 1.5rem;">🔍</span>
+            <h3 style="font-size: 1.2rem; font-weight: bold; color: #1e293b; margin: 0;">Ướm thử Tiêu chuẩn Order</h3>
+        </div>
+        <p style="font-size: 0.9rem; color: #64748b; line-height: 1.5; margin-bottom: 12px;">Nhập mã Order để xem trước dải tiêu chuẩn (khung màu xanh) trên biểu đồ Radar. Việc này KHÔNG ảnh hưởng đến dữ liệu lưu trữ.</p>
+        <input type="text" id="txtPreviewOrderId" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem; font-weight: bold; outline: none; font-family: monospace;" placeholder="VD: SO-2026-0001...">
+        <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+            <button onclick="closePreviewTdcModal()" style="padding: 8px 16px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; color: #475569; cursor: pointer; font-weight: bold;">Hủy bỏ</button>
+            <button onclick="executePreviewTdc()" style="padding: 8px 18px; border: none; border-radius: 6px; color: white; cursor: pointer; font-weight: bold; background: #f59e0b; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);">🔍 Tải Tiêu Chuẩn</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
-    // Chỉ giữ lại các biến cần Jinja2 truyền vào
+    const USER_ROLE = '{{ session.get("role", "") }}';
+    const USER_PERMISSIONS = {{ session.get('permissions', []) | tojson }};
     const RADAR_DATA = {{ radar_data | tojson | default({}) }};
     const TABLE_DATA = {};
     const TAB_PAGING = {};
@@ -358,7 +822,7 @@
 
     window.addEventListener('load', () => {
         {% if data['has_data'] %}
-        calculateSummary(); // Hàm này nằm trong qlcl.js
+        calculateSummary(); 
         switchGroup('SUMMARY');
         {% endif %}
     });

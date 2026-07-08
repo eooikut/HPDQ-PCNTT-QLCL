@@ -44,8 +44,21 @@
         .bin-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
         .bin-input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; width: 100px; text-align: center; }
         .bin-label { flex: 1; font-weight: bold; color: #334155; padding: 8px; background: #f1f5f9; border-radius: 4px; text-align: center; }
+
+        /* ====== CSS THÊM MỚI CHO PREVIEW MA TRẬN 2D ====== */
+        .preview-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        .preview-table th, .preview-table td { border: 1px solid #cbd5e1; padding: 8px; text-align: center; }
+        .preview-table th { background: #f1f5f9; color: #334155; font-weight: bold; }
+        .cell-c1 { background: #dcfce7; color: #166534; }
+        .cell-c2 { background: #fef9c3; color: #854d0e; }
+        .cell-c3 { background: #ffedd5; color: #9a3412; }
+        .cell-c4 { background: #fee2e2; color: #991b1b; }
+        .cell-c5 { background: #fecaca; color: #991b1b; }
+        .cell-c6 { background: #fca5a5; color: #7f1d1d; font-weight: bold; }
+        .surf-input { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; outline: none; text-align: center; font-family: monospace; }
     </style>
 {% endblock %} 
+
 {% block content %}
 <div class="app-header" style="margin: 0 0 15px 0; border-radius: 0; z-index: 10; padding: 10px 0; background: transparent; box-shadow: none;">
     <div class="app-title-row" style="margin-bottom:0; border:none; padding-bottom:0;">
@@ -53,7 +66,7 @@
             <h1 style="color: #1e293b;">⚙️ CẤU HÌNH ĐA MÁC THÉP</h1>
         </div>
         <div>
-            <button onclick="saveAllConfigs()" class="btn-upload btn-surf" style="margin-left: 10px;">💾 LƯU TOÀN BỘ</button>
+            <button onclick="saveAllConfigs()" class="btn-upload btn-surf" style="margin-left: 10px; background: #1e293b;">💾 LƯU TOÀN BỘ</button>
         </div>
     </div>
 </div>
@@ -62,7 +75,7 @@
     <div class="grade-sidebar">
         <button class="btn-add-grade" onclick="addNewGrade()">+ THÊM MÁC MỚI</button>
         <div id="gradeList">
-            </div>
+        </div>
     </div>
 
     <div class="config-main">
@@ -73,11 +86,26 @@
 
         <div id="configContent">
             <div class="config-header">
-                <h2 id="currentGradeTitle" style="margin:0; color:#334155">---</h2>
-                <div class="cfg-tabs">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <h2 id="currentGradeTitle" style="margin:0; color:#334155">---</h2>
+                    <button onclick="triggerRecalc()" class="btn-upload" style="background:#f59e0b; color:white; border:none; padding:5px 15px; border-radius:4px; font-weight:bold; cursor:pointer;">
+                        ⚡ Áp dụng & Tính lại
+                    </button>
+                </div>
+                
+                <div class="cfg-tabs" style="margin-bottom: 0;">
                     <div class="cfg-tab active" onclick="switchTab('surface')">Bề mặt</div>
                     <div class="cfg-tab" onclick="switchTab('geometry')">Hình học</div>
                     <div class="cfg-tab" onclick="switchTab('mechanical')">Cơ/Lý/Hóa</div>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <button onclick="openSurfaceModal(null)" class="btn-upload" style="padding: 6px 15px; border-radius: 6px; font-weight: bold; font-size: 0.9em; background: #ef4444;">
+                        + Thêm Lỗi Bề Mặt
+                    </button>
+                    <button onclick="openAddCriterionModal()" class="btn-upload btn-prop" style="padding: 6px 15px; border-radius: 6px; font-weight: bold; font-size: 0.9em;">
+                        + Thêm TPHH Mới
+                    </button>
                 </div>
             </div>
 
@@ -89,31 +117,117 @@
                     <div>Tác vụ</div>
                 </div>
                 <div id="defectList">
-                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<div id="editModal" class="modal-overlay">
-    <div class="modal-box" style="width: 700px; height: auto; max-height: 90vh;">
-        <div class="modal-header">
-            <span id="modalDefectName">Chỉnh sửa thông số</span>
-            <span class="close-btn" onclick="closeEditModal()">✕</span>
+<div id="editModal" class="modal-overlay" style="display:none; align-items: center; justify-content: center; background-color: rgba(15, 23, 42, 0.5); z-index: 9999; position: fixed; top: 0; left: 0; right: 0; bottom: 0;">
+    <div class="modal-box" style="width: 850px; max-width: 95vw; height: auto; max-height: 90vh; background: white; border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        
+        <div class="modal-header" style="padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+            <h3 id="modalDefectName" style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">Chỉnh sửa thông số</h3>
+            <span class="close-btn" onclick="closeEditModal()" style="cursor: pointer; font-size: 18px; color: #64748b; font-weight: bold;">✕</span>
         </div>
-        <div class="modal-body" style="display:block; padding: 20px; overflow-y:auto;">
-            <p style="color:#64748b; font-style:italic; margin-bottom:15px;">
-                Định nghĩa các khoảng giá trị (Bins) để tính điểm C0-C5. <br>
-                Lưu ý: "inf" đại diện cho vô cực (>).
-            </p>
-            
-            <div id="binsContainer">
-                </div>
-            
-            <div style="margin-top:20px; text-align:right; border-top:1px solid #eee; padding-top:15px;">
-                <button onclick="closeEditModal()" class="btn-reset">Hủy</button>
-                <button onclick="applyChanges()" class="btn-upload btn-prop" style="margin-left:10px;">✅ Áp dụng</button>
+        
+        <div class="modal-body" style="padding: 20px; overflow-y:auto; flex-grow: 1; display: flex; flex-direction: column;">
+            <div style="background: #f1f5f9; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap; border: 1px solid #e2e8f0;">
+                <span style="font-weight: 600; font-size: 14px; color: #334155;">Đổi nhanh cấu trúc:</span>
+                <select id="editScaleTemplate" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; outline: none; min-width: 200px;">
+                    <option value="linear">Tuyến tính (C1 ➔ C6)</option>
+                    <option value="two_ends">Hai đầu mút (C6 ➔ C1 ➔ C6)</option>
+                    <option value="reverse">Đảo ngược (C6 ➔ C1)</option>
+                </select>
+                <button onclick="applyTemplateToEdit()" style="padding: 8px 16px; font-size: 13px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">🔄 Áp dụng Template</button>
+                <div style="flex-grow: 1;"></div>
+                <button onclick="addNewBinRow()" style="padding: 8px 16px; font-size: 13px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">➕ Thêm khoảng</button>
             </div>
+            <div id="binsContainer" style="display: flex; flex-direction: column; gap: 12px;"></div>
+            
+            <div style="margin-top:20px; text-align:right; border-top:1px solid #e2e8f0; padding-top:15px;">
+                <button onclick="closeEditModal()" style="padding: 10px 20px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; cursor: pointer; font-weight: 600; color: #475569;">Hủy</button>
+                <button onclick="applyChanges()" style="padding: 10px 20px; border-radius: 6px; border: none; background: #10b981; color: white; font-weight: 600; cursor: pointer; margin-left: 10px;">✅ Lưu thay đổi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="surfaceModal" class="modal-overlay" style="display:none; align-items: center; justify-content: center; background-color: rgba(15, 23, 42, 0.5); z-index: 9999; position: fixed; top: 0; left: 0; right: 0; bottom: 0;">
+    <div class="modal-box" style="width: 950px; max-width: 95vw; max-height: 90vh; background: white; border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        
+        <div class="modal-header" style="padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+            <h3 id="surfModalTitle" style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">Cấu hình Ma trận Bề mặt</h3>
+            <span class="close-btn" onclick="closeSurfaceModal()" style="cursor: pointer; font-size: 18px; color: #64748b; font-weight: bold;">✕</span>
+        </div>
+        
+        <div class="modal-body" style="padding: 20px; display: grid; grid-template-columns: 320px 1fr; gap: 20px; overflow-y: auto;">
+            <div style="border-right: 1px solid #e2e8f0; padding-right: 20px; display: flex; flex-direction: column; gap: 15px;">
+                <div>
+                    <label style="font-weight: 600; font-size: 14px; color: #334155; margin-bottom: 5px; display: block;">Mã Lỗi (Ví dụ: NEW_SCRATCH):</label>
+                    <input type="text" id="surfCode" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none;">
+                </div>
+
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
+                    <label style="font-weight: bold; color: #1e40af; font-size: 14px; display:block; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 10px;">📉 Trục Y: Mốc Kích Thước (mm)</label>
+                    <div id="surfBinsInputs" style="display: flex; flex-direction: column; gap: 8px;">
+                        </div>
+                </div>
+
+                <div style="background: #f0fdf4; border: 1px solid #dcfce7; border-radius: 8px; padding: 15px;">
+                    <label style="font-weight: bold; color: #166534; font-size: 14px; display:block; border-bottom: 1px solid #dcfce7; padding-bottom: 5px; margin-bottom: 10px;">📊 Trục X: Mốc Số Lượng Lỗi</label>
+                    <div id="surfCountInputs" style="display: flex; flex-direction: column; gap: 8px;">
+                        </div>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column;">
+                <label style="font-weight: 600; font-size: 14px; color: #334155; margin-bottom: 10px;">👀 Bảng xem trước (Live Preview):</label>
+                <div id="surfPreviewContainer" style="flex-grow: 1;">
+                    </div>
+                <div style="font-size: 12px; color: #64748b; margin-top: 15px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px dashed #cbd5e1;">
+                    💡 <b>Lưu ý:</b> Ma trận điểm C1-C6 được kế thừa theo tiêu chuẩn QC mặc định (Lỗi càng to & số lượng càng nhiều -> Điểm C càng cao). Label sẽ tự động nhảy theo số bạn nhập bên trái.
+                </div>
+                
+                <div style="margin-top:20px; text-align:right; border-top:1px solid #e2e8f0; padding-top:15px;">
+                    <button onclick="closeSurfaceModal()" style="padding: 10px 20px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; cursor: pointer; font-weight: 600; color: #475569;">Hủy</button>
+                    <button onclick="saveSurfaceConfig()" style="padding: 10px 20px; border-radius: 6px; border: none; background: #10b981; color: white; font-weight: 600; cursor: pointer; margin-left: 10px;">✅ Xác nhận & Lưu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="addCriterionModal" class="modal-overlay" style="display:none; align-items: center; justify-content: center; background-color: rgba(15, 23, 42, 0.5); z-index: 9999; position: fixed; top: 0; left: 0; right: 0; bottom: 0;">
+    <div class="modal-box" style="width: 420px;background: #ffffff; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden; display: flex; flex-direction: column;">
+        <div class="modal-header" style="padding: 10px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; margin: 0;">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">Thêm Chỉ Tiêu Hóa Học</h3>
+            <span class="close-btn" onclick="document.getElementById('addCriterionModal').style.display='none'" style="cursor: pointer; font-size: 18px; color: #64748b; padding: 0 5px;">✕</span>
+        </div>
+        <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 15px; margin: 0;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label style="font-size: 14px; font-weight: 600; color: #334155;">Nguyên tố / Chỉ tiêu:</label>
+                <select id="newCritCode" style="height: 38px; border-radius: 6px; border: 1px solid #cbd5e1; padding: 0 10px; width: 100%;">
+					<option value="ImpactEnergy" style="font-weight: bold; color: #166534;">Độ dai va đập (Impact Energy)</option>
+                    <option value="Cu">Cu (Đồng)</option><option value="Ni">Ni (Niken)</option><option value="Cr">Cr (Crom)</option>
+                    <option value="Mo">Mo (Molipden)</option><option value="V">V (Vanadi)</option><option value="Ti">Ti (Titan)</option>
+                    <option value="Al">Al (Nhôm)</option><option value="Ca">Ca (Canxi)</option><option value="B">B (Bo)</option>
+                    <option value="Nb">Nb (Niobi)</option><option value="CEV">CEV (Carbon TĐ)</option><option value="O">O (Oxy)</option>
+                    <option value="N">N (Nitơ)</option><option value="H">H (Hydro)</option>
+                </select>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label style="font-size: 14px; font-weight: 600; color: #334155;">Kiểu đánh giá:</label>
+                <select id="scaleType" style="height: 38px; border-radius: 6px; border: 1px solid #cbd5e1; padding: 0 10px; width: 100%;">
+                    <option value="linear">Tuyến tính ( C1 ➔ C6)</option>
+                    <option value="two_ends">Hai đầu mút (C6 ➔ C1 ➔ C6)</option>
+                    <option value="reverse">Đảo ngược (C6 ➔ C1)</option>
+                </select>
+            </div>
+        </div>
+        <div style="padding: 15px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; background: #f8fafc;">
+            <button onclick="document.getElementById('addCriterionModal').style.display='none'" style="padding: 8px 16px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; color: #475569; font-weight: 600; cursor: pointer; font-size: 14px;">Hủy</button>
+            <button onclick="confirmAddCriterion()" style="padding: 8px 16px; border-radius: 6px; border: none; background: #10b981; color: white; font-weight: 600; cursor: pointer; font-size: 14px;">Tạo cấu hình</button>
         </div>
     </div>
 </div>
@@ -125,12 +239,19 @@ let ALL_CONFIGS = {};
 let CURRENT_GRADE = null;
 let CURRENT_TAB = 'surface';
 let EDITING_KEY = null; 
+const PROTECTED_KEYS = [
+    // Bề mặt
+    'MI', 'EL', 'LC', 'SCRT', 'BRUS', 'HPrScale', 'RIP', 'HOLE',
+    // Hình học
+    'Flatness', 'Crown', 'Wedge', 'ThickDiff', 'WidthDiff',
+    // Cơ lý & Hóa học mặc định
+    'YieldPoint', 'Tensile', 'Elongation', 'Hardness', 'C', 'Mn', 'Si', 'P', 'S','Cu', 'Ni', 'Cr', 'Mo', 'V', 'Ti', 'Al', 'Ca', 'B', 'Nb', 'CEV', 'O', 'N', 'H'
+];
 
 // 1. INIT & FETCH DATA
 window.onload = async function() {
     await fetchConfigs();
 }
-
 async function fetchConfigs() {
     try {
         const res = await fetch('/api/grade_configs');
@@ -157,8 +278,16 @@ function renderGradeList() {
 
 function selectGrade(grade) {
     CURRENT_GRADE = grade;
-    document.getElementById('currentGradeTitle').innerText = `Mác thép: ${grade}`;
     renderGradeList(); 
+    
+    // Sửa lại đoạn này
+    const headerTitle = document.getElementById('currentGradeTitle');
+    if (CURRENT_TAB === 'surface') {
+        headerTitle.innerHTML = `<span style="color:#ef4444;">Cấu hình Bề mặt chung toàn bộ Mác</span>`;
+    } else {
+        headerTitle.innerText = `Mác thép: ${grade}`;
+    }
+    
     renderDefectTable();
 }
 
@@ -166,8 +295,6 @@ function addNewGrade() {
     const name = prompt("Nhập tên Mác thép mới (VD: SS400):");
     if(!name) return;
     if(ALL_CONFIGS[name]) return alert("Tên đã tồn tại!");
-    
-    // Copy config từ SAE1006
     ALL_CONFIGS[name] = JSON.parse(JSON.stringify(ALL_CONFIGS['SAE1006'] || {}));
     selectGrade(name);
 }
@@ -187,6 +314,15 @@ function switchTab(tab) {
     CURRENT_TAB = tab;
     document.querySelectorAll('.cfg-tab').forEach(t => t.classList.remove('active'));
     event.target.classList.add('active');
+    
+    // Thêm đoạn này để hiển thị cảnh báo cho người dùng
+    const headerTitle = document.getElementById('currentGradeTitle');
+    if (tab === 'surface') {
+        headerTitle.innerHTML = `<span style="color:#ef4444;">Cấu hình Bề mặt chung toàn bộ Mác</span>`;
+    } else {
+        headerTitle.innerText = `Mác thép: ${CURRENT_GRADE}`;
+    }
+    
     renderDefectTable();
 }
 
@@ -195,7 +331,18 @@ function renderDefectTable() {
     const config = ALL_CONFIGS[CURRENT_GRADE];
     const tbody = document.getElementById('defectList');
     
-    const keys = Object.keys(config).filter(k => {
+    // 1. Kiểm soát ẩn/hiện nút "+ Thêm Lỗi Bề Mặt" ở Header
+    const addSurfBtn = document.querySelector("button[onclick*='openSurfaceModal(null)']");
+    if (addSurfBtn) {
+        if (CURRENT_TAB === 'surface' && CURRENT_GRADE === 'SAE1006') {
+            addSurfBtn.style.display = 'block';
+        } else {
+            addSurfBtn.style.display = 'none';
+        }
+    }
+    
+    // 2. Lọc keys theo tab hiện tại
+    let keys = Object.keys(config).filter(k => {
         const grp = config[k].group;
         if(CURRENT_TAB === 'surface') return grp === 'surface';
         if(CURRENT_TAB === 'geometry') return grp === 'geometry';
@@ -203,117 +350,416 @@ function renderDefectTable() {
         return false;
     });
 
+    // Sắp xếp thứ tự hiển thị cố định
+    const PREDEFINED_ORDER = [
+        'YieldPoint', 'Tensile', 'Elongation', 'Hardness', 'ImpactEnergy',
+        'C', 'Mn', 'Si', 'P', 'S', 'Cu', 'Cr', 'Ni', 'Mo', 
+        'V', 'Ti', 'Al', 'Ca', 'B', 'Nb', 'CEV', 'O', 'N', 'H'
+    ];
+    keys.sort((a, b) => {
+        const indexA = PREDEFINED_ORDER.indexOf(a);
+        const indexB = PREDEFINED_ORDER.indexOf(b);
+        if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+        if (indexA !== -1) return -1;
+        if (indexB !== -1) return 1;
+        return a.localeCompare(b);
+    });
+
+    // 3. Tiến hành Render danh sách hàng cấu hình
     tbody.innerHTML = keys.map(key => {
         const item = config[key];
         const binsStr = item.bins ? item.bins.map(b => b === 'inf' ? '∞' : b).join(' | ') : '---';
         const badgeClass = item.group === 'surface' ? 'grp-surface' : (item.group === 'geometry' ? 'grp-geo' : 'grp-prop');
+        const isDeletable = !PROTECTED_KEYS.includes(key);
         
+        const editFunc = (item.mode === 'matrix') ? `openSurfaceModal('${key}')` : `openEditModal('${key}')`;
+
+        // KIỂM TRA ĐIỀU KIỆN RÀNG BUỘC BỀ MẶT
+        const isSurface = item.group === 'surface';
+        const canEdit = !isSurface || (CURRENT_GRADE === 'SAE1006');
+
         return `
             <div class="cfg-row">
                 <div style="font-weight:bold">${key}</div>
                 <div><span class="badge-grp ${badgeClass}">${item.group}</span></div>
                 <div style="color:#64748b; font-size:0.9em;">Phân giải: [ ${binsStr} ]</div>
-                <div>
-                    <button class="btn-reset" onclick="openEditModal('${key}')">✎ Sửa</button>
+                <div style="display: flex; gap: 8px;">
+                    ${canEdit ? 
+                        `<button class="btn-reset" onclick="${editFunc}">✎ Sửa</button>` : 
+                        `<button class="btn-reset" disabled style="background:#cbd5e1; color:#94a3b8; cursor:not-allowed; border-color:#cbd5e1;">🔒 Chỉ xem</button>`
+                    }
+                    ${isDeletable && canEdit ? `<button class="btn-del-grade" style="background:#fee2e2; border-color:#fecaca;" onclick="deleteCriterion('${key}')" title="Xóa chỉ tiêu này">✕</button>` : ''}
                 </div>
             </div>
         `;
     }).join('');
 }
 
-// 4. LOGIC MODAL & EDIT BINS
-function openEditModal(key) {
+// ==============================================================
+// BẮT ĐẦU: LOGIC MODAL MỚI CHO LỖI BỀ MẶT (MATRIX 2D)
+// ==============================================================
+let WORKING_SURF = null;
+
+function openSurfaceModal(key) {
     EDITING_KEY = key;
-    const item = ALL_CONFIGS[CURRENT_GRADE][key];
-    document.getElementById('modalDefectName').innerText = `Sửa: ${key} (${CURRENT_GRADE})`;
-    document.getElementById('editModal').style.display = 'flex';
+    const isNew = (key === null);
     
-    renderBinInputs(item);
+    // Set Header & Input code
+    document.getElementById('surfCode').value = isNew ? "" : key;
+    document.getElementById('surfCode').disabled = !isNew;
+    document.getElementById('surfModalTitle').innerText = isNew ? "Thêm Lỗi Bề Mặt Mới" : `Sửa cấu hình Bề mặt: ${key}`;
+
+    // Lấy template: Nếu thêm mới thì copy từ MI của SAE1006 cho chuẩn. Nếu sửa thì lấy chính nó.
+    if (isNew) {
+        let template = ALL_CONFIGS[CURRENT_GRADE]['MI'];
+        if(!template) template = ALL_CONFIGS['SAE1006']['MI']; // Fallback
+        WORKING_SURF = JSON.parse(JSON.stringify(template));
+        WORKING_SURF.target_defect = "";
+    } else {
+        WORKING_SURF = JSON.parse(JSON.stringify(ALL_CONFIGS[CURRENT_GRADE][key]));
+    }
+
+    renderSurfaceInputs();
+    updateSurfacePreview();
+    document.getElementById('surfaceModal').style.display = 'flex';
 }
 
-function renderBinInputs(item) {
+function renderSurfaceInputs() {
+    // Render 6 Input cho Bins (Kích thước) - Cho phép sửa mốc đầu tiên (index 0)
+    const binContainer = document.getElementById('surfBinsInputs');
+    let bins = WORKING_SURF.bins;
+    
+    // Thay đổi chỗ này: Lặp từ 0 đến 5
+    binContainer.innerHTML = [0,1,2,3,4,5].map(i => `
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:12px; font-weight:600; width:80px; color:#475569;">
+                ${i === 0 ? 'Mốc Bắt đầu:' : 'Mốc ' + i + ':'}
+            </span>
+            <input type="number" class="surf-bin-val surf-input" value="${bins[i] !== undefined ? bins[i] : 0}" oninput="updateSurfacePreview()" style="flex:1;">
+        </div>
+    `).join('');
+
+    // Render 3 Input cho Limits (Số lượng) - Giữ nguyên
+    const countContainer = document.getElementById('surfCountInputs');
+    let limits = WORKING_SURF.count_limits;
+    countContainer.innerHTML = [0,1,2].map(i => `
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:12px; font-weight:600; width:50px; color:#166534;">Dưới:</span>
+            <input type="number" class="surf-limit-val surf-input" value="${limits[i]}" oninput="updateSurfacePreview()" style="flex:1;">
+        </div>
+    `).join('');
+}
+
+function updateSurfacePreview() {
+    const binInputs = document.querySelectorAll('.surf-bin-val');
+    const limitInputs = document.querySelectorAll('.surf-limit-val');
+    
+    // Gom dữ liệu (BỎ [0, ...] vì lấy trực tiếp từ input)
+    const newBins = [...Array.from(binInputs).map(i => parseFloat(i.value) || 0), 'inf'];
+    const newLimits = [...Array.from(limitInputs).map(i => parseFloat(i.value) || 0), 'inf'];
+
+    // Tính Labels dọc (Size)
+    const sizeLabels = [];
+    for(let i=0; i < newBins.length - 1; i++) {
+        // Sửa logic: Mốc đầu tiên lấy đúng số người dùng nhập
+        let start = (i === 0) ? parseInt(newBins[0]) : parseInt(newBins[i]) + 1;
+        let end = newBins[i+1];
+        sizeLabels.push(end === 'inf' ? `>${newBins[i]}` : `${start} - ${end}`);
+    }
+
+    // Tính Labels ngang (Count)
+    const countLabels = ['0'];
+    for(let i=0; i < newLimits.length; i++) {
+        let start = (i === 0) ? 1 : parseInt(newLimits[i-1]) + 1;
+        let end = newLimits[i];
+        countLabels.push(end === 'inf' ? `>${newLimits[i-1]}` : `${start} - ${end}`);
+    }
+
+    // Vẽ Bảng HTML
+    let html = `<table class="preview-table"><thead><tr><th>Kích thước \\ Số lượng</th>`;
+    countLabels.forEach(l => html += `<th>${l}</th>`);
+    html += `</tr></thead><tbody>`;
+
+    const matrix = WORKING_SURF.matrix_rules;
+    for(let r=0; r < 6; r++) {
+        html += `<tr><td style="font-weight:600; background:#f8fafc; color:#334155;">${sizeLabels[r]}</td>`;
+        html += `<td class="cell-c1">C1</td>`; // Cột 0 lỗi luôn luôn tốt (C1)
+        for(let c=0; c < 4; c++) {
+            let score = matrix[r][c];
+            html += `<td class="cell-c${score}">C${score}</td>`;
+        }
+        html += `</tr>`;
+    }
+    html += `</tbody></table>`;
+    document.getElementById('surfPreviewContainer').innerHTML = html;
+}
+
+function saveSurfaceConfig() {
+    const code = document.getElementById('surfCode').value.trim();
+    if(!code) return alert("Vui lòng nhập Mã Lỗi!");
+
+    const binInputs = document.querySelectorAll('.surf-bin-val');
+    const limitInputs = document.querySelectorAll('.surf-limit-val');
+    
+    // Thu thập Dữ liệu Input (BỎ [0, ...])
+    const bins = [...Array.from(binInputs).map(i => parseFloat(i.value) || 0), 'inf'];
+    const limits = [...Array.from(limitInputs).map(i => parseFloat(i.value) || 0), 'inf'];
+
+    // 1. Kiểm tra tính hợp lệ
+    for(let i=1; i < bins.length-1; i++) {
+        if(bins[i] <= bins[i-1]) return alert("Lỗi Kích Thước: Mốc " + i + " phải lớn hơn mốc trước nó!");
+    }
+    for(let i=1; i < limits.length-1; i++) {
+        if(limits[i] <= limits[i-1]) return alert("Lỗi Số lượng: Mốc " + (i+1) + " phải lớn hơn mốc trước nó!");
+    }
+
+    // 2. Build heatmap_cols đúng chuẩn Python
+    const heatmap = [[0, 0, '0']];
+    for(let i=0; i < limits.length; i++) {
+        let start = (i === 0) ? 1 : parseInt(limits[i-1]) + 1;
+        let end = limits[i];
+        let label = (end === 'inf') ? `>${limits[i-1]}` : `${start}-${end}`;
+        // Do Python đọc 'inf' dạng float, ta đẩy string 'inf' sang Backend rồi hàm sanitize tự cast
+        heatmap.push([start, end, label]);
+    }
+
+    // 3. Build Labels
+    const labels = [];
+    for(let i=0; i < bins.length - 1; i++) {
+        let start = (i === 0) ? parseInt(bins[0]) : parseInt(bins[i]) + 1;
+        let end = bins[i+1];
+        labels.push(end === 'inf' ? `>${bins[i]}` : `${start}-${end}`);
+    }
+
+    // Gán vào biến tổng
+    Object.keys(ALL_CONFIGS).forEach(grade => {
+        if (!ALL_CONFIGS[grade]) ALL_CONFIGS[grade] = {};
+        
+        ALL_CONFIGS[grade][code] = {
+            mode: 'matrix', 
+            group: 'surface', 
+            target_defect: code,
+            bins: bins, 
+            labels: labels,
+            count_limits: limits,
+            matrix_rules: WORKING_SURF.matrix_rules,
+            heatmap_cols: heatmap
+        };
+    });
+
+    closeSurfaceModal();
+    renderDefectTable();
+}
+
+function closeSurfaceModal() {
+    WORKING_SURF = null;
+    document.getElementById('surfaceModal').style.display = 'none';
+}
+// ==============================================================
+// KẾT THÚC LOGIC BỀ MẶT MỚI
+// ==============================================================
+
+
+// ==============================================================
+// LOGIC CŨ (CƠ LÝ/ HÓA HỌC) - GIỮ NGUYÊN 100% CỦA BẠN
+// ==============================================================
+let WORKING_ITEM = null; 
+
+function openEditModal(key) {
+    EDITING_KEY = key;
+    WORKING_ITEM = JSON.parse(JSON.stringify(ALL_CONFIGS[CURRENT_GRADE][key]));
+    document.getElementById('modalDefectName').innerText = `Sửa: ${key} (${CURRENT_GRADE})`;
+    document.getElementById('editModal').style.display = 'flex';
+    renderDynamicBins();
+}
+function renderDynamicBins() {
     const container = document.getElementById('binsContainer');
-    const bins = item.bins; 
-    const labels = item.labels; 
+    const bins = WORKING_ITEM.bins; 
+    const labels = WORKING_ITEM.labels; 
+    const scores = WORKING_ITEM.scores_value || [1,2,3,4,5,6];
     
     let html = '';
     for(let i=0; i < bins.length - 1; i++) {
         let start = bins[i];
         let end = bins[i+1];
-        let label = labels[i] || `Score ${i+1}`;
+        let currentLabel = labels[i] || `C${scores[i] || 1}`;
+        let currentScore = scores[i] || 1;
         
+        let selectHtml = `<select class="bin-score-select" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: bold; color: #1e293b; background: white; min-width: 90px; outline: none;">`;
+        for(let s = 1; s <= 6; s++) {
+            let isSel = (currentScore === s) ? 'selected' : '';
+            selectHtml += `<option value="${s}" ${isSel}>C${s}</option>`;
+        }
+        selectHtml += `</select>`;
+
         html += `
-            <div class="bin-row">
-                <span>Từ</span>
-                <input type="text" class="bin-input bin-start" value="${start}" onchange="syncBins(${i}, 'start', this.value)">
-                <span>đến</span>
-                <input type="text" class="bin-input bin-end" value="${end}" onchange="syncBins(${i}, 'end', this.value)">
-                <span style="margin:0 10px">➔</span>
-                <div class="bin-label">${label}</div>
+            <div class="bin-row" style="display: flex; gap: 15px; align-items: center; background: #f8fafc; padding: 12px 20px; border-radius: 8px; border: 1px solid #e2e8f0; transition: all 0.2s;">
+                <span style="font-weight: bold; width: 30px; color: #64748b; font-size: 15px;">#${i+1}</span>
+                <span style="color: #475569; font-weight: 500;">Từ</span>
+                <input type="text" class="bin-input bin-start" value="${start}" onchange="syncDynamicBins(${i}, 'start', this.value)" style="width: 90px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center; font-family: monospace; font-size: 14px; outline: none;">
+                <span style="color: #475569; font-weight: 500;">đến</span>
+                <input type="text" class="bin-input bin-end" value="${end}" onchange="syncDynamicBins(${i}, 'end', this.value)" style="width: 90px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center; font-family: monospace; font-size: 14px; outline: none;">
+                <span style="margin:0 15px; color: #94a3b8; font-size: 18px;">➔</span>
+                ${selectHtml}
+                <div style="flex-grow: 1;"></div>
+                <button onclick="removeBinRow(${i})" title="Xóa khoảng này" style="background: #fee2e2; color: #dc2626; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center;">✕</button>
             </div>
         `;
     }
     container.innerHTML = html;
 }
-
-function syncBins(idx, type, val) {
-    const inputsStart = document.querySelectorAll('.bin-start');
-    const inputsEnd = document.querySelectorAll('.bin-end');
-    
-    if(type === 'end') {
-        if(idx + 1 < inputsStart.length) {
-            inputsStart[idx+1].value = val;
-        }
-    } else if(type === 'start') {
-        if(idx - 1 >= 0) {
-            inputsEnd[idx-1].value = val;
-        }
+function syncDynamicBins(idx, type, val) {
+    if(type === 'end') WORKING_ITEM.bins[idx+1] = parseVal(val);
+    else if(type === 'start') WORKING_ITEM.bins[idx] = parseVal(val);
+    renderDynamicBins(); 
+}
+function removeBinRow(idx) {
+    if(WORKING_ITEM.bins.length <= 2) return alert("Phải có ít nhất 1 khoảng!");
+    WORKING_ITEM.bins.splice(idx + 1, 1);
+    WORKING_ITEM.labels.splice(idx, 1);
+    WORKING_ITEM.scores_value.splice(idx, 1);
+    renderDynamicBins();
+}
+function addNewBinRow() {
+    let len = WORKING_ITEM.bins.length;
+    let lastVal = WORKING_ITEM.bins[len - 2]; 
+    let newVal = typeof lastVal === 'number' ? lastVal + 10 : 0;
+    WORKING_ITEM.bins.splice(len - 1, 0, newVal);
+    WORKING_ITEM.labels.push('C6');
+    WORKING_ITEM.scores_value.push(6);
+    renderDynamicBins();
+}
+function applyTemplateToEdit() {
+    const scaleType = document.getElementById('editScaleTemplate').value;
+    if (scaleType === 'linear') {
+        WORKING_ITEM.bins = [0, 10, 20, 30, 40, 50, 'inf'];
+        WORKING_ITEM.labels = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'];
+        WORKING_ITEM.scores_value = [1, 2, 3, 4, 5, 6];
+    } else if (scaleType === 'two_ends') {
+        WORKING_ITEM.bins = [0, 10, 20, 30, 40, 50, 60, 'inf'];
+        WORKING_ITEM.labels = ['C6', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6'];
+        WORKING_ITEM.scores_value = [6, 1, 2, 3, 4, 5, 6];
+    } else if (scaleType === 'reverse') {
+        WORKING_ITEM.bins = [0, 10, 20, 30, 40, 50, 'inf'];
+        WORKING_ITEM.labels = ['C6', 'C5', 'C4', 'C3', 'C2', 'C1'];
+        WORKING_ITEM.scores_value = [6, 5, 4, 3, 2, 1];
     }
+    renderDynamicBins();
 }
-
-function closeEditModal() {
-    document.getElementById('editModal').style.display = 'none';
-}
-
 function applyChanges() {
     if(!EDITING_KEY || !CURRENT_GRADE) return;
-    
-    const inputsStart = document.querySelectorAll('.bin-start');
-    const inputsEnd = document.querySelectorAll('.bin-end');
-    
-    let newBins = [];
-    newBins.push(parseVal(inputsStart[0].value));
-    
-    inputsEnd.forEach(inp => {
-        newBins.push(parseVal(inp.value));
+    const selects = document.querySelectorAll('.bin-score-select');
+    let newLabels = [];
+    let newScores = [];
+    selects.forEach(sel => {
+        let val = parseInt(sel.value);
+        newScores.push(val);
+        newLabels.push(`C${val}`);
     });
-    
-    ALL_CONFIGS[CURRENT_GRADE][EDITING_KEY].bins = newBins;
-    
+    WORKING_ITEM.labels = newLabels;
+    WORKING_ITEM.scores_value = newScores;
+    ALL_CONFIGS[CURRENT_GRADE][EDITING_KEY] = JSON.parse(JSON.stringify(WORKING_ITEM));
     closeEditModal();
     renderDefectTable();
 }
+function closeEditModal() {
+    WORKING_ITEM = null;
+    document.getElementById('editModal').style.display = 'none';
+}
 
+// ==============================================================
+// LOGIC CHUNG
+// ==============================================================
+function deleteCriterion(key) {
+    if (!confirm(`Bạn có chắc chắn muốn xóa hoàn toàn chỉ tiêu [${key}]?\nLưu ý: Đối với lỗi BỀ MẶT, hệ thống sẽ xóa khỏi TẤT CẢ mác thép.`)) return;
+    
+    if (CURRENT_TAB === 'surface') {
+        // [BỔ SUNG DÒNG NÀY] Khóa bảo vệ an toàn
+        if (CURRENT_GRADE !== 'SAE1006') return alert("Hành động không hợp lệ! Chỉ được phép xóa cấu hình bề mặt từ mác SAE1006.");
+        
+        // Nếu là tab bề mặt, duyệt qua và xóa sạch ở tất cả các mác
+        Object.keys(ALL_CONFIGS).forEach(grade => {
+            if (ALL_CONFIGS[grade] && ALL_CONFIGS[grade][key]) {
+                delete ALL_CONFIGS[grade][key];
+            }
+        });
+    } else {
+        // Các tab Cơ lý/Hình học/Hóa học thì giữ nguyên logic cũ (chỉ xóa ở mác hiện tại)
+        if (ALL_CONFIGS[CURRENT_GRADE] && ALL_CONFIGS[CURRENT_GRADE][key]) {
+            delete ALL_CONFIGS[CURRENT_GRADE][key];
+        }
+    }
+    renderDefectTable();
+}
 function parseVal(v) {
     if(v === 'inf' || v === '∞') return 'inf';
     return parseFloat(v);
 }
-
-// 5. SAVE TO BACKEND
-async function saveAllConfigs() {
-    if(!confirm('Lưu toàn bộ thay đổi?')) return;
+function openAddCriterionModal() {
+    if (!CURRENT_GRADE) return alert("Vui lòng chọn một Mác thép ở cột bên trái trước!");
+    if (CURRENT_TAB !== 'mechanical') switchTab('mechanical'); 
+    document.getElementById('addCriterionModal').style.display = 'flex';
+}
+function confirmAddCriterion() {
+    const selectEl = document.getElementById('newCritCode');
+    const code = selectEl.value;
+    const labelText = selectEl.options[selectEl.selectedIndex].text;
+    const scaleType = document.getElementById('scaleType').value;
+    if (ALL_CONFIGS[CURRENT_GRADE][code]) return alert(`Chỉ tiêu ${code} đã tồn tại trong Mác ${CURRENT_GRADE}!`);
     
+    let defaultBins, defaultLabels, defaultScores;
+    if (scaleType === 'linear') {
+        defaultBins = [0, 0.01, 0.02, 0.03, 0.04, 0.05, 'inf'];
+        defaultLabels = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'];
+        defaultScores = [1, 2, 3, 4, 5, 6];
+    } else if (scaleType === 'two_ends') {
+        defaultBins = [0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 'inf'];
+        defaultLabels = ['C6', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6'];
+        defaultScores = [6, 1, 2, 3, 4, 5, 6];
+    } else if (scaleType === 'reverse') {
+        defaultBins = [0, 10, 20, 30, 40, 50, 'inf'];
+        defaultLabels = ['C6', 'C5', 'C4', 'C3', 'C2', 'C1'];
+        defaultScores = [6, 5, 4, 3, 2, 1];
+    }
+    let groupType = (code === 'ImpactEnergy') ? 'mechanical' : 'chemical';
+
+    ALL_CONFIGS[CURRENT_GRADE][code] = {
+        mode: 'value', group: groupType, label: labelText, col: code, 
+        bins: defaultBins, labels: defaultLabels, scores_value: defaultScores, heatmap_cols: [[1, 1, 'SL']]
+    };
+    document.getElementById('addCriterionModal').style.display = 'none';
+    renderDefectTable();
+    setTimeout(() => { openEditModal(code); }, 100);
+}
+async function triggerRecalc() {
+    if (!CURRENT_GRADE) return alert("Vui lòng chọn Mác thép cần tính lại!");
+    if (!confirm(`Hệ thống sẽ tìm tất cả cuộn thép cũ thuộc mác [${CURRENT_GRADE}] và chấm lại điểm theo cấu hình mới.\n\nBạn có chắc chắn không?`)) return;
+    const btn = event.target;
+    const oldText = btn.innerText;
+    btn.innerText = "⏳ Đang tính...";
+    btn.disabled = true;
+    try {
+        await saveAllConfigs(false); 
+        const res = await fetch('/api/recalc_scores_by_grade', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ grade: CURRENT_GRADE })
+        });
+        const d = await res.json();
+        if(d.status === 'success') alert("✅ Thành công: " + d.msg);
+        else alert("❌ Lỗi: " + d.msg);
+    } catch(e) { alert("Lỗi kết nối: " + e); } 
+    finally { btn.innerText = oldText; btn.disabled = false; }
+}
+async function saveAllConfigs(showAlert = true) {
+    if(showAlert && !confirm('Lưu toàn bộ thay đổi?')) return;
     try {
         const res = await fetch('/api/grade_configs', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(ALL_CONFIGS)
         });
         const d = await res.json();
-        alert(d.msg);
-    } catch(e) {
-        alert('Lỗi lưu: ' + e);
-    }
+        if(showAlert) alert(d.msg);
+    } catch(e) { alert('Lỗi lưu: ' + e); }
 }
 </script>
 {% endblock %}

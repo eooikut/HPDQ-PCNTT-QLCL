@@ -6,106 +6,278 @@
     <title>{% block title %}Hệ Thống QC{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/qlcl.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.0.2"></script>
     {% block head %}{% endblock %}
 </head>
 <style>
-    /* CSS cho Toast Notification */
+    /* --- TOAST NOTIFICATION MODERN --- */
     .toast-notification {
         position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background-color: #0f172a;
+        bottom: 30px;
+        right: 30px;
+        background: rgba(15, 23, 42, 0.95); /* Màu tối sang trọng */
+        backdrop-filter: blur(10px);
         color: white;
-        padding: 15px 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        display: none; /* Mặc định ẩn */
+        padding: 0;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1);
+        display: none;
         z-index: 9999;
-        animation: slideIn 0.3s ease-out;
-        border-left: 5px solid #16a34a;
-        max-width: 350px;
+        animation: slideInRight 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        max-width: 400px;
+        overflow: hidden;
+        border-left: 6px solid #22c55e; /* Vạch xanh Success */
     }
-    .toast-content { display: flex; align-items: center; gap: 15px; }
-    .toast-btn {
-        background: #16a34a; color: white; border: none; 
-        padding: 5px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;
+
+    .toast-body {
+        padding: 16px 20px;
+        display: flex;
+        align-items: flex-start;
+        gap: 15px;
     }
-    .toast-btn:hover { background: #15803d; }
-    .notification-wrapper {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-}
-.notification-badge {
-    position: absolute;
-    top: -5px;
-    right: -8px; /* Chỉnh vị trí chấm đỏ */
-    background-color: #ef4444; /* Màu đỏ */
-    color: white;
-    font-size: 0.7em;
-    font-weight: bold;
-    padding: 2px 6px;
-    border-radius: 10px;
-    min-width: 18px;
-    text-align: center;
-    border: 2px solid white; /* Viền trắng cho nổi */
-    display: none; /* Mặc định ẩn */
-    animation: popIn 0.3s ease;
-}
-    @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+    .toast-icon {
+        font-size: 1.5rem;
+        background: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .toast-info h4 { margin: 0 0 4px 0; font-size: 1rem; font-weight: 700; color: #fff; }
+    .toast-info p { margin: 0; font-size: 0.9rem; color: #94a3b8; line-height: 1.4; }
+
+    .toast-close {
+        background: transparent; border: none; color: #64748b;
+        font-size: 1.2rem; cursor: pointer; margin-left: auto;
+    }
+    .toast-close:hover { color: #fff; }
+
+    /* --- BELL BADGE ANIMATION --- */
+    .notification-wrapper { position: relative; cursor: pointer; }
+    
+    .notification-badge {
+        position: absolute;
+        top: -6px; right: -6px;
+        background: #ef4444;
+        color: white;
+        font-size: 0.7rem;
+        font-weight: 800;
+        min-width: 18px; height: 18px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        border: 2px solid #fff;
+        box-shadow: 0 2px 5px rgba(239, 68, 68, 0.5);
+        animation: pulse-red 2s infinite;
+    }
+    /* --- TRẠNG THÁI SIDEBAR THU NHỎ (COLLAPSED) --- */
+    .sidebar.collapsed {
+        width: 70px; /* Thu nhỏ còn 70px */
+    }
+
+    /* 1. Chỉ ẩn Logo, Divider và Footer. 
+       CỐ TÌNH KHÔNG ẨN .nav-text để tái sử dụng nó làm Tooltip */
+    .sidebar.collapsed .sidebar-header h2,
+    .sidebar.collapsed .nav-divider,
+    .sidebar.collapsed .sidebar-footer {
+        display: none;
+    }
+
+    /* 2. Fix lỗi bị cắt Tooltip do thanh cuộn mặc định của Sidebar */
+    .sidebar.collapsed .sidebar-nav {
+        overflow: visible; 
+    }
+
+    /* 3. Căn giữa Icon khi thu nhỏ */
+    .sidebar.collapsed .nav-item {
+        justify-content: center;
+        padding: 12px 0;
+        position: relative; /* Làm điểm tựa (anchor) cho Tooltip */
+    }
+
+    .sidebar.collapsed .nav-item .icon {
+        margin-right: 0;
+        font-size: 1.4em; 
+    }
+
+    /* 4. BIẾN NAV-TEXT THÀNH TOOLTIP NỔI BÊN CẠNH */
+    .sidebar.collapsed .nav-item .nav-text {
+        display: block;
+        position: absolute;
+        left: 50px; /* Vị trí bắt đầu để tạo đà trượt */
+        top: 50%;
+        transform: translateY(-50%);
+        
+        background-color: #1e293b; /* Cùng tông màu sidebar */
+        color: #fff !important; 
+        padding: 8px 14px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        white-space: nowrap;
+        margin-left: 0 !important; /* Đè lại margin-left inline nếu có */
+        
+        /* Ẩn mặc định */
+        opacity: 0;
+        visibility: hidden;
+        z-index: 10000; /* Nổi lên trên cùng */
+        
+        /* Hiệu ứng bóng đổ và viền mảnh */
+        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.3);
+        border: 1px solid #334155;
+        
+        /* Animation trượt ra mềm mại */
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        pointer-events: none; /* Chuột không vô tình vướng vào tooltip */
+    }
+
+    /* Tạo mũi tên tam giác chỉ vào icon */
+    .sidebar.collapsed .nav-item .nav-text::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: -6px;
+        transform: translateY(-50%);
+        border-width: 6px 6px 6px 0;
+        border-style: solid;
+        border-color: transparent #334155 transparent transparent; /* Viền mũi tên */
+    }
+    .sidebar.collapsed .nav-item .nav-text::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: -4px;
+        transform: translateY(-50%);
+        border-width: 5px 5px 5px 0;
+        border-style: solid;
+        border-color: transparent #1e293b transparent transparent; /* Nền mũi tên */
+    }
+
+    /* 5. HIỆU ỨNG HOVER: TRƯỢT RA HIỂN THỊ */
+    .sidebar.collapsed .nav-item:hover .nav-text {
+        opacity: 1;
+        visibility: visible;
+        left: 75px; /* Trượt từ 50px ra 75px */
+    }
+
+    /* 6. Nút Toggle ☰ căn giữa */
+    .sidebar.collapsed .sidebar-header {
+        justify-content: center;
+        padding: 0;
+    }
+    .toggle-btn {
+        background: transparent;
+        border: none;
+        color: #cbd5e1;
+        font-size: 1.4rem;
+        cursor: pointer;
+        transition: color 0.2s, transform 0.2s;
+        padding: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .toggle-btn:hover {
+        color: white;
+        transform: scale(1.1);
+    }
+    /* Hiệu ứng rung chuông khi có tin mới */
+    .bell-shake { animation: bellShake 0.8s cubic-bezier(.36,.07,.19,.97) both; }
+
+    @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+    @keyframes bellShake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
 </style>
 <body>
 
 <div id="updateToast" class="toast-notification">
-    <div class="toast-content">
-        <div>
-            <div style="font-weight:bold; margin-bottom:2px;">🔔 Dữ liệu mới!</div>
-            <div id="toastMsg" style="font-size:0.9em; color:#cbd5e1;">Hệ thống vừa cập nhật cuộn thép mới.</div>
+    <div class="toast-body">
+        <div class="toast-icon">✨</div>
+        <div class="toast-info">
+            <h4 id="toastTitle">Cập nhật dữ liệu</h4>
+            <p id="toastMsg">Hệ thống vừa cập nhật dữ liệu mới.</p>
         </div>
-        <button class="toast-btn" onclick="location.reload()">F5 Ngay</button>
-        <button class="btn-reset" onclick="closeToast()" style="color:#94a3b8; margin-left:5px;">✕</button>
+        <button class="toast-close" onclick="closeToast()">✕</button>
     </div>
 </div>
-
 <div class="app-container">
-    <aside class="sidebar">
-        <div class="sidebar-header">
-            <h2>🏭 QC SYSTEM</h2>
+<aside class="sidebar" id="appSidebar"> <div class="sidebar-header">
+            <h2 class="nav-text">🏭 QC SYSTEM</h2>
+            <button class="toggle-btn" onclick="toggleSidebar()" title="Đóng/Mở Menu">☰</button>
         </div>
         
         <nav class="sidebar-nav">
-            <a href="/qlcl" class="nav-item {{ 'active' if request.endpoint == 'qlcl' else '' }}">
-                <span class="icon">📊</span> Dashboard QC
+            <a href="/qlcl" class="nav-item {{ 'active' if request.path.startswith('/qlcl') else '' }}">
+                <span class="icon">📊</span> <span class="nav-text">Dashboard QC</span>
+            </a>
+			<a href="/heatmap_dashboard" class="nav-item {{ 'active' if request.path.startswith('/heatmap_dashboard') else '' }}">
+                <span class="icon">🗂️</span> <span class="nav-text">Phân bố Chất lượng</span>
+            </a>
+            <a href="/cpk_dashboard" class="nav-item {{ 'active' if request.path.startswith('/cpk_dashboard') else '' }}">
+                <span class="icon">📈</span> <span class="nav-text">Dashboard CPK</span>
+            </a>
+            <a href="/tdc_dashboard" class="nav-item {{ 'active' if request.path.startswith('/tdc_dashboard') else '' }}">
+                <span class="icon">📉</span> <span class="nav-text">Báo cáo Khiếu nại</span>
             </a>
             
-            <div class="nav-divider">QUẢN LÝ ĐƠN HÀNG</div>
+            <div class="nav-divider nav-text">QUẢN LÝ ĐƠN HÀNG</div>
             
-            <a href="/tdc_manager" class="nav-item {{ 'active' if request.endpoint == 'tdc_manager' else '' }}">
-                <span class="icon">📑</span> Quản lý TDC
+            <a href="/tdc_manager" class="nav-item {{ 'active' if request.path.startswith('/tdc_manager') else '' }}">
+                <span class="icon">📑</span> <span class="nav-text">Quản lý TDC</span>
             </a>
-            <a href="/allocation_run" class="nav-item {{ 'active' if request.endpoint == 'allocation_run' else '' }}">
-                <span class="icon">🚀</span> Chạy Phân Bổ
+            <a href="/order_rules" class="nav-item {{ 'active' if request.path.startswith('/order_rules') else '' }}">
+                <span class="icon">📋</span> <span class="nav-text">Quản lý Order - TDC</span>
             </a>
-            <a href="/allocation_history" class="nav-item {{ 'active' if request.endpoint == 'allocation_history' else '' }}">
-                <span class="icon">📦</span> Lịch sử Mapping
+            {% if 'allocation_run' in session.get('permissions', []) or session.get('role') == 'admin' %}
+            <a href="/allocation_run" class="nav-item {{ 'active' if request.path.startswith('/allocation_run') else '' }}">
+                <span class="icon">🚀</span> <span class="nav-text">Chạy Phân Bổ</span>
             </a>
+            {% endif %}
 
-            <div class="nav-divider">HỆ THỐNG</div>
+            {% if 'allocation_history' in session.get('permissions', []) or session.get('role') == 'admin' %}
+            <a href="/allocation_history" class="nav-item {{ 'active' if request.path.startswith('/allocation_history') else '' }}">
+                <span class="icon">📦</span> <span class="nav-text">Lịch sử Mapping</span>
+            </a>
+            {% endif %}
+            
             <a href="#" class="nav-item" onclick="openLogModal()">
-                <span class="icon">🔔</span> Thông báo
+                <div class="notification-wrapper">
+                    <span class="icon">🔔</span>
+                    <span id="notifBadge" class="notification-badge">0</span>
+                </div>
+                <span class="nav-text" style="margin-left: 10px;">Thông báo</span>
             </a>
 
-            <div class="nav-divider">CẤU HÌNH</div>
+            <div class="nav-divider nav-text">CẤU HÌNH</div>
 
-            <a href="/config_page" class="nav-item {{ 'active' if request.endpoint == 'config_page' else '' }}">
-                <span class="icon">⚙️</span> Cấu hình Mác Thép
+            {% if 'config_manage' in session.get('permissions', []) or session.get('role') == 'admin' %}
+            <a href="/config_page" class="nav-item {{ 'active' if request.path.startswith('/config_page') else '' }}">
+                <span class="icon">⚙️</span> <span class="nav-text">Cấu hình Mác Thép</span>
             </a>
+            {% endif %}
         </nav>
 
-        <div class="sidebar-footer">
-            <div class="user-info">
-                <span>👤 Admin User</span>
-            </div>
+        <div class="user-profile" style="display: flex; align-items: center; gap: 15px;">
+            <span class="user-name" style="font-weight: 600; color: #334155;">
+                👤 {{ session.get('username', 'Người dùng') }}
+            </span>
+
+            <a href="{{ url_for('auth.logout') }}" class="btn-logout" 
+            style="display: flex; align-items: center; gap: 5px; padding: 6px 12px; background-color: #ef4444; color: white; text-decoration: none; border-radius: 6px; font-size: 0.85em; font-weight: bold; transition: background 0.2s;"
+            onmouseover="this.style.backgroundColor='#dc2626'" 
+            onmouseout="this.style.backgroundColor='#ef4444'">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Đăng xuất
+            </a>
         </div>
     </aside>
 
@@ -135,94 +307,157 @@
 </div>
 
 <script>
-    // --- A. LOGIC HIỂN THỊ TOAST (POLLING) ---
-    // (Phần này đang thiếu trong file của bạn)
-    let localLastUpdate = 0;
+    // --- BIẾN TOÀN CỤC ---
+    let localLastUpdateTS = 0; 
+    let isFirstLoad = true;    
 
-    // Lấy thời gian update hiện tại khi mới vào trang
-    fetch('/api/check_new_data')
-        .then(r => r.json())
-        .then(d => { localLastUpdate = d.timestamp; })
-        .catch(e => console.log("Init check failed", e));
-
-    // Định kỳ 10 giây hỏi server 1 lần
-    setInterval(() => {
-        fetch('/api/check_new_data')
-            .then(r => r.json())
-            .then(data => {
-                // Nếu server có thời gian mới hơn -> Hiện Toast
-                if (data.timestamp > localLastUpdate) {
-                    localLastUpdate = data.timestamp;
-                    showToast(data.message);
-                }
-            })
-            .catch(e => console.log("Check update error", e));
-    }, 10000); // 10s
-
-    function showToast(msg) {
+    // --- 1. HÀM HIỂN THỊ TOAST ---
+    function showToast(msg, title="Thông báo hệ thống") {
         const t = document.getElementById('updateToast');
-        if (msg) document.getElementById('toastMsg').innerText = msg;
+        document.getElementById('toastMsg').innerText = msg;
+        document.getElementById('toastTitle').innerText = title;
+        
         t.style.display = 'block';
-        setTimeout(() => { t.style.display = 'none'; }, 10000); // Tự tắt sau 10s
+        
+        if(window.toastTimeout) clearTimeout(window.toastTimeout);
+        window.toastTimeout = setTimeout(() => { 
+            t.style.display = 'none'; 
+        }, 10000);
+    }
+    
+    function closeToast() { 
+        document.getElementById('updateToast').style.display = 'none'; 
+    }
+    function getCurrentFactory() {
+    // 1. Ưu tiên lấy từ URL (?factory=HRC2)
+    const urlParams = new URLSearchParams(window.location.search);
+    const factoryInUrl = urlParams.get('factory');
+    if (factoryInUrl) return factoryInUrl;
+
+    // 2. Nếu không có URL, lấy từ Dropdown (nếu đang ở trang Dashboard)
+    const select = document.getElementById('globalFactorySelect');
+    if (select) return select.value;
+
+    // 3. Mặc định
+    return 'HRC1';
+}
+    async function updateUnreadCount() {
+        try {
+            const factory = getCurrentFactory();
+            const res = await fetch(`/api/get_unread_count?factory=${factory}`);
+            const data = await res.json();
+            const badge = document.getElementById('notifBadge');
+            
+            if (data.count > 0) {
+                badge.style.display = 'flex';
+                badge.innerText = data.count > 99 ? '99+' : data.count;
+                const bell = document.querySelector('.notification-wrapper .icon');
+                if(bell) {
+                    bell.classList.remove('bell-shake');
+                    void bell.offsetWidth; 
+                    bell.classList.add('bell-shake');
+                }
+            } else {
+                badge.style.display = 'none';
+            }
+        } catch(e) {}
     }
 
-    function closeToast() {
-        document.getElementById('updateToast').style.display = 'none';
-    }
+    setInterval(() => {
+        const factory = getCurrentFactory();
+        fetch(`/api/check_new_data?factory=${factory}`)
+        .then(response => response.json())
+        .then(data => {
+            if (isFirstLoad) {
+                localLastUpdateTS = data.timestamp;
+                isFirstLoad = false;
+                updateUnreadCount(); 
+                return;
+            }
+            if (data.timestamp > localLastUpdateTS) {
+                console.log("🔥 Phát hiện dữ liệu mới:", data.message);
+                
+                localLastUpdateTS = data.timestamp;
 
-    // --- B. LOGIC MODAL LỊCH SỬ ---
+                let parts = data.message.split(': ');
+                let title = parts.length > 1 ? parts[0] : 'Hệ Thống';
+                let content = parts.length > 1 ? parts.slice(1).join(': ') : data.message;
+
+                showToast(content, title);
+
+                updateUnreadCount();
+            
+                if (document.getElementById('logModal').style.display === 'flex') {
+                    fetchLogs(); 
+                }
+            }
+        })
+        .catch(err => console.error("Polling error (có thể bỏ qua):", err));
+
+    }, 10000); 
     function openLogModal() {
+        const factory = getCurrentFactory();
         document.getElementById('logModal').style.display = 'flex';
+        const badge = document.getElementById('notifBadge');
+        if (badge) {
+            badge.innerText = '0';
+            badge.style.display = 'none';
+            const bell = document.querySelector('.notification-wrapper .icon');
+            if(bell) bell.classList.remove('bell-shake');
+        }
         fetchLogs();
+        fetch(`/api/mark_all_read?factory=${factory}`, { method: 'POST' }).catch(err => console.error("Lỗi mark_read ngầm:", err));
+    }
+    function toggleSidebar() {
+        const sidebar = document.getElementById('appSidebar');
+        sidebar.classList.toggle('collapsed');
+        
+        // Lưu trạng thái vào trình duyệt
+        const isCollapsed = sidebar.classList.contains('collapsed');
+        localStorage.setItem('isSidebarCollapsed', isCollapsed);
     }
 
+    // Tự động giữ trạng thái khi tải lại trang hoặc chuyển trang
+    document.addEventListener('DOMContentLoaded', () => {
+        const isCollapsed = localStorage.getItem('isSidebarCollapsed');
+        if (isCollapsed === 'true') {
+            document.getElementById('appSidebar').classList.add('collapsed');
+        }
+    });
     async function fetchLogs() {
         const div = document.getElementById('logListBody');
+        const factory = getCurrentFactory();
         div.innerHTML = '<div style="padding:20px; text-align:center;">⏳ Đang tải...</div>';
-        
         try {
-            const res = await fetch('/api/get_system_logs');
+            const res = await fetch(`/api/get_system_logs?factory=${factory}`);
             const logs = await res.json();
-            
             if (logs.length === 0) {
                 div.innerHTML = '<div style="padding:40px; text-align:center; color:#94a3b8;">Chưa có thông báo nào.</div>';
                 return;
             }
-
             let html = '';
             logs.forEach(log => {
-                let icon = 'ℹ️';
-                let bg = '#f1f5f9';
+                let icon = 'ℹ️'; let bg = '#f1f5f9';
                 if (log.type === 'success') { icon = '✅'; bg = '#f0fdf4'; }
                 if (log.type === 'warning') { icon = '⚠️'; bg = '#fffbeb'; }
                 if (log.type === 'error')   { icon = '❌'; bg = '#fef2f2'; }
 
                 html += `
-                <div style="padding:12px 20px; border-bottom:1px solid #f1f5f9; display:flex; gap:15px; align-items:start; transition:0.2s; hover:background:#f8fafc;">
-                    <div style="background:${bg}; width:35px; height:35px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-size:1.1em; flex-shrink:0;">
-                        ${icon}
-                    </div>
+                <div style="padding:12px 20px; border-bottom:1px solid #f1f5f9; display:flex; gap:15px; align-items:start;">
+                    <div style="background:${bg}; width:35px; height:35px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-size:1.1em; flex-shrink:0;">${icon}</div>
                     <div style="flex:1;">
                         <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                             <span style="font-weight:700; color:#334155;">${log.title || 'Thông báo'}</span>
                             <span style="font-size:0.8em; color:#94a3b8;">${log.time}</span>
                         </div>
-                        <div style="font-size:0.95em; color:#475569; line-height:1.4;">
-                            ${log.message}
-                        </div>
+                        <div style="font-size:0.95em; color:#475569; line-height:1.4;">${log.message}</div>
                     </div>
                 </div>`;
             });
             div.innerHTML = html;
-        } catch(e) {
-            div.innerHTML = `<div style="padding:20px; text-align:center; color:red;">Lỗi: ${e}</div>`;
-        }
+        } catch(e) { div.innerHTML = `<div style="padding:20px; text-align:center; color:red;">Lỗi: ${e}</div>`; }
     }
-
-    // Khởi tạo bảng log (nếu chưa có)
-    fetch('/api/init_log_table');
 </script>
-
 {% block scripts %}
 {% endblock %}
 

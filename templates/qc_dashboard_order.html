@@ -1,0 +1,433 @@
+{% extends "base.html" %}
+{% block title %}Dashboard QC Theo Order{% endblock %}
+
+{% block head %}
+<style>
+    /* --- Bố cục tổng thể --- */
+    .qc-dash-layout { display: flex; flex-direction: column; height: calc(100vh - 100px); }
+    
+    /* --- Thanh Lọc (Filter Bar) --- */
+    .filter-bar { background: white; padding: 12px 20px; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; gap: 15px; margin-bottom: 15px; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .filter-input { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; min-width: 250px; font-size: 0.9em; }
+    .filter-select { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; font-size: 0.9em; background: #f8fafc; cursor: pointer; color: #334155; font-weight: 600; }
+    
+    /* --- Lưới Thống Kê (Overview Cards) --- */
+    .overview-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 15px; flex-shrink: 0; }
+    
+    /* --- Bảng dữ liệu và Phân trang --- */
+    .table-container { background: white; border: 1px solid #cbd5e1; border-radius: 8px; flex: 1; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .table-scroll-wrap { flex: 1; overflow-y: auto; position: relative; }
+    
+    .table-prog-track { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; margin-top: 5px; width: 100%; display: flex; }
+    .table-prog-fill { height: 100%; transition: width 0.5s; }
+    
+    /* Các Badges & Colors */
+    .badge-no-tdc { background: #fef2f2; color: #dc2626; border: 1px solid #fca5a5; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; font-weight: 700; }
+    .badge-has-tdc { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; font-weight: 700; }
+    
+    /* --- Footer Phân Trang --- */
+    .pagination-footer { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; }
+    .btn-page { padding: 6px 12px; border: 1px solid #cbd5e1; background: #fff; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 600; color: #475569; transition: 0.2s; }
+    .btn-page:hover:not(:disabled) { background: #e2e8f0; color: #0f172a; }
+    .btn-page:disabled { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; border-color: #e2e8f0; }
+    /* --- BẢNG DỮ LIỆU ĐÃ NÂNG CẤP --- */
+    .table-container { background: white; border: 1px solid #cbd5e1; border-radius: 8px; flex: 1; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .table-scroll-wrap { flex: 1; overflow-y: auto; position: relative; }
+    
+    .coil-tbl { width: 100%; border-collapse: separate; border-spacing: 0; }
+    
+    /* Sticky Header & Border dọc */
+    .coil-tbl th {
+        position: sticky; top: 0; z-index: 10;
+        background: #1e293b; /* Nền tối */
+        color: #f8fafc;      /* Chữ sáng */
+        padding: 12px 10px;
+        font-size: 0.85em; text-transform: uppercase;
+        border-bottom: 2px solid #334155;
+        border-right: 1px solid #334155; /* Kẻ dọc Header */
+    }
+    .coil-tbl th:last-child { border-right: none; }
+
+    /* Border dọc Body & Kẻ sọc (Zebra) */
+    .coil-tbl td { 
+        padding: 10px; 
+        border-bottom: 1px solid #e2e8f0; 
+        border-right: 1px solid #e2e8f0; /* Kẻ dọc Body */
+        vertical-align: middle; 
+    }
+    .coil-tbl td:last-child { border-right: none; }
+    
+    .coil-tbl tbody tr:nth-child(even) { background-color: #f8fafc; } /* Dòng chẵn màu xám nhạt */
+    .coil-tbl tbody tr:hover { background-color: #eff6ff; } /* Hover sáng dòng */
+
+    /* Thanh Bar cho cột Tỉ lệ Đạt */
+    .table-prog-track { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 5px; width: 100%; display: flex; }
+    .table-prog-fill { height: 100%; transition: width 0.5s; }
+	.sortable { cursor: pointer; position: relative; user-select: none; transition: background 0.2s; }
+    .sortable:hover { background: #334155; }
+    .sort-icon { font-size: 0.8em; color: #94a3b8; margin-left: 5px; display: inline-block; }
+    .sortable.active-asc .sort-icon { color: #38bdf8; transform: rotate(180deg); }
+    .sortable.active-desc .sort-icon { color: #38bdf8; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="qc-dash-layout">
+    <div class="app-title-row" style="margin-bottom: 10px; flex-shrink: 0;">
+        <div class="app-title">
+            <h1>📊 Tỉ lệ đạt Chất lượng (QC) theo Order</h1>
+        </div>
+        <button onclick="fetchData()" class="btn-reset" style="padding: 6px 15px; font-weight:bold;">↻ Làm mới dữ liệu</button>
+    </div>
+
+    <div class="filter-bar">
+        <span style="font-weight: 600; color: #475569;">🔍 Lọc:</span>
+        <input type="text" id="searchOrder" class="filter-input" placeholder="Nhập mã Order..." onkeyup="applyFilters()">
+        
+        <input type="text" id="searchTdcName" class="filter-input" placeholder="Nhập tên TDC (vd: SAE1006)..." onkeyup="applyFilters()" style="min-width: 200px;">
+        
+        <select id="filterTdc" class="filter-select" onchange="applyFilters()">
+            <option value="ALL">Tất cả Order</option>
+            <option value="HAS_TDC">✅ Đã thiết lập TDC</option>
+            <option value="NO_TDC">🚨 Chưa có TDC</option>
+        </select>
+    </div>
+
+    <div class="overview-grid">
+        <div class="stat-card" style="padding: 12px;">
+            <span class="stat-label">Tổng Kế Hoạch</span>
+            <span class="stat-num" id="ovTarget" style="font-size: 1.6rem;">0</span>
+            <span class="stat-sub">Kg</span>
+        </div>
+        <div class="stat-card" style="padding: 12px;">
+            <span class="stat-label">Đã Sản Xuất</span>
+            <span class="stat-num" id="ovActual" style="color:#2563eb; font-size: 1.6rem;">0</span>
+            <span class="stat-sub">Kg</span>
+        </div>
+        <div class="stat-card" style="padding: 12px;">
+            <span class="stat-label">Tiến Độ SX</span>
+            <span class="stat-num" id="ovProgress" style="color:#ea580c; font-size: 1.6rem;">0%</span>
+            <span class="stat-sub">Thực tế / Kế hoạch</span>
+        </div>
+        <div class="stat-card" style="background:#f0fdf4; border-color:#bbf7d0; padding: 12px;">
+            <span class="stat-label" style="color:#166534;">Tỉ Lệ PASS (Đạt)</span>
+            <span class="stat-num" id="ovPassRate" style="color:#16a34a; font-size: 1.6rem;">0%</span>
+            <span class="stat-sub">Cuộn Pass / Tổng SX</span>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <div class="table-scroll-wrap">
+            <table class="coil-tbl">
+                <thead>
+                    <tr>
+                        <th style="width: 50px; text-align:center;">#</th>
+                        
+                        <th style="width: 12%;" class="sortable" onclick="handleSort('Order', this)">
+                            Order <span class="sort-icon">▼</span>
+                        </th>
+                        
+                        <th style="width: 18%;">Tiêu chuẩn (TDC)</th>
+                        
+                        <th style="width: 12%; text-align:right;" class="sortable" onclick="handleSort('Target_Weight', this)">
+                            Kế Hoạch (Kg) <span class="sort-icon">▼</span>
+                        </th>
+                        
+                        <th style="width: 12%; text-align:right;" class="sortable" onclick="handleSort('Actual_Weight', this)">
+                            Đã SX (Kg) <span class="sort-icon">▼</span>
+                        </th>
+                        
+                        <th style="width: 15%; text-align:center;">Tiến độ SX</th>
+                        
+                        <th style="width: 11%; text-align:right;" class="sortable" onclick="handleSort('Pass_Weight', this)">
+                            PASS (Kg) <span class="sort-icon">▼</span>
+                        </th>
+                        
+                        <th style="width: 15%; text-align:center;">Tỉ lệ Chất lượng</th>
+                        <th style="width: 6%; text-align:center;">Lỗi</th>
+                    </tr>
+                </thead>
+                <tbody id="orderTbody">
+                    </tbody>
+            </table>
+        </div>
+        
+        <div class="pagination-footer">
+            <span style="color:#64748b; font-size:0.85em; font-weight: 600;">
+                Hiển thị <b id="pStart">0</b> - <b id="pEnd">0</b> / Tổng <b id="pTotal">0</b> Order
+            </span>
+            <div style="display:flex; gap:8px;">
+                <button onclick="changePage(-1)" id="btnPrev" class="btn-page">◀ Trước</button>
+                <button onclick="changePage(1)" id="btnNext" class="btn-page">Sau ▶</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="errorChartModal" class="modal-overlay" onclick="closeErrorModal()">
+    <div class="chart-box" onclick="event.stopPropagation()" style="background:white; width:800px; padding:20px; border-radius:12px; display:flex; flex-direction:column; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #e2e8f0; padding-bottom:12px;">
+            <h2 id="modalTitle" style="margin:0; color:#1e293b; font-size: 1.3rem;">Phân tích lỗi rớt TDC</h2>
+            <button onclick="closeErrorModal()" class="btn-reset" style="font-size:1.2em; border:none; background: #f1f5f9;">✕</button>
+        </div>
+        <div style="height: 400px; position: relative;">
+            <canvas id="errorBarChart"></canvas>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // --- STATE VARIABLES ---
+    let ALL_ORDERS = [];         // Chứa toàn bộ data từ API
+    let FILTERED_ORDERS = [];    // Chứa data sau khi áp dụng bộ lọc
+    let CURRENT_PAGE = 1;
+    const ITEMS_PER_PAGE = 30;   // Số dòng hiển thị mỗi trang
+    let barChart = null;
+	let currentSortCol = '';
+    let currentSortAsc = false;
+	
+    window.onload = () => { fetchData(); };
+	
+    // 1. Kéo dữ liệu từ API (Chỉ chạy 1 lần lúc mở hoặc khi bấm Làm mới)
+    async function fetchData() {
+        document.getElementById('orderTbody').innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 50px; color:#94a3b8; font-size:1.1em;">⏳ Đang tải dữ liệu, vui lòng chờ...</td></tr>';
+        try {
+            const res = await fetch('/api/qc/order_summary');
+            const data = await res.json();
+            
+            if (data.status !== 'success') { 
+                alert(data.msg); 
+                return; 
+            }
+            
+            ALL_ORDERS = data.data; // Lưu vào biến toàn cục
+            applyFilters();         // Gọi hàm lọc để render
+            
+        } catch (e) {
+            console.error(e);
+            document.getElementById('orderTbody').innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 50px; color:red;">❌ Lỗi kết nối hệ thống.</td></tr>';
+        }
+    }
+	function handleSort(colName, thElement) {
+        // 1. Đổi chiều sắp xếp nếu click lại cột cũ, ngược lại thì mặc định là giảm dần (desc)
+        if (currentSortCol === colName) {
+            currentSortAsc = !currentSortAsc;
+        } else {
+            currentSortCol = colName;
+            currentSortAsc = false; 
+        }
+
+        // 2. Xóa trạng thái css của các cột khác, gắn vào cột hiện tại
+        document.querySelectorAll('.sortable').forEach(el => {
+            el.classList.remove('active-asc', 'active-desc');
+        });
+        thElement.classList.add(currentSortAsc ? 'active-asc' : 'active-desc');
+
+        // 3. Render lại
+        applyFilters();
+    }
+    // 2. Logic Lọc Dữ Liệu
+    function applyFilters() {
+        const searchText = document.getElementById('searchOrder').value.toLowerCase().trim();
+        const tdcNameText = document.getElementById('searchTdcName').value.toLowerCase().trim(); // Lấy giá trị lọc tên TDC
+        const tdcStatus = document.getElementById('filterTdc').value;
+        
+        // --- BƯỚC 1: LỌC (FILTER) ---
+        FILTERED_ORDERS = ALL_ORDERS.filter(row => {
+            // Lọc mã Order
+            const orderStr = String(row.Order || '').toLowerCase();
+            const matchSearch = orderStr.includes(searchText);
+            
+            // Lọc tên TDC
+            const tdcStr = String(row.tdc_name || '').toLowerCase();
+            const matchTdcName = tdcStr.includes(tdcNameText);
+            
+            // Lọc trạng thái có/không TDC
+            const hasTdc = row.tdc_name && row.tdc_name.trim() !== '' && row.tdc_name !== '-';
+            let matchTdc = true;
+            if (tdcStatus === 'HAS_TDC') matchTdc = hasTdc;
+            if (tdcStatus === 'NO_TDC') matchTdc = !hasTdc;
+            
+            return matchSearch && matchTdcName && matchTdc; // Phải thỏa mãn cả 3
+        });
+
+        // --- BƯỚC 2: SẮP XẾP (SORT) ---
+        if (currentSortCol !== '') {
+            FILTERED_ORDERS.sort((a, b) => {
+                let valA = a[currentSortCol];
+                let valB = b[currentSortCol];
+
+                // Nếu là các cột khối lượng, ép về kiểu số để sort đúng (1000 > 2)
+                if (['Target_Weight', 'Actual_Weight', 'Pass_Weight'].includes(currentSortCol)) {
+                    valA = parseFloat(valA) || 0;
+                    valB = parseFloat(valB) || 0;
+                } else {
+                    // Nếu là Order, ép về chuỗi
+                    valA = String(valA || '').toLowerCase();
+                    valB = String(valB || '').toLowerCase();
+                }
+
+                if (valA < valB) return currentSortAsc ? -1 : 1;
+                if (valA > valB) return currentSortAsc ? 1 : -1;
+                return 0;
+            });
+        }
+        
+        CURRENT_PAGE = 1; // Reset về trang 1 sau khi lọc/sắp xếp
+        updateOverviewCards();
+        renderTablePage();
+    }
+
+    // 3. Cập nhật các thẻ Thống kê phía trên
+    function updateOverviewCards() {
+        let totalTarget = 0, totalActual = 0, totalPass = 0;
+        
+        FILTERED_ORDERS.forEach(row => {
+            totalTarget += parseFloat(row.Target_Weight || 0);
+            totalActual += parseFloat(row.Actual_Weight || 0);
+            totalPass += parseFloat(row.Pass_Weight || 0);
+        });
+        
+        const progPct = totalTarget > 0 ? ((totalActual / totalTarget) * 100).toFixed(1) : 0;
+        const passRatePct = totalActual > 0 ? ((totalPass / totalActual) * 100).toFixed(1) : 0;
+        
+        document.getElementById('ovTarget').innerText = totalTarget.toLocaleString();
+        document.getElementById('ovActual').innerText = totalActual.toLocaleString();
+        document.getElementById('ovProgress').innerText = progPct + '%';
+        document.getElementById('ovPassRate').innerText = passRatePct + '%';
+    }
+
+    // 4. Render Bảng theo Trang hiện tại
+    // 4. Render Bảng theo Trang hiện tại
+    function renderTablePage() {
+        const tbody = document.getElementById('orderTbody');
+        
+        if (FILTERED_ORDERS.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 40px; color:#94a3b8;">Không tìm thấy Order nào khớp với bộ lọc.</td></tr>';
+            updatePaginationInfo(0, 0, 0);
+            return;
+        }
+
+        const totalItems = FILTERED_ORDERS.length;
+        const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+        const startIdx = (CURRENT_PAGE - 1) * ITEMS_PER_PAGE;
+        const endIdx = Math.min(startIdx + ITEMS_PER_PAGE, totalItems);
+        const pageData = FILTERED_ORDERS.slice(startIdx, endIdx);
+
+        tbody.innerHTML = pageData.map((row, index) => {
+            const realIndex = startIdx + index + 1;
+            const target = row.Target_Weight;
+            const actual = row.Actual_Weight;
+            const pass = row.Pass_Weight;
+            const fail = actual - pass;
+            
+            const progPct = row.Progress_Pct;
+            const passRate = row.Pass_Rate_Pct;
+            const failRate = actual > 0 ? ((fail / actual) * 100).toFixed(1) : 0;
+            
+            const hasTdc = row.tdc_name && row.tdc_name.trim() !== '' && row.tdc_name !== '-';
+            const tdcDisplay = hasTdc 
+                ? `<span style="color:#0f172a; font-weight:600;">${row.tdc_name}</span>` 
+                : `<span class="badge-no-tdc">Chưa có TDC</span>`;
+
+            // Màu của % Đạt
+            const rateColor = passRate >= 95 ? '#16a34a' : (passRate >= 80 ? '#d97706' : '#dc2626');
+            
+            // Màu của % Tiến độ (Bỏ thanh bar, chỉ đổi màu chữ)
+            const progColor = progPct >= 100 ? '#16a34a' : (progPct > 0 ? '#ea580c' : '#64748b');
+
+            return `
+            <tr>
+                <td style="color:#64748b; text-align:center;">${realIndex}</td>
+                <td style="font-weight:700; color:#2563eb; font-size:1.05em; text-align:left;">${row.Order}</td>
+                <td style="font-size:0.85em; text-align:left;">${tdcDisplay}</td>
+                
+                <td style="text-align:right; font-family:monospace; font-size:1.05em; color:#475569;">${target.toLocaleString()}</td>
+                <td style="text-align:right; font-family:monospace; font-size:1.05em; font-weight:bold; color:#0f172a;">${actual.toLocaleString()}</td>
+                
+                <td style="text-align:center; font-weight:800; font-size:1.1em; color:${progColor};">
+                    ${progPct}%
+                </td>
+                
+                <td style="text-align:right; font-family:monospace; color:#16a34a; font-size:1.05em; font-weight:bold;">${pass.toLocaleString()}</td>
+                
+                <td style="text-align:center;">
+                    <div style="font-size:0.85em; font-weight:800; color:${rateColor}; margin-bottom:2px;">
+                        Đạt: ${passRate}%
+                    </div>
+                    <div class="table-prog-track">
+                        <div class="table-prog-fill" style="width:${passRate}%; background:#16a34a;" title="PASS: ${passRate}%"></div>
+                        <div class="table-prog-fill" style="width:${failRate}%; background:#ef4444;" title="FAIL: ${failRate}%"></div>
+                    </div>
+                </td>
+                
+                <td style="text-align:center;">
+                    ${fail > 0 && hasTdc ? `<button onclick="showErrorAnalysis('${row.Order}')" class="btn-reset" style="background:#fff1f2; border-color:#fecdd3; color:#e11d48; padding:4px 10px; border-radius:6px; cursor:pointer;" title="Xem biểu đồ rớt TDC">📊</button>` : '<span style="color:#cbd5e1;">-</span>'}
+                </td>
+            </tr>`;
+        }).join('');
+
+        updatePaginationInfo(startIdx + 1, endIdx, totalItems);
+    }
+    // 5. Điều khiển nút Phân trang
+    function changePage(delta) {
+        const totalPages = Math.ceil(FILTERED_ORDERS.length / ITEMS_PER_PAGE);
+        CURRENT_PAGE += delta;
+        if (CURRENT_PAGE < 1) CURRENT_PAGE = 1;
+        if (CURRENT_PAGE > totalPages) CURRENT_PAGE = totalPages;
+        renderTablePage();
+    }
+
+    function updatePaginationInfo(start, end, total) {
+        document.getElementById('pStart').innerText = start;
+        document.getElementById('pEnd').innerText = end;
+        document.getElementById('pTotal').innerText = total;
+        
+        const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+        document.getElementById('btnPrev').disabled = (CURRENT_PAGE <= 1);
+        document.getElementById('btnNext').disabled = (CURRENT_PAGE >= totalPages || total === 0);
+    }
+
+    // --- LOGIC BIỂU ĐỒ (Giữ nguyên như cũ) ---
+    async function showErrorAnalysis(orderId) {
+        document.getElementById('modalTitle').innerText = `Lỗi rớt TDC - Order: ${orderId}`;
+        document.getElementById('errorChartModal').style.display = 'flex';
+
+        try {
+            const res = await fetch(`/api/qc/order_errors/${orderId}`);
+            const data = await res.json();
+            const ctx = document.getElementById('errorBarChart').getContext('2d');
+            
+            if (barChart) barChart.destroy();
+
+            barChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Khối lượng lỗi (Kg)',
+                        data: data.data,
+                        backgroundColor: 'rgba(225, 29, 72, 0.85)',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', 
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { beginAtZero: true },
+                        y: { ticks: { font: { weight: 'bold', size: 11 } } }
+                    }
+                }
+            });
+        } catch (e) { console.error(e); }
+    }
+
+    function closeErrorModal() { document.getElementById('errorChartModal').style.display = 'none'; }
+</script>
+{% endblock %}

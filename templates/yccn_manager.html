@@ -1,0 +1,940 @@
+{% extends "base.html" %} 
+{% block title %}Quản lý Yêu Cầu Công Nghệ (YCCN){% endblock %} 
+
+{% block head %}
+<style>
+  /* GLOBAL LAYOUT */
+.main-content { 
+      padding: 0 !important; 
+      display: flex; 
+      flex-direction: column; 
+      overflow: hidden !important; 
+  }
+  /* UTILS */
+  .badge { padding: 2px 6px; border-radius: 4px; font-size: 0.75em; font-weight: bold; display: inline-block; }
+  .badge-active { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+  .badge-pending { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+  .badge-replaced { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; text-decoration: line-through; }
+  .hidden { display: none !important; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+  /* HEADER */
+  .factory-bar { background: #0f172a; padding: 10px 20px; display: flex; align-items: center; gap: 15px; color: white; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+  .btn-factory { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #cbd5e1; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9em; transition: all 0.2s; }
+  .btn-factory:hover { background: rgba(255,255,255,0.2); color: white; }
+  .btn-factory.active { background: #06b6d4; color: white; border-color: #22d3ee; box-shadow: 0 0 10px rgba(6,182,212,0.4); }
+
+  /* TABS & SUBTABS */
+  .cat-tabs { display: flex; background: white; border-bottom: 1px solid #e2e8f0; padding: 0 20px; flex-shrink: 0; gap: 5px; }
+  .tab-item { padding: 12px 16px; cursor: pointer; color: #64748b; font-weight: 600; font-size: 0.95em; border-bottom: 3px solid transparent; transition: color 0.2s; }
+  .tab-item:hover { color: #0f172a; background: #f8fafc; }
+  .tab-item.active { color: #0891b2; border-bottom-color: #0891b2; background: #ecfeff; }
+  
+  .sub-tabs { display: none; background: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 6px 20px; gap: 10px; }
+  .sub-tab-item { padding: 4px 12px; font-size: 0.85em; font-weight: bold; color: #64748b; border: 1px solid #cbd5e1; border-radius: 12px; cursor: pointer; background: white; }
+  .sub-tab-item.active { background: #0891b2; color: white; border-color: #0891b2; }
+
+  /* MAIN LAYOUT */
+  .main-container { flex: 1; display: grid; grid-template-columns: 320px 1fr; gap: 0; overflow: hidden; }
+  .side-panel { background: #f8fafc; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden; }
+  .side-head { padding: 10px 15px; background: white; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-weight: bold; color: #334155; }
+  .tree-container { flex: 1; overflow-y: auto; padding: 10px; }
+  
+  /* TREE NODES */
+  .t-node { margin-left: 14px; border-left: 1px dashed #cbd5e1; }
+  .t-label { padding: 6px 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; border-radius: 4px; color: #475569; font-size: 0.95em; user-select: none; transition: background 0.1s; }
+  .t-label:hover { background: #e2e8f0; color: #1e293b; }
+  .t-label.file { color: #0f172a; font-weight: 500; }
+  .t-label.file:hover { background: #e0f2fe; color: #0284c7; }
+  .t-label.file.active { background: #bae6fd; color: #0369a1; font-weight: bold; border-left: 3px solid #0369a1; }
+  .t-children { display: none; }
+  .t-children.open { display: block; }
+
+  /* WORKSPACE */
+  .workspace { background: white; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+  .view-layout { display: flex; height: 100%; overflow: hidden; }
+  .view-main { flex: 1; display: flex; flex-direction: column; background: #334155; position: relative; }
+  .view-sidebar { width: 320px; background: white; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; flex-shrink: 0; }
+  .hist-item { padding: 12px 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.1s; }
+  .hist-item:hover { background: #f8fafc; }
+  .hist-item.active { background: #eff6ff; border-left: 4px solid #3b82f6; }
+  .hist-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .hist-ver { font-weight: bold; color: #1e293b; }
+  .hist-date { font-size: 0.8em; color: #64748b; }
+  .hist-note { font-size: 0.85em; color: #334155; font-style: italic; background: #f1f5f9; padding: 4px; border-radius: 4px; margin-top: 4px;}
+
+  /* EDIT FORM */
+  .ws-head { padding: 10px 20px; border-bottom: 1px solid #e2e8f0; background: #fff; display: flex; justify-content: space-between; align-items: center; height: 40px; flex-shrink: 0; }
+  .form-container { padding: 20px; overflow-y: auto; max-width: 900px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-label { font-size: 0.75em; font-weight: 700; color: #64748b; text-transform: uppercase; }
+  .form-input { padding: 9px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.95em; width: 100%; box-sizing: border-box; }
+  .form-input:focus { outline: 2px solid #a5f3fc; border-color: #0891b2; }
+  .form-readonly { background: #f1f5f9; color: #64748b; cursor: not-allowed; }
+  .section-title { grid-column: 1 / -1; font-weight: bold; color: #0891b2; border-bottom: 2px solid #ecfeff; padding-bottom: 6px; margin-top: 15px; margin-bottom: 5px; }
+  
+  .btn-primary { background: #0891b2; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+  .btn-secondary { background: white; border: 1px solid #cbd5e1; color: #475569; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+  .btn-renew { background: #f59e0b; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-size: 0.85em; cursor: pointer; font-weight: bold;}
+</style>
+{% endblock %} 
+
+{% block content %}
+<div class="factory-bar">
+    <div style="font-weight:bold; font-size:1.2em; display:flex; align-items:center; gap:10px;">
+        🚀 YCCN MANAGER
+    </div>
+    <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.3); margin: 0 5px;"></div>
+    <div id="factoryBtns">
+        <button class="btn-factory active" onclick="setFactory('HRC1')">🏭 HRC1</button>
+        <button class="btn-factory" onclick="setFactory('HRC2')">🏭 HRC2</button>
+        <button class="btn-factory" onclick="setFactory('CTD')">🏗️ CTD (Thép XD)</button>
+    </div>
+</div>
+
+<div class="cat-tabs">
+    <div class="tab-item active" onclick="setCategory('Phân loại')">📂 Phân loại chung</div>
+    <div class="tab-item" onclick="setCategory('Sản xuất nội bộ')">⚙️ Sản xuất nội bộ</div>
+    <div class="tab-item" id="tab-sales" onclick="setCategory('Sales')">💰 Phôi xuất bán (Sales)</div>
+    <div class="tab-item" onclick="setCategory('NPD')">🚀 Phát triển Sản phẩm mới</div>
+</div>
+
+<div class="sub-tabs" id="subTabs">
+    <div class="sub-tab-item active" onclick="setSubCategory('Luyện')">Luyện (Steel Making)</div>
+    <div class="sub-tab-item" onclick="setSubCategory('Đúc')">Đúc (Casting)</div>
+    <div class="sub-tab-item" id="tab-can" onclick="setSubCategory('Cán')">Cán (Rolling)</div>
+</div>
+
+<div class="main-container">
+    <div class="side-panel">
+        <div class="side-head">
+            <span>Danh sách tài liệu</span>
+            <button onclick="openAddForm()" class="btn-primary" style="font-size: 0.8em; background: #22c55e;">
+                + Thêm Mới
+            </button>
+        </div>
+        <div class="tree-container" id="treeView"></div>
+    </div>
+
+    <div class="workspace">
+        <div id="viewMode" style="height:100%; display:flex; flex-direction:column;">
+            <div class="ws-head" id="viewHeader" style="justify-content: flex-start; gap: 15px;">
+                <span style="color:#94a3b8; font-style:italic;">(Chọn tài liệu bên trái để xem)</span>
+            </div>
+            <div class="view-layout">
+                <div class="view-main" id="pdfContainer">
+                    <div style="color: #94a3b8; margin: auto; text-align: center;">
+                        <div style="font-size: 3em; margin-bottom: 10px;">📄</div>
+                        Chọn tài liệu để xem nội dung
+                    </div>
+                </div>
+                <div class="view-sidebar">
+                    <div style="padding: 15px; border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
+                        <div style="font-size: 0.85em; font-weight: bold; color: #0891b2; margin-bottom: 8px;">ℹ️ THÔNG TIN CHI TIẾT</div>
+                        <div id="metaInfo" style="display: flex; flex-direction: column; gap: 6px; font-size: 0.9em; color: #334155;"></div>
+                    </div>
+                    <div style="padding: 10px 15px; background: #fff; border-bottom: 1px solid #eee; font-weight: bold; color: #475569; display: flex; justify-content: space-between; align-items: center;">
+                        <span>⏳ Lịch sử phiên bản</span>
+                        <span id="histCount" class="badge" style="background: #e2e8f0;">0</span>
+                    </div>
+                    <div id="historyList" style="flex: 1; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="editMode" class="hidden" style="height:100%; display:flex; flex-direction:column;">
+            <div class="ws-head" style="background: #f0fdfa; border-bottom: 1px solid #ccfbf1;">
+                <span style="font-weight:bold; color: #0f766e;" id="formTitle">📝 Thêm mới tài liệu</span>
+                <button onclick="cancelEdit()" class="btn-secondary">Đóng / Hủy</button>
+            </div>
+            
+            <div class="form-container">
+                <div class="form-grid">
+                    <input type="hidden" id="inpMasterId">
+
+                    <div class="section-title">1. Thông tin định danh</div>
+                    <div class="form-group">
+                        <label class="form-label" id="lblCode">Mã Tài Liệu <span style="color:red">*</span></label>
+                        <input id="inpCode" class="form-input" placeholder="VD: YCCN-001" style="font-family: monospace; font-weight: bold; color: #0891b2;">
+                        <small id="hintCode" style="color:#94a3b8; font-size:0.8em;">(Mã phải là duy nhất)</small>
+                    </div>
+                    <div class="form-group" id="grpTitle">
+                        <label class="form-label" id="lblTitle">Tên Tài Liệu / Chủ đề <span style="color:red">*</span></label>
+                        <input id="inpTitle" class="form-input" placeholder="VD: Quy định đóng gói...">
+                    </div>
+
+                    <div class="section-title" id="dynamicTitle">2. Chi tiết Kỹ thuật / Mục đích</div>
+                    <div class="form-group" id="grpGrade">
+                        <label class="form-label">Mác Thép (Steel Grade)</label>
+                        <input id="inpGrade" class="form-input" placeholder="VD: SS400, SPHC...">
+                    </div>
+                    <div class="form-group" id="grpSlab">
+                        <label class="form-label" style="color: #b91c1c;">Mác </label>
+                        <input id="inpSlab" class="form-input" placeholder="VD: SS400-CN...">
+                    </div>
+                    <div class="form-group" id="grpUsage">
+                        <label class="form-label" id="lblUsage">Mục đích sử dụng / Lưu ý</label>
+                        <input id="inpUsageText" class="form-input" placeholder="Ghi chú thêm...">
+                        <select id="inpUsageSelect" class="form-input hidden">
+							<option value="1. Đề nghị thử nghiệm">1. Đề nghị thử nghiệm</option>
+							<option value="2. Đánh giá khả thi">2. Đánh giá khả thi</option>
+							<option value="3. Yêu cầu thử nghiệm">3. Yêu cầu thử nghiệm</option>
+							<option value="4. Báo cáo thử nghiệm">4. Báo cáo thử nghiệm</option>
+							<option value="5. Đánh giá phản hồi khách hàng">5. Đánh giá phản hồi khách hàng</option>
+							<option value="6. Tài liệu khác">6. Tài liệu khác</option>
+						</select>
+                    </div>
+
+                    <div class="section-title">3. Tệp đính kèm & Ghi chú Version</div>
+                    <div class="form-group" style="grid-column: 1/-1;">
+                        <label class="form-label" id="lblFile">File PDF <span style="color:red">*</span></label>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="file" id="inpFile" style="display:none;" accept="application/pdf" onchange="uploadFile()">
+                            <button onclick="document.getElementById('inpFile').click()" class="btn-secondary">📂 Chọn PDF từ máy</button>
+                            <span id="uploadStatus" style="font-size: 0.9em; color: #64748b;">Chưa có file</span>
+                        </div>
+                        <input type="hidden" id="inpPdfPath">
+                    </div>
+                    <div class="form-group" style="grid-column: 1/-1;">
+                        <label class="form-label">Ghi chú thay đổi (Note)</label>
+                        <textarea id="inpNote" class="form-input" rows="3" placeholder="Nhập nội dung thay đổi của phiên bản này..."></textarea>
+                    </div>
+
+                    <div style="grid-column: 1/-1; margin-top: 20px; padding-top: 20px; border-top: 1px dashed #cbd5e1;">
+                        <button onclick="saveData()" class="btn-primary" style="width: 100%; padding: 12px; font-size: 1.1em;">
+                            💾 LƯU & KÍCH HOẠT NGAY
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
+
+{% block scripts %}
+<script>
+    let CUR_FACTORY = 'HRC1';
+    let CUR_CAT = 'Phân loại';
+    let CUR_SUB_CAT = 'Luyện'; // Default cho SXNB
+    let RAW_DATA = [];
+    let CURRENT_ITEM = null; 
+    let VERSION_HISTORY = []; // Thêm biến lưu lịch sử để fix lỗi hiển thị
+
+    window.onload = () => {
+        setFactory('HRC1');
+        loadData();
+    };
+
+    async function loadData() {
+        try {
+            const res = await fetch('/api/yccn/library');
+            RAW_DATA = await res.json();
+            renderTree();
+        } catch (e) {
+            console.error("Load Data Error:", e);
+            document.getElementById('treeView').innerHTML = '<div style="color:red; padding:10px;">Lỗi tải dữ liệu</div>';
+        }
+    }
+
+    function resetView() {
+        CURRENT_ITEM = null; 
+        VERSION_HISTORY = [];
+        document.getElementById('viewHeader').innerHTML = `<span style="color:#94a3b8; font-style:italic;">(Chọn tài liệu bên trái để xem)</span>`;
+        document.getElementById('pdfContainer').innerHTML = `
+            <div style="color: #94a3b8; margin: auto; text-align: center;">
+                <div style="font-size: 3em; margin-bottom: 10px;">📄</div>
+                Chọn tài liệu để xem nội dung
+            </div>
+        `;
+        document.getElementById('metaInfo').innerHTML = '';
+        document.getElementById('histCount').innerText = '0';
+        document.getElementById('historyList').innerHTML = '';
+        document.getElementById('editMode').classList.add('hidden');
+        document.getElementById('viewMode').classList.remove('hidden');
+    }
+
+    function setFactory(code) {
+        CUR_FACTORY = code;
+        document.querySelectorAll('.btn-factory').forEach(b => {
+            b.classList.toggle('active', b.innerText.includes(code));
+        });
+        const tabSales = document.getElementById('tab-sales');
+        if (code === 'HRC1') {
+            tabSales.classList.add('hidden');
+            if (CUR_CAT === 'Sales') { setCategory('Phân loại'); return; }
+        } else {
+            tabSales.classList.remove('hidden');
+        }
+        renderTree();
+        resetView(); 
+    }
+
+    function setCategory(catName) {
+        CUR_CAT = catName;
+        document.querySelectorAll('.tab-item').forEach(t => {
+            t.classList.toggle('active', t.innerText.includes(catName));
+        });
+        
+        const subTabs = document.getElementById('subTabs');
+        const tabCan = document.getElementById('tab-can');
+
+        if (catName === 'Sản xuất nội bộ') {
+            subTabs.style.display = 'flex';
+            tabCan.style.display = 'block'; 
+            setSubCategory('Luyện'); 
+        } else if (catName === 'Sales') {
+            subTabs.style.display = 'flex';
+            tabCan.style.display = 'none'; 
+            setSubCategory('Luyện'); 
+        } else {
+            subTabs.style.display = 'none';
+        }
+        
+        renderTree();
+        resetView();
+    }
+    
+    function setSubCategory(subCat) {
+        CUR_SUB_CAT = subCat;
+        document.querySelectorAll('.sub-tab-item').forEach(t => {
+            t.classList.toggle('active', t.innerText.includes(subCat));
+        });
+        renderTree();
+        resetView();
+    }
+
+    /* === SMART TREE RENDERING === */
+    function renderTree() {
+        const container = document.getElementById('treeView');
+        container.innerHTML = '';
+        let filtered = RAW_DATA.filter(item => 
+            (item.factory_code === CUR_FACTORY) && (item.category === CUR_CAT)
+        );
+
+        // Áp dụng lọc theo Công đoạn cho CẢ SXNB và Sales
+        if(CUR_CAT === 'Sản xuất nội bộ' || CUR_CAT === 'Sales') {
+            filtered = filtered.filter(i => i.process_stage === CUR_SUB_CAT);
+        }
+
+        if(filtered.length === 0) {
+            container.innerHTML = '<div style="color:#94a3b8; text-align:center; padding:20px; font-style:italic;">(Trống)</div>';
+            return;
+        }
+
+        let html = '';
+        
+        if (CUR_CAT === 'Phân loại') {
+            const byTopic = groupBy(filtered, 'title');
+            for(const [topic, items] of Object.entries(byTopic)) {
+                const files = items.map(f => renderFileNode(f, `📄 ${f.usage_purpose || 'Bản chung'}`)).join('');
+                html += buildFolder(`📂 ${topic}`, null, files);
+            }
+        } 
+        else if (CUR_CAT === 'Sản xuất nội bộ') {
+            // Nhóm: Folder (Mác thép) -> Clickable File (Mác phôi)
+            const byGrade = groupBy(filtered, 'grade_apply'); 
+            for(const [grade, items1] of Object.entries(byGrade)) {
+                let inner1 = '';
+                const bySlab = groupBy(items1, 'slab_grade'); 
+                for(const [slab, items2] of Object.entries(bySlab)) {
+                    // Vì mỗi Mác phôi chỉ có 1 tài liệu Active, ta lấy luôn phần tử đầu tiên items2[0] làm File hiển thị
+                    const f = items2[0]; 
+                    inner1 += renderFileNode(f, `🧱 Mác: ${slab === 'null' ? '?' : slab}`);
+                }
+                html += buildFolder(`🔩 Mác Thép: ${grade === 'null' ? '?' : grade}`, null, inner1);
+            }
+        }
+        else if (CUR_CAT === 'Sales') {
+            // Nhóm: Clickable File (Mác phôi)
+            const bySlab = groupBy(filtered, 'slab_grade');
+            for(const [slab, items] of Object.entries(bySlab)) {
+                // Tương tự, biến Mác phôi thành thẻ Click mở PDF luôn
+                const f = items[0];
+                html += renderFileNode(f, `🧱 Phôi: ${slab === 'null' ? '?' : slab}`);
+            }
+        }
+        else if (CUR_CAT === 'NPD') {
+            // Nhóm: Folder (Tên Dự án) -> Clickable File (Giai đoạn)
+            const byProject = groupBy(filtered, 'title');
+            for(const [proj, items] of Object.entries(byProject)) {
+				items.sort((a, b) => (a.usage_purpose || '').localeCompare(b.usage_purpose || ''));
+                const files = items.map(f => renderFileNode(f, `📌 Giai đoạn: ${f.usage_purpose}`)).join('');
+                html += buildFolder(`🚀 ${proj}`, null, files);
+            }
+        }
+        
+        container.innerHTML = html;
+    }
+
+    function groupBy(arr, key) {
+        return arr.reduce((acc, i) => {
+            const v = i[key] || 'null';
+            if(!acc[v]) acc[v] = [];
+            acc[v].push(i);
+            return acc;
+        }, {});
+    }
+
+    function renderFileNode(f, displayLabel) {
+        const activeClass = (CURRENT_ITEM && CURRENT_ITEM.version_id === f.version_id) ? 'active' : '';
+        return `<div class="t-label file ${activeClass}" onclick='viewFile(this, ${JSON.stringify(f)})'>
+                📄 ${displayLabel} <span class="badge badge-active" style="font-size:0.65em; margin-left:4px;">v${f.version_no}</span>
+            </div>`;
+    }
+
+    function buildFolder(title, fileItems = null, innerHtml = '') {
+        let content = innerHtml;
+        if(fileItems) content += fileItems.map(f => renderFileNode(f, f.title)).join('');
+        return `<div style="margin-bottom:2px;">
+                <div class="t-label" onclick="this.nextElementSibling.classList.toggle('open')">
+                    ${title} <small style="color:#94a3b8; margin-left:5px;">${fileItems ? '('+fileItems.length+')' : ''}</small>
+                </div>
+                <div class="t-children t-node">${content}</div>
+            </div>`;
+    }
+
+    /* === PDF & VIEW MODE (FIXED BUG) === */
+    async function viewFile(el, item) {
+        CURRENT_ITEM = item;
+        document.querySelectorAll('.t-label.file').forEach(e => e.classList.remove('active'));
+        if(el) el.classList.add('active');
+
+        document.getElementById('editMode').classList.add('hidden');
+        document.getElementById('viewMode').classList.remove('hidden');
+
+        // --- XỬ LÝ NÚT BẤM DỰA VÀO TAB ---
+        let actionButtons = `
+            <button onclick="renewYccn(${item.master_id})" class="btn-renew">
+                ✏️ Cập nhật v${item.version_no + 1}
+            </button>
+        `;
+
+        // Nếu là NPD, cho phép tạo giai đoạn tiếp theo của dự án này
+        if (CUR_CAT === 'NPD') {
+            actionButtons += `
+                <button onclick="addNextPhase(${item.master_id})" class="btn-primary" style="background: #10b981; margin-left: 5px;">
+                    ➕ Thêm Giai đoạn
+                </button>
+            `;
+        }
+        else if (CUR_CAT === 'Phân loại') {
+            actionButtons += `
+                <button onclick="addSubItem(${item.master_id})" class="btn-primary" style="background: #10b981; margin-left: 5px;">
+                    ➕ Thêm Mục con
+                </button>
+            `;
+        }
+
+        document.getElementById('viewHeader').innerHTML = `
+            <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
+                <span class="badge" style="background:#0891b2; color:white; font-family:monospace; font-size:1em;">${item.yccn_code}</span>
+                <span style="font-weight:bold; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.title}</span>
+            </div>
+            <div>
+                ${actionButtons}
+            </div>
+        `;
+
+        // Render meta info
+        renderMetaInfo(item, item);
+        loadPdfToView(item.pdf_path);
+        loadHistory(item.master_id, item.version_no);
+    }
+
+    function renderMetaInfo(master, ver) {
+        let dateStr = 'Chưa xác định';
+        if (ver.created_at) {
+            let cleanDateStr = ver.created_at;
+            if (typeof cleanDateStr === 'string') {
+                cleanDateStr = cleanDateStr.replace(" GMT", ""); 
+            }
+            
+            const d = new Date(cleanDateStr);
+            if (!isNaN(d.getTime())) { // Nếu parse ngày thành công
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                const hh = String(d.getHours()).padStart(2, '0');
+                const min = String(d.getMinutes()).padStart(2, '0');
+                dateStr = `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+            } else {
+                dateStr = ver.created_at; // Trả về nguyên gốc nếu có lỗi
+            }
+        }
+        let metaHtml = `
+            <div><b>Mã:</b> ${master.yccn_code}</div>
+            <div><b>Nhà máy:</b> ${master.factory_code || 'N/A'}</div>
+            <div style="color: #059669; font-size: 0.95em; padding-bottom: 5px; border-bottom: 1px dashed #cbd5e1; margin-bottom: 5px;">
+                <b>🕒 Cập nhật lần cuối:</b> ${dateStr}
+            </div>
+        `;
+        
+        if (CUR_CAT === 'Phân loại') {
+            if(master.usage_purpose) metaHtml += `<div style="margin-top:5px; padding:5px; background:#e0f2fe; border-radius:4px;"><b>Phân loại con:</b> ${master.usage_purpose}</div>`;
+        } 
+        else if (CUR_CAT === 'Sản xuất nội bộ' || CUR_CAT === 'Sales') {
+            metaHtml += `<div><b>Công đoạn:</b> ${master.process_stage}</div>`;
+            if(ver.grade_apply) metaHtml += `<div><b style="color:#0891b2">Mác thép:</b> ${ver.grade_apply}</div>`;
+            if(ver.slab_grade) metaHtml += `<div><b style="color:#b91c1c">Mác:</b> ${ver.slab_grade}</div>`;
+            if(master.usage_purpose) metaHtml += `<div style="margin-top:5px; padding:5px; background:#e0f2fe; border-radius:4px;"><b>Ghi chú / Mục đích SD:</b> ${master.usage_purpose}</div>`;
+        }
+        else if (CUR_CAT === 'NPD') {
+            metaHtml += `<div><b>Dự án:</b> ${master.title}</div>`;
+            metaHtml += `<div><b>Giai đoạn:</b> ${master.usage_purpose}</div>`;
+            if(ver.grade_apply) metaHtml += `<div><b style="color:#0891b2">Mác thép:</b> ${ver.grade_apply}</div>`;
+        }
+
+        // Ghi chú thay đổi
+        if(ver.note && ver.version_no !== master.version_no) {
+             metaHtml += `<div style="margin-top:8px; padding:6px; background:#fef9c3; border-left:3px solid #eab308; border-radius:4px; font-size:0.9em;"><b>Ghi chú bản v${ver.version_no}:</b> ${ver.note}</div>`;
+        } else if (ver.note) {
+             metaHtml += `<div style="margin-top:8px; padding:6px; background:#f1f5f9; border-left:3px solid #cbd5e1; border-radius:4px; font-size:0.9em;"><b>Ghi chú thay đổi:</b> ${ver.note}</div>`;
+        }
+        document.getElementById('metaInfo').innerHTML = metaHtml;
+    }
+
+    function loadPdfToView(pathData) {
+        const con = document.getElementById('pdfContainer');
+        if(!pathData) {
+            con.innerHTML = `<div style="color:#ef4444; margin:auto;">⚠️ Không tìm thấy file PDF</div>`;
+            return;
+        }
+
+        let paths = [];
+        try {
+            // Cố gắng đọc dưới dạng mảng JSON (của NPD)
+            paths = JSON.parse(pathData);
+            if (!Array.isArray(paths)) paths = [pathData]; 
+        } catch(e) {
+            // Lỗi parse tức là đường dẫn 1 file bình thường của các danh mục khác
+            paths = [pathData]; 
+        }
+
+        if (paths.length === 1) {
+            // Chỉ có 1 file -> Render iFrame bình thường
+            con.innerHTML = `<iframe src="${paths[0]}" style="width:100%; height:100%; border:none;"></iframe>`;
+        } else {
+            // Mảng nhiều file -> Render thêm thanh Tab đổi file
+            let tabsHtml = `<div style="display:flex; gap:10px; padding:10px; background:#1e293b; color:white; overflow-x:auto; flex-shrink: 0;">`;
+            paths.forEach((p, idx) => {
+                const isActive = idx === 0 ? 'background:#0891b2;' : 'background:#334155;';
+                tabsHtml += `<button onclick="switchPdfIframe('${p}', this)" class="pdf-tab-btn" style="padding:6px 12px; border-radius:4px; cursor:pointer; ${isActive} border:none; color:white; font-weight:bold;">📄 File ${idx + 1}</button>`;
+            });
+            tabsHtml += `</div>`;
+            
+            con.innerHTML = `
+                ${tabsHtml}
+                <div style="flex:1;"><iframe id="multiPdfFrame" src="${paths[0]}" style="width:100%; height:100%; border:none;"></iframe></div>
+            `;
+        }
+    }
+
+    // Bổ sung hàm hỗ trợ chuyển Tab iFrame
+    window.switchPdfIframe = function(path, btnEl) {
+        document.getElementById('multiPdfFrame').src = path;
+        document.querySelectorAll('.pdf-tab-btn').forEach(b => b.style.background = '#334155');
+        btnEl.style.background = '#0891b2';
+    }
+    async function loadHistory(masterId, activeVerNo) {
+        const listDiv = document.getElementById('historyList');
+        const countSpan = document.getElementById('histCount');
+        listDiv.innerHTML = '<div style="padding:15px; color:#94a3b8; text-align:center;">Đang tải...</div>';
+        
+        try {
+            const r = await fetch('/api/yccn/history', {
+                method: 'POST',
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ master_id: masterId })
+            });
+            const j = await r.json();
+            
+            if(j.status === 'success') {
+                VERSION_HISTORY = j.data;
+                countSpan.innerText = VERSION_HISTORY.length;
+                if(VERSION_HISTORY.length === 0) { listDiv.innerHTML = '<div style="padding:15px; text-align:center;">Chưa có lịch sử</div>'; return; }
+                
+                listDiv.innerHTML = VERSION_HISTORY.map((h, idx) => {
+                    const isActive = (h.version_no === activeVerNo) ? 'active' : '';
+                    let badgeClass = h.status === 'Active' ? 'badge-active' : (h.status==='Pending'?'badge-pending':'badge-replaced');
+                    return `<div class="hist-item ${isActive}" onclick="switchVersion(this, ${idx})">
+                            <div class="hist-row">
+                                <span class="hist-ver">v${h.version_no}</span>
+                                <span class="badge ${badgeClass}">${h.status}</span>
+                            </div>
+                            <div class="hist-date">📅 ${h.created_at ? h.created_at.replace('T', ' ').substring(0, 16) : ''}</div>
+                        </div>`;
+                }).join('');
+            }
+        } catch(e) { listDiv.innerHTML = 'Lỗi tải lịch sử'; }
+    }
+
+    // [SỬA LỖI UI] Khi click bản cũ, truyền toàn bộ data để render lại MetaInfo
+    function switchVersion(el, idx) {
+        document.querySelectorAll('.hist-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+        
+        const verItem = VERSION_HISTORY[idx];
+        loadPdfToView(verItem.pdf_path);
+        renderMetaInfo(CURRENT_ITEM, verItem); // Cập nhật Text info
+        
+        // --- XỬ LÝ HEADER VÀ NÚT BẤM KHI XEM LỊCH SỬ ---
+        let actionButtons = '';
+        
+        if (verItem.version_no === CURRENT_ITEM.version_no) {
+            actionButtons = `<button onclick="renewYccn(${CURRENT_ITEM.master_id})" class="btn-renew">✏️ Cập nhật v${CURRENT_ITEM.version_no + 1}</button>`;
+            actionButtons += `
+                <button onclick="fixMasterTypo(${CURRENT_ITEM.master_id})" class="btn-secondary" style="margin-left:5px;" title="Sửa tên/mục đích gốc">
+                    ⚙️ Sửa thông tin Gốc
+                </button>
+            `;
+            
+            if (CUR_CAT === 'NPD') {
+                actionButtons += `<button onclick="addNextPhase(${CURRENT_ITEM.master_id})" class="btn-primary" style="background: #10b981; margin-left: 5px;">➕ Thêm Giai đoạn</button>`;
+            } 
+            else if (CUR_CAT === 'Phân loại') {
+                actionButtons += `<button onclick="addSubItem(${CURRENT_ITEM.master_id})" class="btn-primary" style="background: #10b981; margin-left: 5px;">➕ Thêm Mục con</button>`;
+            }
+        } else {
+            // Nếu click xem bản Cũ -> Hiện cảnh báo rõ ràng
+            actionButtons = `<span style="background: #fef3c7; color: #d97706; padding: 6px 12px; border-radius: 6px; font-weight: bold; border: 1px solid #fde68a;">⚠️ Đang xem bản cũ (v${verItem.version_no})</span>`;
+        }
+
+        document.getElementById('viewHeader').innerHTML = `
+            <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
+                <span class="badge" style="background:#0891b2; color:white; font-family:monospace; font-size:1em;">${CURRENT_ITEM.yccn_code}</span>
+                <span style="font-weight:bold; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${CURRENT_ITEM.title}</span>
+            </div>
+            <div>
+                ${actionButtons}
+            </div>
+        `;
+    }
+    async function fixMasterTypo(masterId) {
+        const item = RAW_DATA.find(x => x.master_id === masterId);
+        if(!item) return;
+
+        // Dùng popup mặc định của trình duyệt cho nhanh & gọn
+        let newTitle = prompt("✏️ SỬA LỖI CHÍNH TẢ\n\nNhập lại Tên Tài liệu / Dự án:", item.title);
+        if (newTitle === null) return; // Người dùng bấm Cancel
+        
+        let newUsage = prompt("Nhập lại Mục đích sử dụng / Phân loại:", item.usage_purpose || "");
+        if (newUsage === null) return;
+
+        if (newTitle.trim() === "") { alert("Tên không được để trống!"); return; }
+
+        try {
+            const r = await fetch("/api/yccn/update_master_info", {
+                method: "POST",
+                headers: {"Content-Type":"application/json"},
+                body: JSON.stringify({ master_id: masterId, title: newTitle.trim(), usage_purpose: newUsage.trim() })
+            });
+            const j = await r.json();
+            if(j.status === "success") {
+                alert("✅ Sửa thông tin thành công! Lịch sử các version đã được đồng bộ.");
+                loadData(); // Tải lại cây thư mục
+            } else {
+                alert("❌ Lỗi: " + j.msg);
+            }
+        } catch(e) {
+            alert("Lỗi kết nối server!");
+        }
+    }
+    // --- SMART FORM ACTIONS (FIXED MASTER OVERWRITE) ---
+    function setupDynamicFields(isRenew = false) {
+        const grpTitle = document.getElementById('grpTitle');
+        const grpGrade = document.getElementById('grpGrade');
+        const grpSlab = document.getElementById('grpSlab');
+        const lblCode = document.getElementById('lblCode');
+        const hintCode = document.getElementById('hintCode');
+        const lblUsage = document.getElementById('lblUsage');
+        const inpText = document.getElementById('inpUsageText');
+        const inpSel = document.getElementById('inpUsageSelect');
+
+        grpTitle.classList.remove('hidden');
+        grpGrade.classList.remove('hidden');
+        grpSlab.classList.remove('hidden');
+        inpText.classList.remove('hidden');
+        inpSel.classList.add('hidden');
+        lblCode.innerHTML = `Mã Tài Liệu <span style="color:red">*</span>`;
+        hintCode.innerText = '(Mã phải là duy nhất)';
+        lblUsage.innerText = 'Mục đích sử dụng / Ghi chú chung';
+
+        if (CUR_CAT === 'Phân loại') {
+            grpGrade.classList.add('hidden');
+            grpSlab.classList.add('hidden');
+            document.getElementById('lblTitle').innerHTML = `Chủ đề / Tên nhóm <span style="color:red">*</span>`;
+            lblUsage.innerHTML = `Mục đích / Tên phân loại con <span style="color:red">*</span>`;
+            inpFile.multiple = false;
+            lblFile.innerHTML = `File PDF <span style="color:red">*</span>`;
+        }
+        else if (CUR_CAT === 'Sản xuất nội bộ' || CUR_CAT === 'Sales') {
+            grpTitle.classList.add('hidden'); 
+            inpFile.multiple = false;
+            lblFile.innerHTML = `File PDF <span style="color:red">*</span>`;
+        }
+        else if (CUR_CAT === 'NPD') {
+            grpSlab.classList.add('hidden'); 
+            lblCode.innerHTML = `Mã Dự Án (Project Code) <span style="color:red">*</span>`;
+            hintCode.innerText = '(Hệ thống sẽ tự thêm hậu tố Giai đoạn)';
+            document.getElementById('lblTitle').innerHTML = `Tên Dự Án (Project Name) <span style="color:red">*</span>`;
+            
+            inpText.classList.add('hidden');
+            inpSel.classList.remove('hidden');
+            lblUsage.innerText = 'Giai đoạn đánh giá';
+            inpFile.multiple = true;
+            lblFile.innerHTML = `File PDF (Có thể chọn nhiều file) <span style="color:red">*</span>`;
+        }
+
+        // [QUAN TRỌNG]: KHÓA CHẶT CÁC TRƯỜNG MASTER KHI "CẬP NHẬT" ĐỂ BẢO TOÀN LỊCH SỬ
+        const isLock = isRenew;
+        document.getElementById('inpTitle').readOnly = isLock;
+        document.getElementById('inpUsageSelect').disabled = isLock;
+        document.getElementById('inpUsageText').readOnly = isLock; // <-- Bổ sung khóa Text
+
+        if(isLock) {
+            document.getElementById('inpTitle').classList.add('form-readonly');
+            document.getElementById('inpUsageSelect').classList.add('form-readonly');
+            document.getElementById('inpUsageText').classList.add('form-readonly'); // <-- Bổ sung CSS khóa
+        } else {
+            document.getElementById('inpTitle').classList.remove('form-readonly');
+            document.getElementById('inpUsageSelect').classList.remove('form-readonly');
+            document.getElementById('inpUsageText').classList.remove('form-readonly'); // <-- Mở CSS khóa
+        }
+    }
+    function openAddForm() {
+        document.getElementById('viewMode').classList.add('hidden');
+        document.getElementById('editMode').classList.remove('hidden');
+
+        document.querySelectorAll('.form-input').forEach(i => i.value = '');
+        document.getElementById('inpMasterId').value = ''; 
+        
+        document.getElementById('uploadStatus').innerText = 'Chưa có file';
+        document.getElementById('uploadStatus').style.color = '#64748b';
+        document.getElementById('inpPdfPath').value = '';
+        document.getElementById('inpCode').readOnly = false;
+        document.getElementById('inpCode').classList.remove('form-readonly');
+        
+        let contextTitle = CUR_CAT;
+        if(CUR_CAT === 'Sản xuất nội bộ' || CUR_CAT === 'Sales') contextTitle += ` (${CUR_SUB_CAT})`;
+        document.getElementById('formTitle').innerText = `📝 Thêm mới [${CUR_FACTORY} > ${contextTitle}]`;
+        
+        setupDynamicFields(false); 
+    }
+
+    function renewYccn(masterId) {
+        const item = RAW_DATA.find(x => x.master_id === masterId);
+        if(!item) return;
+        
+        document.getElementById('viewMode').classList.add('hidden');
+        document.getElementById('editMode').classList.remove('hidden');
+        document.getElementById('inpMasterId').value = masterId;
+        document.getElementById('formTitle').innerText = `♻️ Cập nhật phiên bản mới cho ${item.yccn_code}`;
+        
+        setupDynamicFields(true); // Mode: Renew (Khóa các trường Master)
+        
+        let displayCode = item.yccn_code;
+        if (CUR_CAT === 'NPD') {
+			if (displayCode.includes('-')) {
+				displayCode = displayCode.substring(0, displayCode.lastIndexOf('-')).trim();
+			}
+			document.getElementById('inpUsageSelect').value = item.usage_purpose;
+		}
+
+        document.getElementById('inpCode').value = displayCode;
+        document.getElementById('inpCode').readOnly = true; 
+        document.getElementById('inpCode').classList.add('form-readonly');
+
+        document.getElementById('inpTitle').value = item.title;
+        document.getElementById('inpGrade').value = item.grade_apply || '';
+        document.getElementById('inpSlab').value = item.slab_grade || '';
+        document.getElementById('inpUsageText').value = item.usage_purpose || '';
+        document.getElementById('inpNote').value = ''; // Note phải để trống cho bản cập nhật mới
+        
+        document.getElementById('inpPdfPath').value = item.pdf_path;
+        if(item.pdf_path) {
+            document.getElementById('uploadStatus').innerHTML = `⚠️ <b style="color:#f59e0b">Đang dùng lại PDF cũ (v${item.version_no})</b>. Upload mới nếu cần.`;
+        }
+    }
+    function addNextPhase(masterId) {
+        const item = RAW_DATA.find(x => x.master_id === masterId);
+        if(!item) return;
+        
+        openAddForm(); // Gọi hàm mở form như bình thường
+        
+        // Cập nhật tiêu đề Form để người dùng biết họ đang làm gì
+        document.getElementById('formTitle').innerText = `➕ Thêm Giai đoạn cho Dự án: ${item.title}`;
+        
+        // 1. Tách lấy Mã Dự Án gốc (Bỏ phần hậu tố Giai đoạn cũ đi)
+        let baseCode = item.yccn_code;
+		if (baseCode.includes('-')) {
+			baseCode = baseCode.substring(0, baseCode.lastIndexOf('-')).trim();
+		}
+        
+        // 2. Điền Mã dự án & Khóa lại
+        const inpCode = document.getElementById('inpCode');
+        inpCode.value = baseCode;
+        inpCode.readOnly = true;
+        inpCode.classList.add('form-readonly');
+        
+        // 3. Điền Tên dự án & Khóa lại
+        const inpTitle = document.getElementById('inpTitle');
+        inpTitle.value = item.title;
+        inpTitle.readOnly = true;
+        inpTitle.classList.add('form-readonly');
+        
+        // 4. Kế thừa Mác thép (Nếu dự án đó đang test mác thép cụ thể)
+        document.getElementById('inpGrade').value = item.grade_apply || '';
+
+        // Đảm bảo Master ID = rỗng để Backend hiểu đây là 1 Master/Tài liệu mới (cùng tên nhóm dự án)
+        document.getElementById('inpMasterId').value = ''; 
+    }
+    function addSubItem(masterId) {
+        const item = RAW_DATA.find(x => x.master_id === masterId);
+        if(!item) return;
+        
+        openAddForm(); 
+        
+        document.getElementById('formTitle').innerText = `➕ Thêm Mục con cho Chủ đề: ${item.title}`;
+        
+        // 1. Điền Tên Chủ đề & KHÓA LẠI (Gom chung 1 folder)
+        const inpTitle = document.getElementById('inpTitle');
+        inpTitle.value = item.title;
+        inpTitle.readOnly = true;
+        inpTitle.classList.add('form-readonly');
+        
+        // 2. MỞ KHÓA và LÀM TRỐNG Mã Tài liệu 
+        // (Vì phân loại tự do, mỗi mục con cần 1 mã YCCN riêng biệt để DB không báo lỗi)
+        const inpCode = document.getElementById('inpCode');
+        inpCode.value = "";
+        inpCode.readOnly = false;
+        inpCode.classList.remove('form-readonly');
+        document.getElementById('hintCode').innerText = '(Nhập mã tài liệu mới cho mục này)';
+        
+        // 3. Làm trống Mục đích để người dùng tự gõ tay mục mới
+        document.getElementById('inpUsageText').value = "";
+
+        // Đảm bảo Master ID = rỗng để Backend hiểu đây là 1 Master mới
+        document.getElementById('inpMasterId').value = ''; 
+    }
+    function cancelEdit() {
+        document.getElementById('editMode').classList.add('hidden');
+        document.getElementById('viewMode').classList.remove('hidden');
+    }
+
+    async function uploadFile() {
+        const files = document.getElementById("inpFile").files;
+        if (files.length === 0) return;
+
+        // NẾU LÀ NPD -> GỌI API MULTI UPLOAD
+        if (CUR_CAT === 'NPD') {
+            const fd = new FormData();
+            for(let i=0; i < files.length; i++){
+                fd.append("files", files[i]); 
+            }
+            
+            document.getElementById('uploadStatus').innerText = `⏳ Đang upload ${files.length} file...`;
+            try {
+                const r = await fetch("/api/yccn/upload_multi", { method: "POST", body: fd });
+                const j = await r.json();
+                if (j.status == "success") {
+                    document.getElementById("inpPdfPath").value = JSON.stringify(j.paths);
+                    document.getElementById("uploadStatus").innerHTML = `✅ Đã tải lên <b>${j.paths.length}</b> file`;
+                    document.getElementById("uploadStatus").style.color = "#059669";
+                } else {
+                    alert(j.msg);
+                    document.getElementById("uploadStatus").innerText = "❌ Lỗi upload";
+                }
+            } catch(e) { 
+                alert("Lỗi kết nối"); document.getElementById("uploadStatus").innerText = "❌ Lỗi kết nối";
+            }
+        } 
+        // CÁC DANH MỤC KHÁC -> GỌI API UPLOAD 1 FILE CŨ
+        else {
+            const f = files[0];
+            const fd = new FormData();
+            fd.append("file", f);
+            document.getElementById('uploadStatus').innerText = "⏳ Đang upload...";
+            try {
+                const r = await fetch("/api/yccn/upload", { method: "POST", body: fd });
+                const j = await r.json();
+                if (j.status == "success") {
+                    // Trả về string path thẳng như cũ
+                    document.getElementById("inpPdfPath").value = j.path;
+                    document.getElementById("uploadStatus").innerText = "✅ Đã chọn: " + f.name;
+                    document.getElementById("uploadStatus").style.color = "#059669";
+                } else {
+                    alert(j.msg);
+                    document.getElementById("uploadStatus").innerText = "❌ Lỗi upload";
+                }
+            } catch(e) { 
+                alert("Lỗi kết nối"); document.getElementById("uploadStatus").innerText = "❌ Lỗi kết nối";
+            }
+        }
+    }
+    async function saveData() {
+        let p = {
+            master_id: document.getElementById('inpMasterId').value, 
+            factory: CUR_FACTORY,
+            category: CUR_CAT,
+            yccn_code: document.getElementById("inpCode").value.trim(),
+            title: document.getElementById("inpTitle").value.trim(),
+            process: '',
+            grade_apply: document.getElementById("inpGrade").value.trim(),
+            slab_grade: document.getElementById("inpSlab").value.trim(),
+            usage_purpose: document.getElementById("inpUsageText").value.trim(),
+            pdf_path: document.getElementById("inpPdfPath").value,
+            note: document.getElementById("inpNote").value
+        };
+
+        if (CUR_CAT === 'Sản xuất nội bộ') {
+            p.process = CUR_SUB_CAT;
+            p.title = `SXNB (${CUR_SUB_CAT}) - ${p.grade_apply} - ${p.slab_grade}`;
+            if(!p.grade_apply || !p.slab_grade) { alert("Sản xuất nội bộ bắt buộc nhập Mác thép & Mác phôi!"); return; }
+        } 
+        else if (CUR_CAT === 'Sales') {
+            p.process = CUR_SUB_CAT;
+            p.title = `Phôi bán (${CUR_SUB_CAT}) - ${p.grade_apply} - ${p.slab_grade}`;
+            if(!p.slab_grade) { alert("Phôi xuất bán bắt buộc nhập Mác phôi!"); return; }
+        }
+        else if (CUR_CAT === 'NPD') {
+            p.usage_purpose = document.getElementById("inpUsageSelect").value;
+            p.yccn_code = `${p.yccn_code}-${p.usage_purpose}`;
+            if(!p.title) { alert("Thiếu Tên Dự án!"); return; }
+        } 
+        else if (CUR_CAT === 'Phân loại') {
+            // [SỬA Ở ĐÂY] Validate cho Phân loại chung
+            if(!p.title) { alert("Thiếu Chủ đề (Tên nhóm)!"); return; }
+            if(!p.usage_purpose) { alert("Thiếu Mục đích (Tên phân loại con)!"); return; }
+        }
+        else {
+            if(!p.title) { alert("Thiếu Tên tài liệu!"); return; }
+        }
+
+        if(!p.yccn_code) { alert("Thiếu Mã tài liệu!"); return; }
+        if(!p.pdf_path) { alert("Chưa có file PDF!"); return; }
+
+        if(!confirm("Xác nhận Lưu và Kích hoạt tài liệu này?")) return;
+
+        try {
+            const r = await fetch("/api/yccn/save_direct", {
+                method: "POST",
+                headers: {"Content-Type":"application/json"},
+                body: JSON.stringify(p)
+            });
+            const j = await r.json();
+            if(j.status == "success") {
+                alert(j.msg);
+                cancelEdit();
+                loadData(); 
+            } else {
+                alert(j.msg);
+            }
+        } catch(e) { alert("Lỗi hệ thống: " + e); }
+    }
+</script>
+{% endblock %}

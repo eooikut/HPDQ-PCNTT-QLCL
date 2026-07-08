@@ -1,0 +1,261 @@
+{% extends "base.html" %} 
+{% block title %}Dashboard Quản Trị Khiếu Nại{% endblock %} 
+
+{% block head %}
+<style>
+    /* Bỏ background của body vì base.html đã lo việc đó */
+
+    /* Đưa Header sát mép viền của main-content */
+    .dashboard-header { 
+        padding: 15px 25px; 
+        background: #fff; 
+        border-bottom: 1px solid #e2e8f0; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        margin: -20px -20px 25px -20px; /* Kéo giãn header bù trừ cho padding 20px của main-content */
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    
+    /* Container bung full 100% chiều ngang */
+    .dashboard-container { 
+        width: 100%; 
+        display: flex; 
+        flex-direction: column; 
+        gap: 25px; 
+        padding-bottom: 20px;
+    }
+    
+    /* KPI Cards - Sang trọng hơn, viền trên thay vì viền trái */
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+    .kpi-card { 
+        background: #fff; 
+        padding: 25px 20px; 
+        border-radius: 12px; 
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
+        border-top: 4px solid #cbd5e1; 
+        display: flex; 
+        flex-direction: column; 
+        justify-content: center; 
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .kpi-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08); }
+    
+    .kpi-card.danger { border-top-color: #ef4444; }
+    .kpi-card.warning { border-top-color: #f59e0b; }
+    .kpi-card.info { border-top-color: #3b82f6; }
+    .kpi-card.success { border-top-color: #10b981; }
+    
+    .kpi-title { font-size: 0.85em; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;}
+    .kpi-value { font-size: 2.2em; font-weight: 800; color: #0f172a; line-height: 1.2;}
+    .kpi-sub { font-size: 0.85em; color: #94a3b8; margin-top: 5px; font-style: italic;}
+
+    /* Chart Grid */
+    .chart-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+    .chart-grid-bottom { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    
+    .chart-card { 
+        background: #fff; 
+        padding: 25px; 
+        border-radius: 12px; 
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
+        display: flex; 
+        flex-direction: column; 
+    }
+    .chart-title { 
+        font-size: 1.15em; 
+        font-weight: 700; 
+        color: #1e293b; 
+        margin-bottom: 20px; 
+        display: flex; 
+        align-items: center; 
+        gap: 10px;
+    }
+    .chart-wrapper { position: relative; height: 320px; width: 100%; flex: 1; }
+
+    /* Bảng Top Khách hàng */
+    .top-table { width: 100%; border-collapse: collapse; }
+    .top-table th { background: #f8fafc; padding: 12px 15px; text-align: left; font-size: 0.85em; color: #64748b; border-bottom: 2px solid #e2e8f0; text-transform: uppercase; font-weight: 700;}
+    .top-table td { padding: 15px; border-bottom: 1px solid #f1f5f9; font-size: 0.95em; color: #334155; font-weight: 500; }
+    .top-table tr:hover td { background: #f8fafc; }
+    
+    /* Filter Area */
+    .filter-box { display: flex; gap: 12px; align-items: center; background: #f8fafc; padding: 6px 15px; border-radius: 8px; border: 1px solid #e2e8f0;}
+    .filter-input { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; font-family: 'Segoe UI', sans-serif; font-weight: 600; color: #334155;}
+    .filter-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
+    .btn-primary { background: #2563eb; color: white; border: none; padding: 9px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s;}
+    .btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <h2 style="margin: 0; color: #0f172a; display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 1.2em;">📊</span> TỔNG QUAN KHIẾU NẠI CHẤT LƯỢNG
+    </h2>
+    <div class="filter-box">
+        <span style="font-size: 0.9em; font-weight: 600; color: #64748b;">Thời gian:</span>
+        <input type="month" id="filterMonth" class="filter-input" onchange="loadDashboardData()">
+        <button onclick="loadDashboardData()" class="btn-primary">↻ Tải lại</button>
+    </div>
+</div>
+
+<div class="dashboard-container">
+    <div class="kpi-grid">
+        <div class="kpi-card danger">
+            <div class="kpi-title">Tổng Giá Trị Thiệt Hại</div>
+            <div class="kpi-value" id="kpiAmount">0 ₫</div>
+            <div class="kpi-sub">Ước tính tiền đền bù / giảm giá</div>
+        </div>
+        <div class="kpi-card warning">
+            <div class="kpi-title">Tổng Khối Lượng</div>
+            <div class="kpi-value" id="kpiWeight">0 Tan</div>
+            <div class="kpi-sub">Trọng lượng hàng bị phàn nàn</div>
+        </div>
+        <div class="kpi-card info">
+            <div class="kpi-title">Số Vụ Việc</div>
+            <div class="kpi-value" id="kpiCount">0</div>
+            <div class="kpi-sub">Biên bản khiếu nại được ghi nhận</div>
+        </div>
+        <div class="kpi-card success">
+            <div class="kpi-title">Tỷ Lệ Xử Lý (Closed)</div>
+            <div class="kpi-value" id="kpiClosedRate">0%</div>
+            <div class="kpi-sub">Tiến độ hoàn thành khiếu nại</div>
+        </div>
+    </div>
+
+    <div class="chart-grid">
+        <div class="chart-card">
+            <div class="chart-title">🏷️ Tiến độ xử lý (Status)</div>
+            <div class="chart-wrapper"><canvas id="statusChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title">🚨 Phân bổ theo Nhóm Lỗi (Defects)</div>
+            <div class="chart-wrapper"><canvas id="groupChart"></canvas></div>
+        </div>
+    </div>
+
+    <div class="chart-grid-bottom">
+        <div class="chart-card">
+            <div class="chart-title">📈 Xu hướng Khiếu nại (6 Tháng gần nhất)</div>
+            <div class="chart-wrapper"><canvas id="trendChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title">🏆 Top 5 Khách Hàng (Theo Số Vụ)</div>
+            <div style="flex: 1; overflow-y: auto;">
+                <table class="top-table">
+                    <thead>
+                        <tr>
+                            <th>Khách hàng</th>
+                            <th style="text-align: center;">Số vụ</th>
+                            <th style="text-align: right;">Khối lượng</th>
+                        </tr>
+                    </thead>
+                    <tbody id="topCustomersBody">
+                        <tr><td colspan="3" style="text-align: center; color: #94a3b8; padding: 20px;">Đang tải dữ liệu...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Định dạng số tiền VNĐ và Kg
+    const formatVND = (num) => new Intl.NumberFormat('vi-VN').format(num || 0) + ' ₫';
+    const formatKg = (num) => new Intl.NumberFormat('en-US').format(num || 0) + ' Tan';
+
+    let charts = {};
+
+    window.onload = () => {
+        // Mặc định set filter là tháng hiện tại
+        const now = new Date();
+        document.getElementById('filterMonth').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        
+        initCharts();
+        loadDashboardData();
+    };
+
+    function initCharts() {
+        // Chart 1: Trạng thái (Doughnut)
+        charts.status = new Chart(document.getElementById('statusChart'), {
+            type: 'doughnut',
+            data: { labels: [], datasets: [{ data: [], backgroundColor: ['#f59e0b', '#3b82f6', '#10b981'], borderWidth: 0 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 20, font: {family: "'Segoe UI', sans-serif", weight: '600'} } } }, cutout: '70%' }
+        });
+
+        // Chart 2: Nhóm Lỗi (Bar)
+        charts.group = new Chart(document.getElementById('groupChart'), {
+            type: 'bar',
+            data: { labels: [], datasets: [{ label: 'Số vụ', data: [], backgroundColor: '#6366f1', borderRadius: 6 }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { borderDash: [4, 4] } }, x: { grid: { display: false } } }, plugins: { legend: { display: false } } }
+        });
+
+        // Chart 3: Xu hướng (Line)
+        charts.trend = new Chart(document.getElementById('trendChart'), {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Số vụ việc', data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', fill: true, tension: 0.4, pointBackgroundColor: '#ef4444', pointBorderWidth: 2, pointRadius: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { borderDash: [4, 4] } }, x: { grid: { display: false } } }, plugins: { legend: { display: false } } }
+        });
+    }
+
+    async function loadDashboardData() {
+        const monthFilter = document.getElementById('filterMonth').value;
+        try {
+            const res = await fetch('/api/dashboard_complaints', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ month: monthFilter })
+            });
+            const result = await res.json();
+            if (result.status === 'success') {
+                updateUI(result.data);
+            }
+        } catch (e) {
+            console.error("Lỗi lấy dữ liệu Dashboard", e);
+        }
+    }
+
+    function updateUI(data) {
+        // 1. Update KPIs
+        document.getElementById('kpiAmount').innerText = formatVND(data.kpi.total_amount);
+        document.getElementById('kpiWeight').innerText = formatKg(data.kpi.total_weight);
+        document.getElementById('kpiCount').innerText = data.kpi.total_count;
+        
+        let rate = data.kpi.total_count > 0 ? Math.round((data.kpi.closed_count / data.kpi.total_count) * 100) : 0;
+        document.getElementById('kpiClosedRate').innerText = `${rate}%`;
+
+        // 2. Update Charts
+        charts.status.data.labels = data.status_chart.map(x => x.status);
+        charts.status.data.datasets[0].data = data.status_chart.map(x => x.count);
+        charts.status.update();
+
+        charts.group.data.labels = data.group_chart.map(x => x.group);
+        charts.group.data.datasets[0].data = data.group_chart.map(x => x.count);
+        charts.group.update();
+
+        charts.trend.data.labels = data.trend_chart.map(x => x.month);
+        charts.trend.data.datasets[0].data = data.trend_chart.map(x => x.count);
+        charts.trend.update();
+
+        // 3. Update Table Top Customers
+        const tbody = document.getElementById('topCustomersBody');
+        if (!data.top_customers || data.top_customers.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #94a3b8; padding: 20px;">Không có dữ liệu</td></tr>';
+        } else {
+            tbody.innerHTML = data.top_customers.map(c => `
+                <tr>
+                    <td><strong style="color:#2563eb">${c.customer_name}</strong></td>
+                    <td style="text-align: center;">
+                        <span style="background: #f1f5f9; padding: 4px 10px; border-radius: 12px; font-weight: bold; color: #475569;">${c.count}</span>
+                    </td>
+                    <td style="text-align: right; color:#b91c1c; font-family: monospace; font-size: 1.1em;">${formatKg(c.weight)}</td>
+                </tr>
+            `).join('');
+        }
+    }
+</script>
+{% endblock %}

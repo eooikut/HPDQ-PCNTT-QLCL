@@ -58,32 +58,38 @@ def get_heatmap_matrix():
         shift_filter = req.get('shift', 'ALL')
         coil_ids_raw = req.get('coil_ids', '')
         po_ids_raw = req.get('po_ids', '')
+        so_mapping = req.get('so_mapping', '').strip()
         # 2. XÂY DỰNG QUERY TRUY VẤN SQL LINH HOẠT
         conn = db.get_connection()
         cursor = conn.cursor()
         
         sql = "SELECT coil_id, weight, production_date, Ca, scores, [Order], prime_status, qc_status FROM coil_data WITH (NOLOCK) WHERE 1=1"
         params = []
-
-        # Nếu người dùng tìm đích danh ID cuộn
         if coil_ids_raw:
             ids = [x.strip().upper() for x in re.split(r'[\s,;]+', coil_ids_raw) if x.strip()]
             if ids:
                 placeholders = ','.join(['?'] * len(ids))
                 sql += f" AND coil_id IN ({placeholders})"
                 params.extend(ids)
-
-        # 2. THÊM MỚI: Logic lọc theo danh sách PO (Cột [Order])
-        if po_ids_raw:
-            # Tách chuỗi PO, hỗ trợ dấu phẩy, dấu cách hoặc xuống dòng
+                
+        # ƯU TIÊN 2: PO / ORDER (Chỉ chạy nếu không có ID Cuộn)
+        elif po_ids_raw:
             pos = [x.strip() for x in re.split(r'[\s,;]+', po_ids_raw) if x.strip()]
             if pos:
                 placeholders = ','.join(['?'] * len(pos))
-                sql += f" AND [Order] IN ({placeholders})" # Cột Order trong DB
+                sql += f" AND [Order] IN ({placeholders})" 
                 params.extend(pos)
-
-        # 3. Nếu không lọc theo ID/PO cụ thể thì mới dùng bộ lọc Ngày/Nhà máy
-        if not coil_ids_raw and not po_ids_raw:
+                
+        # ƯU TIÊN 3: SO MAPPING (Chỉ chạy nếu không có ID Cuộn và PO)
+        elif so_mapping:
+            sql += """ AND [Order] IN (
+                SELECT [Order] FROM order_production_rules WITH (NOLOCK) 
+                WHERE SO_mapping = ?
+            )"""
+            params.append(so_mapping)
+            
+        # ƯU TIÊN 4: LỌC NGÀY & NHÀ MÁY (Mặc định)
+        else:
             sql += " AND factory = ?"
             params.append(factory)
             if start_date:

@@ -138,6 +138,10 @@
             <input type="date" id="f_end" class="filter-input">
         </div>
         <div class="filter-group">
+            <label>📑 SO MAPPING</label>
+            <input type="text" id="f_so" class="filter-input" placeholder="Nhập 1 mã SO..." style="width: 200px;">
+        </div>
+        <div class="filter-group">
             <label>🧾 PO/ORDER</label>
             <input type="text" id="f_pos" class="filter-input" 
                     placeholder="Nhập PO (cách nhau phẩy)...)" 
@@ -336,7 +340,8 @@ const DEFECT_NAMES = {
             start_date: document.getElementById('f_start').value,
             end_date: document.getElementById('f_end').value,
             coil_ids: document.getElementById('f_ids').value,
-            po_ids: document.getElementById('f_pos').value
+            po_ids: document.getElementById('f_pos').value,
+            so_mapping: document.getElementById('f_so').value
         };
 
         if(typeof showLoading === 'function') showLoading();

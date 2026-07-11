@@ -360,10 +360,17 @@ def sync_tphh_from_slabs(coil_slab_map, factory_id="HRC1"):
                 keys = list(final_data_map.keys())
                 
                 query = f"""
-                    SELECT coil_id, raw_data, grade, scores, is_checked, 
-                        weight, target_thick, target_width, production_date, slab_grade,
-                        Temperature, Speed  ,TARGET_LV2
-                    FROM coil_data WITH (NOLOCK) WHERE coil_id IN ({placeholders})
+                    SELECT c.coil_id, c.raw_data, c.grade, c.scores, c.is_checked, 
+                        c.weight, c.target_thick, c.target_width, c.production_date, c.slab_grade,
+                        c.Temperature, c.Speed, c.TARGET_LV2
+                    FROM coil_data c WITH (NOLOCK) 
+                    WHERE c.coil_id IN ({placeholders})
+                    AND NOT EXISTS (
+                        SELECT 1 
+                        FROM sanluong sl WITH (NOLOCK) 
+                        WHERE sl.[ID Cuộn bó] = c.coil_id 
+                            AND sl.[Đã nhập kho] = N'Yes'
+                    )
                 """
                 cursor = conn_local.cursor()
                 cursor.execute(query, keys)
@@ -850,8 +857,15 @@ def sync_properties_mysql(target_ids=None,factory_id="HRC1"):
                     placeholders = ','.join('?' * len(clean_ids_found))
                     
                     query = f"""
-                        SELECT coil_id, raw_data, grade, scores, is_checked , quality_level, TARGET_LV2
-                        FROM coil_data WITH (NOLOCK) WHERE coil_id IN ({placeholders})
+                        SELECT c.coil_id, c.raw_data, c.grade, c.scores, c.is_checked, c.quality_level, c.TARGET_LV2
+                        FROM coil_data c WITH (NOLOCK) 
+                        WHERE c.coil_id IN ({placeholders})
+                        AND NOT EXISTS (
+                            SELECT 1 
+                            FROM sanluong sl WITH (NOLOCK) 
+                            WHERE sl.[ID Cuộn bó] = c.coil_id 
+                                AND sl.[Đã nhập kho] = N'Yes'
+                        )
                     """
                     
                     cursor = conn_local.cursor()
@@ -867,7 +881,8 @@ def sync_properties_mysql(target_ids=None,factory_id="HRC1"):
 
                 for cid, new_props in final_data_map.items():
                     curr = existing_map.get(cid, {})
-                    
+                    if not curr:
+                        continue
                     # Merge Raw Data
                     old_raw = json.loads(curr['raw_data']) if curr.get('raw_data') else {}
                     final_raw = old_raw.copy()

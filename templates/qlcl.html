@@ -242,9 +242,11 @@
                 <option value="FINAL">Đã chốt (FINAL)</option>
                 <option value="LAY_MAU">Lấy Mẫu</option>
                 <option value="SKIN_CUST">Chờ SKIN Khách đặt</option>
+                <option value="SKIN_RCL_AGAIN">Chờ SKIN/RCL lại</option>
                 <option value="SKIN">Chờ SKIN </option>
                 <option value="RCL">Chờ RCL</option>
                 <option value="CXL">Chờ CXL (Xử lý tay)</option>
+                <option value="CXL_L2">Chờ CXL loại 2</option>
                 <option value="NULL">Chưa có lệnh</option>
             </select>
             
@@ -308,9 +310,11 @@
                     <option value="FINAL" style="color:#0369a1;">Đã chốt (FINAL)</option>
                     <option value="LAY_MAU" style="color:#16a34a;">Lấy Mẫu</option>
                     <option value="SKIN_CUST" style="color:#c2410c;">Chờ SKIN Khách đặt</option>
+                    <option value="SKIN_RCL_AGAIN" style="color:#ea580c;">Chờ SKIN/RCL lại</option>
                     <option value="SKIN" style="color:#b45309;">Chờ SKIN </option>
                     <option value="RCL" style="color:#7e22ce;">Chờ RCL</option>
                     <option value="CXL" style="color:#059669;">Chờ CXL (Xử lý tay)</option>
+                    <option value="CXL_L2" style="color:#047857;">Chờ CXL loại 2</option>
                     <option value="NULL" style="color:#475569;">Chưa có lệnh</option>
                 </select>
 				
@@ -786,21 +790,6 @@
                     style="padding: 10px 20px; background: #64748b; color: white; border: none; border-radius: 6px; cursor: pointer;">
                 ❌ Không chọn đơn hàng nào (Tiếp tục hạ cấp)
             </button>
-        </div>
-    </div>
-</div>
-<!-- MODAL ƯỚM THỬ TDC ORDER -->
-<div id="mdlPreviewTdc" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 9999; backdrop-filter: blur(2px);">
-    <div style="background: #ffffff; width: 440px; margin: 12% auto; padding: 25px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-            <span style="font-size: 1.5rem;">🔍</span>
-            <h3 style="font-size: 1.2rem; font-weight: bold; color: #1e293b; margin: 0;">Ướm thử Tiêu chuẩn Order</h3>
-        </div>
-        <p style="font-size: 0.9rem; color: #64748b; line-height: 1.5; margin-bottom: 12px;">Nhập mã Order để xem trước dải tiêu chuẩn (khung màu xanh) trên biểu đồ Radar. Việc này KHÔNG ảnh hưởng đến dữ liệu lưu trữ.</p>
-        <input type="text" id="txtPreviewOrderId" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem; font-weight: bold; outline: none; font-family: monospace;" placeholder="VD: SO-2026-0001...">
-        <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
-            <button onclick="closePreviewTdcModal()" style="padding: 8px 16px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; color: #475569; cursor: pointer; font-weight: bold;">Hủy bỏ</button>
-            <button onclick="executePreviewTdc()" style="padding: 8px 18px; border: none; border-radius: 6px; color: white; cursor: pointer; font-weight: bold; background: #f59e0b; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);">🔍 Tải Tiêu Chuẩn</button>
         </div>
     </div>
 </div>

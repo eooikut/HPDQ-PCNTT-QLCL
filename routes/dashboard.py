@@ -47,11 +47,15 @@ def export_excel_qc():
                    c.[Order], c.TieuChuan, c.Ca,
                    c.prime_status, c.qc_status, c.mapped_po, c.rework_status, c.qc_msg,
                    tm.tdc_code,
-                   sl.[Ngày sản xuất] AS sl_production_date
+                   -- Dùng COALESCE thay cho ISNULL để quét 3 tầng dữ liệu một cách an toàn
+                   COALESCE(sl1.[Ngày sản xuất], sl2.[Ngày sản xuất]) AS sl_production_date
             FROM coil_data c WITH (NOLOCK)
             LEFT JOIN tdc_versions tv WITH (NOLOCK) ON c.target_tdc_version_id = tv.id
             LEFT JOIN tdc_master tm WITH (NOLOCK) ON tv.master_id = tm.id
-            LEFT JOIN sanluong sl WITH (NOLOCK) ON c.coil_id = sl.[ID Cuộn Bó]
+            -- JOIN lần 1: Lấy sản lượng theo mã cuộn gốc
+            LEFT JOIN sanluong sl1 WITH (NOLOCK) ON c.coil_id = sl1.[ID Cuộn Bó]
+            -- JOIN lần 2: Lấy sản lượng theo mã cuộn xử lý
+            LEFT JOIN sanluong sl2 WITH (NOLOCK) ON c.ID_XuLy = sl2.[ID Cuộn Bó]
             WHERE 1=1
         """
         
@@ -575,6 +579,7 @@ def render_dashboard_logic(msg=None):
                    c.stage1_penalty, c.stage2_penalty,
                    c.downgrade_reason,
                    ISNULL(r.is_skin_required, 0) as is_skin_required,
+                   r.alloc_thick,
                    c.[Order] as original_order,
                    tm.tdc_code,
                    c.TARGET_LV2,
@@ -673,6 +678,7 @@ def render_dashboard_logic(msg=None):
             'prime_status': r['prime_status'] if 'prime_status' in r and r['prime_status'] else '',
             'downgrade_reason': r['downgrade_reason'] if 'downgrade_reason' in r and r['downgrade_reason'] else '',
             'is_skin_required': r['is_skin_required'] if 'is_skin_required' in r else 0, 
+            'alloc_thick': float(r['alloc_thick']) if 'alloc_thick' in r and r['alloc_thick'] is not None else 0.0,
             'original_order': r['original_order'] if 'original_order' in r and r['original_order'] else '---',
             'tdc_code': r['tdc_code'] if 'tdc_code' in r and r['tdc_code'] else '---',
             'TARGET_LV2': float(r['TARGET_LV2'] or 0.0),
@@ -784,6 +790,8 @@ def regenerate_dashboard_data(all_data, selected_grade):
         frontend_obj['prime_status'] = d.get('prime_status', '')
         frontend_obj['downgrade_reason'] = d.get('downgrade_reason', '')
         frontend_obj['is_skin_required'] = d.get('is_skin_required', 0)
+        frontend_obj['alloc_thick'] = d.get('alloc_thick', 0.0)
+        frontend_obj['TARGET_LV2'] = d.get('TARGET_LV2', 0.0)
         frontend_obj['original_order'] = d.get('original_order', '---')
         frontend_obj['tdc_code'] = d.get('tdc_code', '---')
         frontend_obj['stage1_penalty'] = d.get('stage1_penalty', 0) 
@@ -890,10 +898,18 @@ def recalc_scores_by_grade():
         conn = db.get_connection()
         cursor = conn.cursor()
         query = """
-            SELECT coil_id, raw_data, grade, scores, is_checked, factory,
-                production_date, slab_grade, weight, target_thick, target_width, note_qc ,quality_level, Temperature, Speed, TARGET_LV2
-            FROM coil_data WITH (NOLOCK) 
-            WHERE production_date >= '2026-07-01 08:00:00'  and grade = ?
+            SELECT c.coil_id, c.raw_data, c.grade, c.scores, c.is_checked, c.factory,
+                c.production_date, c.slab_grade, c.weight, c.target_thick, c.target_width, c.note_qc, c.quality_level, c.Temperature, c.Speed, c.TARGET_LV2
+            FROM coil_data c WITH (NOLOCK) 
+            WHERE c.production_date >= '2026-07-01 08:00:00'  
+              AND c.grade = ?
+              -- [MỚI THÊM] Bỏ qua việc tính lại điểm nếu cuộn đã được nhập kho
+              AND NOT EXISTS (
+                  SELECT 1 
+                  FROM sanluong sl WITH (NOLOCK) 
+                  WHERE sl.[ID Cuộn bó] = c.coil_id 
+                    AND sl.[Đã nhập kho] = N'Yes'
+              )
         """
         cursor.execute(query, (target_grade,))
         rows = db.fetchall_as_dict(cursor)
@@ -934,7 +950,7 @@ def recalc_scores_by_grade():
                         MECH_KEYS = [
                             'YieldPoint', 'Tensile', 'Elongation', 'Hardness',
                             'C', 'Mn', 'Si', 'P', 'S', 'Cu', 'Ni', 'Cr', 'Mo', 
-                            'V', 'Ti', 'Al', 'Ca', 'B', 'Nb', 'CEV', 'O', 'N', 'H','Crown','WidthDiff'
+                            'V', 'Ti', 'Al', 'Ca', 'B', 'Nb', 'CEV', 'O', 'N', 'H'
                         ]
                         
                         for k, v in new_scores.items():
@@ -1248,8 +1264,12 @@ def save_manual_data():
                 
                 if weight_diff > 0: 
                     if prod_status == 'MTO':
+                        if total_allowed <= 100000:
+                            max_allowed = total_allowed * 1.20 # Dung sai 20% cho đơn <= 100,000
+                        else:
+                            max_allowed = total_allowed * 1.10
                         # NẾU CÒN ROOM: Lấy so_mapping, nếu rỗng thì gán '1' (Chờ SO)
-                        if new_fulfilled <= total_allowed:
+                        if new_fulfilled <= max_allowed:
                             final_mapped_po = so_mapping if so_mapping else '1'
                         else:
                             final_mapped_po = '0'
@@ -1492,6 +1512,7 @@ def get_latest_coils():
                 c.stage1_penalty, c.stage2_penalty,
                 c.downgrade_reason,
                 ISNULL(r.is_skin_required, 0) as is_skin_required,
+                r.alloc_thick,
                 c.quality_class, c.prime_status,
                 c.[Order] as original_order,
                 tm.tdc_code,
@@ -1621,6 +1642,8 @@ def get_latest_coils():
             frontend_obj['rework_status'] = r['rework_status'] or ''
             frontend_obj['suggested_order_map'] = r['suggested_order_map'] or ''
             frontend_obj['is_skin_required'] = r['is_skin_required']
+            frontend_obj['alloc_thick'] = float(r['alloc_thick'] or 0.0)
+            frontend_obj['TARGET_LV2'] = float(r['TARGET_LV2'] or 0.0)
             frontend_obj['qc_msg'] = r['qc_msg'] or ''
             frontend_obj['quality_class'] = r.get('quality_class', '')  
             frontend_obj['prime_status'] = r.get('prime_status', '')
@@ -1863,75 +1886,83 @@ def downgrade_coil():
         if order_id is not None:
             order_id = str(order_id).strip()
         # 2. Logic tính toán và cập nhật sản lượng đơn hàng (🌟 ĐÃ FIX LỖI TRỪ KÉP & BẢO TOÀN NON-PRIME)
+        new_mapped_po = '0' # Mặc định đẩy về tồn kho tự do (MTS)
+        
         if order_id:
-            cursor.execute("SELECT fulfilled_weight FROM order_production_rules WITH (UPDLOCK, ROWLOCK) WHERE [Order] = ?", (order_id,))
+            # Sửa: Lấy thêm total_weight để làm mốc tính dung sai
+            cursor.execute("SELECT fulfilled_weight, total_weight FROM order_production_rules WITH (UPDLOCK, ROWLOCK) WHERE [Order] = ?", (order_id,))
             order_row = cursor.fetchone()
+            
             if order_row:
                 current_fulfilled = float(order_row[0] or 0)
+                total_allowed = float(order_row[1] or 0)
                 
-                # QUY TẮC VÀNG: Cuộn này trước đó có đang được tính vào sản lượng không? (Phải PASS và là LOẠI 1)
+                # QUY TẮC VÀNG: Cuộn này trước đó có đang được tính vào sản lượng không?
                 is_currently_counted = (old_qc_status == 'PASS') and (old_q_class == 'LOAI_1')
                 
-                # SỬA LẠI LOGIC NÀY:
                 new_fulfilled = current_fulfilled
                 should_update_order = False
 
-                if is_currently_counted and action_type == 'SCRAP':
-                    # Đang tính mà bị vứt đi -> Trừ ra
-                    new_fulfilled = max(0, current_fulfilled - coil_weight)
-                    should_update_order = True
-                elif not is_currently_counted and action_type == 'NON_PRIME':
-                    # Đang rớt mà được hạ cấp thành LOAI_1 -> Cộng vào
-                    new_fulfilled = current_fulfilled + coil_weight
-                    should_update_order = True
+                # TRƯỜNG HỢP 1: XUỐNG PHẾ (SCRAP - LOẠI 2)
+                if action_type == 'SCRAP':
+                    if is_currently_counted:
+                        # Đang tính mà bị vứt đi -> Trừ khối lượng ra khỏi tiến độ
+                        new_fulfilled = max(0, current_fulfilled - coil_weight)
+                        should_update_order = True
+                    new_mapped_po = '0' # Phế thì vĩnh viễn mất cờ
+
+                # TRƯỜNG HỢP 2: HẠ CẤP THƯƠNG PHẨM (NON-PRIME - LOẠI 1)
+                elif action_type == 'NON_PRIME':
+                    # A. TÍNH TOÁN KHỐI LƯỢNG: Vì là LOẠI 1, nếu trước đó chưa cộng thì BẮT BUỘC CỘNG
+                    if not is_currently_counted:
+                        new_fulfilled = current_fulfilled + coil_weight
+                        should_update_order = True
                     
+                    # B. DUYỆT CỜ PO DỰA TRÊN NGƯỠNG DUNG SAI KHỐI LƯỢNG
+                    if prod_status == 'MTO':
+                        if total_allowed <= 100000:
+                            max_allowed = total_allowed * 1.20 # Dung sai 20% cho đơn <= 100,000
+                        else:
+                            max_allowed = total_allowed * 1.10 # Ngưỡng an toàn 120%
+                        
+                        if new_fulfilled <= max_allowed:
+                            # Còn Room -> Vừa được cộng khối lượng, vừa được cầm cờ PO
+                            new_mapped_po = so_mapping if so_mapping else '1'
+                        else:
+                            # Tràn Room (> 120%) -> Vẫn là hàng Loại 1 của nhà máy, 
+                            # nhưng Đơn hàng này không nhận nữa -> Tước cờ, đẩy về MTS
+                            new_mapped_po = '0'
+                    else:
+                        # Hàng MTS (Make to Stock) thì mặc định không cầm cờ
+                        new_mapped_po = '0'
+
+                # Thực thi Update sản lượng Order nếu có sự xê dịch (Cộng hoặc Trừ)
                 if should_update_order:
                     cursor.execute("""
                         UPDATE order_production_rules 
                         SET fulfilled_weight = ? 
                         WHERE [Order] = ?
                     """, (new_fulfilled, order_id))
-        # 3. XỬ LÝ LÝ DO HẠ CẤP (Ghi trực tiếp vào cột mới, TUYỆT ĐỐI KHÔNG ĐỤNG note_qc)
+
+        # 3. XỬ LÝ LÝ DO HẠ CẤP (Bảo toàn Ghi chú QC gốc)
         import datetime
         now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        # Tạo chuỗi ghi chú rõ ràng có kèm tên người hạ cấp
         action_log = f"[{now_str} - {user}]: {note}"
 
-        # 4. Định nghĩa cấp chất lượng
+        # 4. Định nghĩa Cấp chất lượng
         final_q_class = 'LOAI_1' if action_type == 'NON_PRIME' else 'LOAI_2'
         final_p_status = action_type 
 
-        # 5. CẬP NHẬT CHỐT: Ghi vào downgrade_reason
-        new_mapped_po = '0' # Mặc định là Tồn kho (MTS)
-        if action_type == 'NON_PRIME':
-            if prod_status == 'MTO':
-                if so_mapping:
-                    # Nếu đã có SO mapping từ Kế hoạch -> Kéo sang
-                    new_mapped_po = so_mapping
-                else:
-                    # Nếu là hàng Đặt (MTO) nhưng chưa có mã SO -> Gán cờ '1' (Chờ SO)
-                    new_mapped_po = '1'
-        
-        # 5. CẬP NHẬT CHỐT: Ép mapped_po vào câu SQL
-        if action_type == 'SCRAP':
-            # Phế thì luôn trả về 0
-            cursor.execute("""
-                UPDATE coil_data 
-                SET prime_status = ?, quality_class = ?, 
-                    downgrade_reason = ?, mapped_po = '0', rework_status = 'FINAL', qc_status = 'PASS'
-                WHERE coil_id = ?
-            """, (final_p_status, final_q_class, action_log, coil_id))
-        else:
-            # NON-PRIME thì dùng biến new_mapped_po vừa tính toán
-            cursor.execute("""
-                UPDATE coil_data 
-                SET prime_status = ?, quality_class = ?, 
-                    downgrade_reason = ?, mapped_po = ?, rework_status = 'FINAL', qc_status = 'PASS'
-                WHERE coil_id = ?
-            """, (final_p_status, final_q_class, action_log, new_mapped_po, coil_id))
+        # 5. CẬP NHẬT CHỐT DỮ LIỆU CUỘN VÀO DB
+        # Sử dụng biến new_mapped_po đã được bộ lọc dung sai phía trên phê duyệt
+        cursor.execute("""
+            UPDATE coil_data 
+            SET prime_status = ?, quality_class = ?, 
+                downgrade_reason = ?, mapped_po = ?, rework_status = 'FINAL', qc_status = 'PASS'
+            WHERE coil_id = ?
+        """, (final_p_status, final_q_class, action_log, new_mapped_po, coil_id))
 
-        # 6. Ghi log lịch sử thay đổi
+        # 6. Ghi log lịch sử thay đổi (Giữ nguyên đoạn này của bạn)
         cursor.execute("""
             INSERT INTO audit_log_qlcl (coil_id, user_name, defect_key, old_value, new_value, changed_at) 
             VALUES (?, ?, ?, ?, ?, ?)
@@ -2015,8 +2046,9 @@ def recommend_order():
 
             # Nếu mô phỏng PASS -> Đưa vào danh sách ứng viên
             if total_penalty == 0:
+                max_allowed = total_w * 1.20
                 # Đánh giá Room (Còn dung lượng hay không)
-                has_room = (fulfilled_w + coil_weight) <= total_w
+                has_room = (fulfilled_w + coil_weight) <= max_allowed
                 remaining = total_w - fulfilled_w
                 
                 suggested_orders.append({
@@ -2140,7 +2172,7 @@ def complete_cxl():
         row = cursor.fetchone()
         
         # Nếu cuộn không tồn tại hoặc trạng thái hiện tại không hợp lệ
-        valid_statuses = ['CXL', 'RCL', 'SKIN', 'SKIN_CUST', 'LAY_MAU']
+        valid_statuses = ['CXL', 'RCL', 'SKIN', 'SKIN_CUST', 'LAY_MAU','CXL_L2','SKIN_RCL_AGAIN']
         if not row or row[0] not in valid_statuses:
             return jsonify({'status': 'error', 'msg': 'Cuộn không ở trạng thái gia công hợp lệ để mở khóa.'})
             
@@ -2172,6 +2204,7 @@ def complete_cxl():
 def undo_downgrade():
     req = request.json
     coil_id = req.get('coil_id')
+    target_rework = req.get('target_rework', 'NULL')
     user = session.get('username', 'Unknown')
 
     if not coil_id:
@@ -2224,11 +2257,11 @@ def undo_downgrade():
                 quality_class = NULL, 
                 downgrade_reason = NULL, 
                 mapped_po = NULL, 
-                rework_status = 'NULL', 
+                rework_status = ?,
                 qc_status = 'FAIL',
                 updated_at = GETDATE()
             WHERE coil_id = ?
-        """, (coil_id,))
+        """, (target_rework, coil_id))
 
         # 4. Ghi log lịch sử hệ thống
         log_action_name = f'UNDO_DOWNGRADE: {p_status} -> FAIL'

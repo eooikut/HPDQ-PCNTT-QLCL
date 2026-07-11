@@ -10,6 +10,23 @@
     {% block head %}{% endblock %}
 </head>
 <style>
+    /* Ẩn tên người dùng và chữ "Đăng xuất" khi thu nhỏ sidebar */
+    .sidebar.collapsed .user-profile .user-name,
+    .sidebar.collapsed .user-profile .logout-text {
+        display: none;
+    }
+
+    /* Căn giữa nút Đăng xuất (lúc này chỉ còn icon) */
+    .sidebar.collapsed .user-profile {
+        justify-content: center !important;
+        gap: 0 !important;
+    }
+
+    /* Bo lại nút Đăng xuất cho gọn gàng khi ở dạng icon */
+    .sidebar.collapsed .btn-logout {
+        padding: 10px !important;
+        border-radius: 8px !important;
+    }
     /* --- TOAST NOTIFICATION MODERN --- */
     .toast-notification {
         position: fixed;
@@ -262,21 +279,21 @@
             {% endif %}
         </nav>
 
-        <div class="user-profile" style="display: flex; align-items: center; gap: 15px;">
+        <div class="user-profile" style="display: flex; align-items: center; gap: 15px; padding: 15px 0;">
             <span class="user-name" style="font-weight: 600; color: #334155;">
                 👤 {{ session.get('username', 'Người dùng') }}
             </span>
 
             <a href="{{ url_for('auth.logout') }}" class="btn-logout" 
-            style="display: flex; align-items: center; gap: 5px; padding: 6px 12px; background-color: #ef4444; color: white; text-decoration: none; border-radius: 6px; font-size: 0.85em; font-weight: bold; transition: background 0.2s;"
+            style="display: flex; align-items: center; gap: 5px; padding: 8px 12px; background-color: #ef4444; color: white; text-decoration: none; border-radius: 6px; font-size: 0.85em; font-weight: bold; transition: all 0.2s;"
             onmouseover="this.style.backgroundColor='#dc2626'" 
             onmouseout="this.style.backgroundColor='#ef4444'">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                     <polyline points="16 17 21 12 16 7"></polyline>
                     <line x1="21" y1="12" x2="9" y2="12"></line>
                 </svg>
-                Đăng xuất
+                <span class="logout-text">Đăng xuất</span>
             </a>
         </div>
     </aside>

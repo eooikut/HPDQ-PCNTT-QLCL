@@ -26,9 +26,9 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-def permission_required(permission):
+def permission_required(*permissions):
     """
-    Đảm bảo người dùng có quyền cụ thể HOẶC là admin
+    Đảm bảo người dùng có ÍT NHẤT 1 quyền trong danh sách yêu cầu HOẶC là admin
     """
     def decorator(f):
         @wraps(f)
@@ -37,18 +37,19 @@ def permission_required(permission):
             role = session.get('role', '')
             perms = session.get('permissions', [])
             
-            # ĐIỀU KIỆN VÀNG: Nếu là admin HOẶC có quyền cụ thể HOẶC có quyền 'all'
-            if role == 'admin' or permission in perms or 'all' in perms:
+            # ĐIỀU KIỆN VÀNG (Nâng cấp): 
+            # Nếu là admin HOẶC có quyền 'all' HOẶC có ít nhất 1 quyền khớp với yêu cầu
+            if role == 'admin' or 'all' in perms or any(p in perms for p in permissions):
                 return f(*args, **kwargs)
                 
-            # XỬ LÝ KHI BỊ CHẶN (Không có quyền):
+            # XỬ LÝ KHI BỊ CHẶN (Giữ nguyên 100% logic của bạn):
             # 1. Nếu Frontend đang gọi API ngầm lấy dữ liệu -> Trả về lỗi JSON
             if request.path.startswith('/api/') or request.path.startswith('/save_') or request.path.startswith('/get_'):
                 return jsonify({'status': 'error', 'msg': 'Bạn không có thẩm quyền (Forbidden)!'}), 403
                 
             # 2. Nếu Frontend đang load một trang web -> Đẩy về trang báo lỗi
             flash("Bạn không có quyền truy cập chức năng này.", "danger")
-            return render_template('403.html') # Hoặc đổi thành return redirect(url_for('auth.login'))
+            return render_template('403.html') 
             
         return decorated_function
     return decorator

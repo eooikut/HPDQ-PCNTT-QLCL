@@ -10,11 +10,21 @@ from auth.decorator import login_required, permission_required
 config_bp = Blueprint('config_bp', __name__)
 upload_lock = threading.Lock()
 @config_bp.route('/config_page', methods=['GET'])
-@permission_required('config_manage')
-def config_page(): return render_template('config_grade.html')
+@permission_required('config_view', 'config_manage')
+def config_page(): 
+    # 1. Lấy role và permissions từ session ra
+    role = session.get('role', '')
+    perms = session.get('permissions', [])
+    
+    # 2. ÁP DỤNG ĐIỀU KIỆN VÀNG:
+    # Tài khoản được phép SỬA khi: Là admin HOẶC có quyền 'all' HOẶC có quyền 'config_manage'
+    can_edit = (str(role).lower() == 'admin' or 'all' in perms or 'config_manage' in perms)
+    
+    # 3. Truyền xuống giao diện
+    return render_template('config_grade.html', can_edit=can_edit)
 
 @config_bp.route('/api/grade_configs', methods=['GET'])
-@permission_required('config_manage')
+@permission_required('config_view', 'config_manage')
 def api_get_configs(): return jsonify(sanitize_data(get_all_grade_configs()))
 
 # API LƯU CẤU HÌNH ĐIỂM SỐ
@@ -73,7 +83,7 @@ def api_save_configs():
     finally:
         if conn: conn.close()
 @config_bp.route('/api/get_grade_criteria', methods=['GET'])
-@permission_required('config_manage')
+@permission_required('config_view', 'config_manage')
 def get_grade_criteria():
     """Trả về danh sách các lỗi/chỉ tiêu của một Mác thép để hiện lên Dropdown"""
     try:
